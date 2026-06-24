@@ -1,87 +1,40 @@
 import { useContext, useEffect, useMemo, useRef } from 'react';
-import { PageHeader } from '../components/common/PageHeader';
+import { Cpu, HardDrive, MessageSquareMore, Mic, Video } from 'lucide-react';
 import { FilterContext } from '../app/FilterContext';
 import { superadminDemoData } from '../demo-data/superadminDemoData';
 import { selectFacts, sumMetric, timeSeries } from '../demo-data/superadminSelectors';
 import { areaChart, stackedBar } from '../utils/chartHelpers';
-import { formatNumber, formatCurrency, formatPercent, envBadge } from '../utils/dashboardUtils';
+import { deltaPercent, formatNumber } from '../utils/dashboardUtils.jsx';
 
 const metricCards = [
-  { key: 'messages', label: 'Messages', icon: 'messages-square', tone: 'primary' },
-  { key: 'tokens', label: 'OpenAI tokens', icon: 'cpu', tone: 'emerald' },
-  { key: 'videoMins', label: 'Video minutes', icon: 'video', tone: 'violet' },
-  { key: 'voiceChars', label: 'Voice chars', icon: 'mic', tone: 'sky' },
-  { key: 'storageGB', label: 'Storage (GB)', icon: 'hard-drive', tone: 'amber' },
+  { key: 'messages', label: 'Messages', icon: MessageSquareMore, tone: 'indigo' },
+  { key: 'tokens', label: 'OpenAI tokens', icon: Cpu, tone: 'emerald' },
+  { key: 'videoMins', label: 'Video minutes', icon: Video, tone: 'violet' },
+  { key: 'voiceChars', label: 'Voice chars', icon: Mic, tone: 'sky' },
+  { key: 'storageGB', label: 'Storage (GB)', icon: HardDrive, tone: 'amber' },
 ];
+
+function formatScopeLabel(filters) {
+  if (filters.envs.length === superadminDemoData.ENVS.length) {
+    return `All envs · last ${filters.range}`;
+  }
+  const separator = filters.envs.length > 1 ? ' + ' : ', ';
+  const envLabel = filters.envs.map((env) => superadminDemoData.ENV_META[env]?.label ?? env).join(separator);
+  return `${envLabel} · last ${filters.range}`;
+}
+
+function formatAxisMillions(value) {
+  if (value === 0) return '0';
+  return `${(value / 1e6).toFixed(2)}M`;
+}
+
+function formatAxisBillions(value) {
+  if (value === 0) return '0';
+  return `${(value / 1e9).toFixed(2)}B`;
+}
 
 export function UsagePage() {
   const { filters } = useContext(FilterContext);
-  const rows = useMemo(() => selectFacts(filters), [filters]);
-  const labels = useMemo(() => timeSeries(rows, 'cost', filters).labels, [rows, filters]);
-
-  const summary = useMemo(
-    () => ({
-      messages: sumMetric(rows, 'messages', filters),
-      tokens: sumMetric(rows, 'tokens', filters),
-      videoMins: sumMetric(rows, 'videoMins', filters),
-      voiceChars: sumMetric(rows, 'voiceChars', filters),
-      storageGB: sumMetric(rows, 'storageGB', filters),
-    }),
-    [rows, filters],
-  );
-
-  const modalityData = useMemo(
-    () => [
-      { label: 'Text', color: '#4f46e5', values: timeSeries(rows, 'mText', filters).values },
-      { label: 'Audio', color: '#0ea5e9', values: timeSeries(rows, 'mAudio', filters).values },
-      { label: 'Video', color: '#a855f7', values: timeSeries(rows, 'mVideo', filters).values },
-    ],
-    [rows, filters],
-  );
-
-  const tokenData = useMemo(
-    () => [{ label: 'Tokens', color: '#10b981', values: timeSeries(rows, 'tokens', filters).values }],
-    [rows, filters],
-  );
-
-  const videoData = useMemo(
-    () => [{ label: 'Video min', color: '#a855f7', values: timeSeries(rows, 'videoMins', filters).values }],
-    [rows, filters],
-  );
-
-  const voiceData = useMemo(
-    () => [{ label: 'Voice chars', color: '#0ea5e9', values: timeSeries(rows, 'voiceChars', filters).values }],
-    [rows, filters],
-  );
-
-  const storageData = useMemo(() => {
-    const series = timeSeries(rows, 'storageGB', filters).values;
-    let acc = 0;
-    return [{ label: 'Cumulative GB', color: '#f59e0b', values: series.map((value) => (acc += value)) }];
-  }, [rows, filters]);
-
-  const apiData = useMemo(
-    () => [{ label: 'API calls', color: '#4f46e5', values: timeSeries(rows, 'apiCalls', filters).values }],
-    [rows, filters],
-  );
-
-  const heatmap = useMemo(() => {
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    const grid = [];
-    let max = 0;
-    for (let day = 0; day < 7; day += 1) {
-      const row = [];
-      for (let hour = 0; hour < 24; hour += 1) {
-        const weekend = day >= 5 ? 0.55 : 1;
-        const value = weekend * (Math.exp(-Math.pow(hour - 10, 2) / 14) + 0.85 * Math.exp(-Math.pow(hour - 20, 2) / 10) + 0.06);
-        row.push(value);
-        max = Math.max(max, value);
-      }
-      grid.push({ day: days[day], row });
-    }
-    return { grid, max };
-  }, []);
-
   const modalityRef = useRef(null);
   const tokensRef = useRef(null);
   const videoRef = useRef(null);
@@ -89,136 +42,288 @@ export function UsagePage() {
   const storageRef = useRef(null);
   const apiRef = useRef(null);
 
+  const scopedFilters = useMemo(
+    () => ({
+      ...filters,
+      service: null,
+      vendor: null,
+      twin: null,
+      user: null,
+    }),
+    [filters],
+  );
+
+  const rows = useMemo(() => selectFacts(scopedFilters), [scopedFilters]);
+  const scopeLabel = useMemo(() => formatScopeLabel(filters), [filters]);
+  const labels = useMemo(() => timeSeries(rows, 'messages', scopedFilters).labels, [rows, scopedFilters]);
+
+  const summary = useMemo(
+    () => ({
+      messages: sumMetric(rows, 'messages', scopedFilters),
+      tokens: sumMetric(rows, 'tokens', scopedFilters),
+      videoMins: sumMetric(rows, 'videoMins', scopedFilters),
+      voiceChars: sumMetric(rows, 'voiceChars', scopedFilters),
+      storageGB: sumMetric(rows, 'storageGB', scopedFilters),
+    }),
+    [rows, scopedFilters],
+  );
+
+  const modalityData = useMemo(
+    () => [
+      { label: 'Text', color: '#4f46e5', data: timeSeries(rows, 'mText', scopedFilters).values },
+      { label: 'Audio', color: '#1d9bf0', data: timeSeries(rows, 'mAudio', scopedFilters).values },
+      { label: 'Video', color: '#a855f7', data: timeSeries(rows, 'mVideo', scopedFilters).values },
+    ],
+    [rows, scopedFilters],
+  );
+
+  const tokenSeries = useMemo(
+    () => [{ label: 'Tokens', color: '#10b981', data: timeSeries(rows, 'tokens', scopedFilters).values }],
+    [rows, scopedFilters],
+  );
+
+  const videoSeries = useMemo(
+    () => [{ label: 'Video minutes', color: '#a855f7', data: timeSeries(rows, 'videoMins', scopedFilters).values }],
+    [rows, scopedFilters],
+  );
+
+  const voiceSeries = useMemo(
+    () => [{ label: 'Voice chars', color: '#0ea5e9', data: timeSeries(rows, 'voiceChars', scopedFilters).values }],
+    [rows, scopedFilters],
+  );
+
+  const storageSeries = useMemo(() => {
+    const base = timeSeries(rows, 'storageGB', scopedFilters).values;
+    let acc = 0;
+    return [{ label: 'Storage', color: '#f59e0b', data: base.map((value) => (acc += value)) }];
+  }, [rows, scopedFilters]);
+
+  const apiSeries = useMemo(
+    () => [{ label: 'API calls', color: '#4f46e5', data: timeSeries(rows, 'apiCalls', scopedFilters).values }],
+    [rows, scopedFilters],
+  );
+
+  const heatmap = useMemo(() => {
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const grid = [];
+    let max = 0;
+
+    for (let day = 0; day < 7; day += 1) {
+      const row = [];
+      for (let hour = 0; hour < 24; hour += 1) {
+        const weekend = day >= 5 ? 0.55 : 1;
+        const value =
+          weekend *
+          (Math.exp(-Math.pow(hour - 10, 2) / 14) + 0.85 * Math.exp(-Math.pow(hour - 20, 2) / 10) + 0.06);
+        row.push(value);
+        max = Math.max(max, value);
+      }
+      grid.push({ day: days[day], row });
+    }
+
+    return { grid, max };
+  }, []);
+
   useEffect(() => {
     const charts = [];
-    if (modalityRef.current) charts.push(stackedBar(modalityRef.current, labels, modalityData, { fmt: formatNumber, yfmt: formatNumber, legend: true }));
-    if (tokensRef.current) charts.push(areaChart(tokensRef.current, labels, tokenData, { fmt: formatNumber, yfmt: formatNumber }));
-    if (videoRef.current) charts.push(areaChart(videoRef.current, labels, videoData, { fmt: formatNumber, yfmt: formatNumber }));
-    if (voiceRef.current) charts.push(areaChart(voiceRef.current, labels, voiceData, { fmt: formatNumber, yfmt: formatNumber }));
-    if (storageRef.current) charts.push(areaChart(storageRef.current, labels, storageData, { fmt: formatNumber, yfmt: formatNumber }));
-    if (apiRef.current) charts.push(areaChart(apiRef.current, labels, apiData, { fmt: formatNumber, yfmt: formatNumber }));
+
+    if (modalityRef.current) {
+      charts.push(
+        stackedBar(modalityRef.current, labels, modalityData, {
+          legend: true,
+          fmt: formatNumber,
+          yfmt: formatAxisMillions,
+        }),
+      );
+    }
+
+    if (tokensRef.current) {
+      charts.push(
+        areaChart(tokensRef.current, labels, tokenSeries, {
+          fmt: formatNumber,
+          yfmt: formatAxisBillions,
+        }),
+      );
+    }
+
+    if (videoRef.current) {
+      charts.push(
+        areaChart(videoRef.current, labels, videoSeries, {
+          fmt: formatNumber,
+          yfmt: (value) => (value === 0 ? '0' : `${(value / 1e3).toFixed(1)}k`),
+        }),
+      );
+    }
+
+    if (voiceRef.current) {
+      charts.push(
+        areaChart(voiceRef.current, labels, voiceSeries, {
+          fmt: formatNumber,
+          yfmt: formatAxisMillions,
+        }),
+      );
+    }
+
+    if (storageRef.current) {
+      charts.push(
+        areaChart(storageRef.current, labels, storageSeries, {
+          fmt: formatNumber,
+          yfmt: formatAxisMillions,
+        }),
+      );
+    }
+
+    if (apiRef.current) {
+      charts.push(
+        areaChart(apiRef.current, labels, apiSeries, {
+          fmt: formatNumber,
+          yfmt: formatAxisMillions,
+        }),
+      );
+    }
 
     return () => charts.forEach((chart) => chart.destroy());
-  }, [labels, modalityData, tokenData, videoData, voiceData, storageData, apiData]);
+  }, [apiSeries, labels, modalityData, storageSeries, tokenSeries, videoSeries, voiceSeries]);
 
   return (
-    <section className="page-section">
-      <PageHeader
-        eyebrow="Usage analytics"
-        title="Usage analytics"
-        description="Deep time-series across modalities, tokens, media, storage, and traffic."
-      />
-
-      <div className="stats-grid">
-        {metricCards.map((card) => (
-          <article key={card.key} className="stat-card">
-            <div className="stat-card-top">
-              <p className="stat-label">{card.label}</p>
-              <span className={`status-dot ${card.tone}`}></span>
-            </div>
-            <h3>{formatNumber(summary[card.key])}</h3>
-          </article>
-        ))}
-      </div>
-
-      <div className="content-grid">
-        <div>
-          <div className="card-header">
-            <h2 className="section-title">Messages by modality</h2>
-          </div>
-          <div className="table-card chart-card">
-            <div className="chart-wrapper">
-              <canvas ref={modalityRef} />
-            </div>
-          </div>
+    <section className="page-section usage-demo-page">
+      <header className="usage-demo-header">
+        <div className="usage-demo-header-copy">
+          <h1>Usage Analytics</h1>
+          <p>Deep time-series across modalities, tokens, media, storage and traffic</p>
         </div>
-
-        <div>
-          <div className="card-header">
-            <h2 className="section-title">OpenAI tokens</h2>
-          </div>
-          <div className="table-card chart-card">
-            <div className="chart-wrapper">
-              <canvas ref={tokensRef} />
-            </div>
-          </div>
+        <div className="usage-demo-scope">
+          <span className="usage-demo-scope-label">Scope</span>
+          <span className="usage-demo-scope-value">{scopeLabel}</span>
         </div>
-      </div>
+      </header>
 
-      <div className="content-grid">
-        <div>
-          <div className="card-header">
-            <h2 className="section-title">Video minutes</h2>
-          </div>
-          <div className="table-card chart-card">
-            <div className="chart-wrapper">
-              <canvas ref={videoRef} />
-            </div>
-          </div>
-        </div>
+      <div className="usage-demo-metric-grid">
+        {metricCards.map((card) => {
+          const Icon = card.icon;
+          const delta = card.key === 'storageGB' ? null : deltaPercent(scopedFilters, card.key);
 
-        <div>
-          <div className="card-header">
-            <h2 className="section-title">Voice characters</h2>
-          </div>
-          <div className="table-card chart-card">
-            <div className="chart-wrapper">
-              <canvas ref={voiceRef} />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="content-grid">
-        <div>
-          <div className="card-header">
-            <h2 className="section-title">Storage growth</h2>
-          </div>
-          <div className="table-card chart-card">
-            <div className="chart-wrapper">
-              <canvas ref={storageRef} />
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <div className="card-header">
-            <h2 className="section-title">API call volume</h2>
-          </div>
-          <div className="table-card chart-card">
-            <div className="chart-wrapper">
-              <canvas ref={apiRef} />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="table-card px-5 py-4">
-        <div className="card-header">
-          <h2 className="section-title">Peak-hour activity</h2>
-        </div>
-        <div className="mt-4 space-y-3">
-          {heatmap.grid.map((row) => (
-            <div className="flex items-center gap-3" key={row.day}>
-              <span className="heatmap-label">{row.day}</span>
-              <div className="heatmap-row">
-                {row.row.map((value, index) => {
-                  const ratio = value / heatmap.max;
-                  return <div key={index} className="heatmap-cell" style={{ backgroundColor: `rgba(79, 70, 229, ${0.08 + ratio * 0.92})` }} />;
-                })}
+          return (
+            <article key={card.key} className="table-card usage-demo-metric-card">
+              <div className="usage-demo-metric-top">
+                <span className={`usage-demo-metric-icon usage-demo-metric-icon-${card.tone}`}>
+                  <Icon size={17} />
+                </span>
+                {delta != null ? <span className="usage-demo-metric-delta">^ {Math.abs(delta).toFixed(1)}%</span> : null}
               </div>
-            </div>
-          ))}
-          <div className="heatmap-footer">
-            <span>low</span>
-            <div className="heatmap-scale">
-              {[0.1, 0.3, 0.5, 0.7, 0.95].map((alpha) => (
-                <span key={alpha} className="heatmap-scale-cell" style={{ backgroundColor: `rgba(79, 70, 229, ${alpha})` }} />
+              <h2>{formatNumber(summary[card.key])}</h2>
+              <p>{card.label}</p>
+            </article>
+          );
+        })}
+      </div>
+
+      <div className="usage-demo-chart-grid">
+        <section className="table-card usage-demo-chart-card">
+          <div className="usage-demo-card-head">
+            <h2>Messages by modality</h2>
+            <span>stacked, per day</span>
+          </div>
+          <div className="chart-wrapper usage-demo-chart-wrapper">
+            <canvas ref={modalityRef} />
+          </div>
+        </section>
+
+        <section className="table-card usage-demo-chart-card">
+          <div className="usage-demo-card-head">
+            <h2>OpenAI tokens</h2>
+          </div>
+          <div className="chart-wrapper usage-demo-chart-wrapper">
+            <canvas ref={tokensRef} />
+          </div>
+        </section>
+      </div>
+
+      <div className="usage-demo-triple-grid">
+        <section className="table-card usage-demo-chart-card">
+          <div className="usage-demo-card-head">
+            <h2>Video minutes</h2>
+          </div>
+          <div className="chart-wrapper usage-demo-chart-wrapper">
+            <canvas ref={videoRef} />
+          </div>
+        </section>
+
+        <section className="table-card usage-demo-chart-card">
+          <div className="usage-demo-card-head">
+            <h2>Voice characters</h2>
+          </div>
+          <div className="chart-wrapper usage-demo-chart-wrapper">
+            <canvas ref={voiceRef} />
+          </div>
+        </section>
+
+        <section className="table-card usage-demo-chart-card">
+          <div className="usage-demo-card-head">
+            <h2>Storage growth (GB)</h2>
+          </div>
+          <div className="chart-wrapper usage-demo-chart-wrapper">
+            <canvas ref={storageRef} />
+          </div>
+        </section>
+      </div>
+
+      <div className="usage-demo-bottom-grid">
+        <section className="table-card usage-demo-chart-card">
+          <div className="usage-demo-card-head">
+            <h2>API call volume</h2>
+            <span>SDK gateway telemetry</span>
+          </div>
+          <div className="chart-wrapper usage-demo-chart-wrapper">
+            <canvas ref={apiRef} />
+          </div>
+        </section>
+
+        <section className="table-card usage-demo-chart-card usage-demo-heatmap-card">
+          <div className="usage-demo-card-head">
+            <h2>Peak-hour heatmap</h2>
+            <span>UTC</span>
+          </div>
+          <div className="usage-demo-heatmap">
+            <div className="usage-demo-heatmap-grid">
+              {heatmap.grid.map((row) => (
+                <div key={row.day} className="usage-demo-heatmap-row">
+                  <span className="usage-demo-heatmap-day">{row.day}</span>
+                  <div className="usage-demo-heatmap-cells">
+                    {row.row.map((value, index) => {
+                      const ratio = value / heatmap.max;
+                      return (
+                        <span
+                          key={index}
+                          className="usage-demo-heatmap-cell"
+                          style={{ backgroundColor: `rgba(79, 70, 229, ${0.10 + ratio * 0.90})` }}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
               ))}
             </div>
-            <span>high</span>
+            <div className="usage-demo-heatmap-footer">
+              <div className="usage-demo-heatmap-hours">
+                <span>00</span>
+                <span>06</span>
+                <span>12</span>
+                <span>18</span>
+                <span>23</span>
+              </div>
+              <div className="usage-demo-heatmap-scale">
+                <span>low</span>
+                <div className="usage-demo-heatmap-scale-cells">
+                  {[0.12, 0.28, 0.44, 0.6, 0.76, 0.92].map((alpha) => (
+                    <span key={alpha} className="usage-demo-heatmap-scale-cell" style={{ backgroundColor: `rgba(79, 70, 229, ${alpha})` }} />
+                  ))}
+                </div>
+                <span>high</span>
+              </div>
+            </div>
           </div>
-        </div>
+        </section>
       </div>
     </section>
   );
