@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react';
 import { getStatusTone } from '../../utils/status';
 
 export function DataTable({
@@ -8,25 +9,73 @@ export function DataTable({
   onRowClick,
   emptyMessage = 'No data to display',
 }) {
+  const [sortConfig, setSortConfig] = useState(() => ({
+    key: columns[0]?.key ?? null,
+    direction: 'asc',
+  }));
+
+  const sortedRows = useMemo(() => {
+    if (!sortConfig.key) return rows;
+
+    const column = columns.find((item) => item.key === sortConfig.key);
+    if (!column) return rows;
+
+    const getValue = (row) => {
+      if (column.sortValue) return column.sortValue(row);
+      return row[column.key];
+    };
+
+    return [...rows].sort((left, right) => {
+      const a = getValue(left);
+      const b = getValue(right);
+
+      if (typeof a === 'number' && typeof b === 'number') {
+        return sortConfig.direction === 'asc' ? a - b : b - a;
+      }
+
+      return sortConfig.direction === 'asc'
+        ? String(a ?? '').localeCompare(String(b ?? ''))
+        : String(b ?? '').localeCompare(String(a ?? ''));
+    });
+  }, [columns, rows, sortConfig]);
+
+  const toggleSort = (key) => {
+    setSortConfig((prev) =>
+      prev.key === key
+        ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' }
+        : { key, direction: 'asc' },
+    );
+  };
+
   return (
     <div className="table-card">
       <table>
         <thead>
           <tr>
-            {columns.map((column) => (
-              <th key={column.key}>{column.label}</th>
-            ))}
+            {columns.map((column) => {
+              const isActive = sortConfig.key === column.key;
+              return (
+                <th key={column.key}>
+                  <button type="button" className="table-sort-button" onClick={() => toggleSort(column.key)}>
+                    <span>{column.label}</span>
+                    <span className={`table-sort-indicator${isActive ? ' active' : ''}`}>
+                      {isActive ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}
+                    </span>
+                  </button>
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>
-          {rows.length === 0 ? (
+          {sortedRows.length === 0 ? (
             <tr>
-              <td colSpan={columns.length} className="text-center py-10 text-slate-400">
+              <td colSpan={columns.length} className="table-empty">
                 {emptyMessage}
               </td>
             </tr>
           ) : (
-            rows.map((row) => (
+            sortedRows.map((row) => (
               <tr
                 key={row[rowKey]}
                 className={onRowClick ? 'row-link' : ''}

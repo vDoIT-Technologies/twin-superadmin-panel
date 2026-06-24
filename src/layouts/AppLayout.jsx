@@ -1,11 +1,12 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { useContext, useMemo } from 'react';
+import { useContext, useMemo, useState } from 'react';
 import { FilterContext } from '../app/FilterContext';
 import { FilterDropdown } from '../components/common/FilterDropdown';
 import { superadminDemoData } from '../demo-data/superadminDemoData';
 import {
   LayoutDashboard,
   Boxes,
+  Database,
   Building2,
   Bot,
   Users,
@@ -23,6 +24,7 @@ const navGroups = [
     items: [
       { to: '/', label: 'Overview', end: true, icon: <LayoutDashboard size={18} /> },
       { to: '/services', label: 'Services', icon: <Boxes size={18} /> },
+      { to: '/vault', label: 'Vault', icon: <Database size={18} /> },
     ],
   },
   {
@@ -34,11 +36,16 @@ const navGroups = [
     ],
   },
   {
-    label: 'Analytics',
+    label: 'Financials',
     items: [
-      { to: '/financial', label: 'Cost', icon: <Wallet size={18} /> },
-      { to: '/usage', label: 'Usage', icon: <Activity size={18} /> },
-      { to: '/telemetry', label: 'Telemetry', icon: <ScrollText size={18} /> },
+      { to: '/financial', label: 'Cost & Billing', icon: <Wallet size={18} /> },
+      { to: '/usage', label: 'Usage Analytics', icon: <Activity size={18} /> },
+    ],
+  },
+  {
+    label: 'System',
+    items: [
+      { to: '/telemetry', label: 'Telemetry / Logs', icon: <ScrollText size={18} /> },
     ],
   },
 ];
@@ -49,9 +56,10 @@ const breadcrumbTitles = {
   '/twins': 'Twins',
   '/users': 'Users',
   '/services': 'Services',
-  '/financial': 'Cost',
-  '/usage': 'Usage',
-  '/telemetry': 'Telemetry',
+  '/vault': 'Vault',
+  '/financial': 'Cost & Billing',
+  '/usage': 'Usage Analytics',
+  '/telemetry': 'Telemetry / Logs',
 };
 
 const envOptions = [
@@ -71,6 +79,7 @@ const lensOptions = [
 export function AppLayout() {
   const location = useLocation();
   const { filters, setFilters } = useContext(FilterContext);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const currentTitle = breadcrumbTitles[location.pathname] ?? 'Overview';
 
   const updateFilters = (partial) => {
@@ -162,7 +171,7 @@ export function AppLayout() {
 
   return (
     <div className="app-shell">
-      <aside className="sidebar">
+      <aside className={`sidebar${isSidebarCollapsed ? ' collapsed' : ''}`}>
         <div className="brand-block">
           <div className="brand-mark" aria-label="Twin Protocol logo">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -182,7 +191,7 @@ export function AppLayout() {
               />
             </svg>
           </div>
-          <div>
+          <div className="brand-copy">
             <p className="brand-name">Twin Protocol</p>
             <p className="brand-kicker">SuperAdmin</p>
           </div>
@@ -211,7 +220,7 @@ export function AppLayout() {
 
         <div className="sidebar-profile">
           <div className="avatar-badge">SA</div>
-          <div>
+          <div className="profile-copy">
             <p className="profile-name">Super Admin</p>
             <p className="profile-email">admin@twinprotocol.dev</p>
           </div>
@@ -219,150 +228,161 @@ export function AppLayout() {
       </aside>
 
       <div className="workspace">
-        <header className="topbar">
-          <div className="breadcrumb">
-            <span className="breadcrumb-root">Twin Protocol</span>
-            <span className="breadcrumb-sep">/</span>
-            <span className="breadcrumb-current">{currentTitle}</span>
-          </div>
+        <div className="workspace-chrome">
+          <header className="topbar">
+            <div className="topbar-title-group">
+              <button
+                className="icon-button topbar-toggle"
+                type="button"
+                aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                aria-pressed={isSidebarCollapsed}
+                onClick={() => setIsSidebarCollapsed((value) => !value)}
+              >
+                <Columns2 size={16} />
+              </button>
+              <div className="breadcrumb">
+                <span className="breadcrumb-current">{currentTitle}</span>
+              </div>
+            </div>
 
-          <div className="topbar-actions">
-            <label className="search-shell">
-              <Search className="search-icon" size={16} />
-              <input type="text" placeholder="Search clients, twins, users..." />
-            </label>
-            <button className="icon-button" type="button" aria-label="Notifications">
-              <Bell size={16} />
-            </button>
-            <div className="avatar-badge compact">SA</div>
-          </div>
-        </header>
+            <div className="topbar-actions">
+              <label className="search-shell">
+                <Search className="search-icon" size={16} />
+                <input type="text" placeholder="Search clients, twins, users..." />
+              </label>
+              <button className="icon-button" type="button" aria-label="Notifications">
+                <Bell size={16} />
+              </button>
+              <div className="avatar-badge compact">SA</div>
+            </div>
+          </header>
 
-        <div className="filterbar">
-          <div className="filter-group">
-            <span className="filter-label">Env</span>
-            {envOptions.map((option) => {
-              const active = filters.envs.includes(option.id);
-              return (
+          <div className="filterbar">
+            <div className="filter-group">
+              <span className="filter-label">Env</span>
+              {envOptions.map((option) => {
+                const active = filters.envs.includes(option.id);
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    className={`filter-chip filter-chip-env filter-chip-env-${option.id}${active ? ' active' : ''}`}
+                    onClick={() => {
+                      const next = active
+                        ? filters.envs.filter((id) => id !== option.id)
+                        : [...filters.envs, option.id];
+                      if (next.length === 0) return;
+                      updateFilters({ envs: next });
+                    }}
+                  >
+                    <span className="filter-chip-dot" aria-hidden="true" />
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="filter-group">
+              {rangeOptions.map((range) => (
                 <button
-                  key={option.id}
+                  key={range}
                   type="button"
-                  className={`filter-chip filter-chip-env filter-chip-env-${option.id}${active ? ' active' : ''}`}
-                  onClick={() => {
-                    const next = active
-                      ? filters.envs.filter((id) => id !== option.id)
-                      : [...filters.envs, option.id];
-                    if (next.length === 0) return;
-                    updateFilters({ envs: next });
-                  }}
+                  className={`filter-chip${filters.range === range ? ' active' : ''}`}
+                  onClick={() => updateFilters({ range })}
                 >
-                  <span className="filter-chip-dot" aria-hidden="true" />
-                  {option.label}
+                  {range}
                 </button>
-              );
-            })}
-          </div>
+              ))}
+            </div>
 
-          <div className="filter-group">
-            {rangeOptions.map((range) => (
+            <div className="filter-group">
+              <FilterDropdown
+                value={filters.gran}
+                onChange={(value) => updateFilters({ gran: value ?? 'day' })}
+                options={granDropdownOptions}
+                placeholder="by day"
+                searchable={false}
+              />
+            </div>
+
+            <div className="filter-group">
+              <FilterDropdown
+                value={filters.client}
+                onChange={(value) => updateScopeFilter('client', value)}
+                options={clientDropdownOptions}
+                placeholder="All clients"
+                searchPlaceholder="Search client..."
+              />
+            </div>
+
+            <div className="filter-group">
+              <FilterDropdown
+                value={filters.twin}
+                onChange={(value) => updateScopeFilter('twin', value)}
+                options={twinDropdownOptions}
+                placeholder="All twins"
+                searchPlaceholder="Search twin..."
+              />
+            </div>
+
+            <div className="filter-group">
+              <FilterDropdown
+                value={filters.user}
+                onChange={(value) => updateScopeFilter('user', value)}
+                options={userDropdownOptions}
+                placeholder="All users"
+                searchPlaceholder="Search user..."
+              />
+            </div>
+
+            <div className="filter-group">
+              <FilterDropdown
+                value={filters.service}
+                onChange={(value) => updateScopeFilter('service', value)}
+                options={serviceDropdownOptions}
+                placeholder="All services"
+                searchPlaceholder="Search service..."
+              />
+            </div>
+
+            <div className="filter-group">
+              <FilterDropdown
+                value={filters.vendor}
+                onChange={(value) => updateScopeFilter('vendor', value)}
+                options={vendorDropdownOptions}
+                placeholder="All vendors"
+                searchPlaceholder="Search vendor..."
+                align="right"
+              />
+            </div>
+
+            <div className="filter-group filter-group-spacer" />
+
+            <div className="filter-group">
               <button
-                key={range}
                 type="button"
-                className={`filter-chip${filters.range === range ? ' active' : ''}`}
-                onClick={() => updateFilters({ range })}
+                className={`filter-chip filter-chip-compare${filters.compare ? ' active' : ''}`}
+                onClick={() => updateFilters({ compare: !filters.compare })}
               >
-                {range}
+                <Columns2 size={15} />
+                Compare
               </button>
-            ))}
+            </div>
           </div>
 
-          <div className="filter-group">
-            <FilterDropdown
-              value={filters.gran}
-              onChange={(value) => updateFilters({ gran: value ?? 'day' })}
-              options={granDropdownOptions}
-              placeholder="by day"
-              searchable={false}
-            />
-          </div>
-
-          <div className="filter-group">
-            <FilterDropdown
-              value={filters.client}
-              onChange={(value) => updateScopeFilter('client', value)}
-              options={clientDropdownOptions}
-              placeholder="All clients"
-              searchPlaceholder="Search client..."
-            />
-          </div>
-
-          <div className="filter-group">
-            <FilterDropdown
-              value={filters.twin}
-              onChange={(value) => updateScopeFilter('twin', value)}
-              options={twinDropdownOptions}
-              placeholder="All twins"
-              searchPlaceholder="Search twin..."
-            />
-          </div>
-
-          <div className="filter-group">
-            <FilterDropdown
-              value={filters.user}
-              onChange={(value) => updateScopeFilter('user', value)}
-              options={userDropdownOptions}
-              placeholder="All users"
-              searchPlaceholder="Search user..."
-            />
-          </div>
-
-          <div className="filter-group">
-            <FilterDropdown
-              value={filters.service}
-              onChange={(value) => updateScopeFilter('service', value)}
-              options={serviceDropdownOptions}
-              placeholder="All services"
-              searchPlaceholder="Search service..."
-            />
-          </div>
-
-          <div className="filter-group">
-            <FilterDropdown
-              value={filters.vendor}
-              onChange={(value) => updateScopeFilter('vendor', value)}
-              options={vendorDropdownOptions}
-              placeholder="All vendors"
-              searchPlaceholder="Search vendor..."
-              align="right"
-            />
-          </div>
-
-          <div className="filter-group filter-group-spacer" />
-
-          <div className="filter-group">
-            <button
-              type="button"
-              className={`filter-chip filter-chip-compare${filters.compare ? ' active' : ''}`}
-              onClick={() => updateFilters({ compare: !filters.compare })}
-            >
-              <Columns2 size={15} />
-              Compare
-            </button>
-          </div>
-        </div>
-
-        <div className="filterbar filterbar-secondary">
-          <div className="filter-group filter-group-lens">
-            {lensOptions.map((lens) => (
-              <button
-                key={lens.id}
-                type="button"
-                className={`filter-chip${filters.lens === lens.id ? ' active' : ''}`}
-                onClick={() => updateFilters({ lens: lens.id })}
-              >
-                {lens.label}
-              </button>
-            ))}
+          <div className="filterbar filterbar-secondary">
+            <div className="filter-group filter-group-lens">
+              {lensOptions.map((lens) => (
+                <button
+                  key={lens.id}
+                  type="button"
+                  className={`filter-chip filter-chip-lens${filters.lens === lens.id ? ' active' : ''}`}
+                  onClick={() => updateFilters({ lens: lens.id })}
+                >
+                  {lens.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 

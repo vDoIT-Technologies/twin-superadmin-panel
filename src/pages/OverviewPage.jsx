@@ -10,12 +10,11 @@ import {
   Users,
   Wallet,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { FilterContext } from '../app/FilterContext';
-import { DataTable } from '../components/common/DataTable';
 import { superadminDemoData } from '../demo-data/superadminDemoData';
-import { groupBy, selectFacts, sumMetric, timeSeries } from '../demo-data/superadminSelectors';
-import { areaChart, donut } from '../utils/chartHelpers';
-import { formatCurrency, formatMetricValue } from '../utils/formatters';
+import { RANGE_DAYS, groupBy, selectFacts, sumMetric, timeSeries, twinShare } from '../demo-data/superadminSelectors';
+import { areaChart, donut, stackedBar } from '../utils/chartHelpers';
 
 function formatOverviewCurrency(value) {
   const absolute = Math.abs(value);
@@ -33,19 +32,13 @@ function formatOverviewMetric(value) {
   return `${Math.round(value)}`;
 }
 
-const clientColumns = [
-  { key: 'name', label: 'Client' },
-  { key: 'plan', label: 'Plan' },
-  { key: 'cost', label: 'Cost' },
-  { key: 'status', label: 'Status' },
-];
+function formatDeltaMetric(key, value) {
+  if (key === 'cost' || key === 'revenue') {
+    return formatOverviewCurrency(value);
+  }
 
-const serviceColumns = [
-  { key: 'name', label: 'Service' },
-  { key: 'cost', label: 'Cost' },
-  { key: 'messages', label: 'Messages' },
-  { key: 'status', label: 'Status' },
-];
+  return formatOverviewMetric(value);
+}
 
 const alertIconMap = {
   red: Flame,
@@ -64,12 +57,17 @@ const metricConfig = [
 
 export function OverviewPage() {
   const { filters } = useContext(FilterContext);
+  const navigate = useNavigate();
   const rows = useMemo(() => selectFacts(filters), [filters]);
-  const pointsChartRef = useRef(null);
+  const trendChartRef = useRef(null);
   const modalityChartRef = useRef(null);
+  const vendorChartRef = useRef(null);
 
   const scopeLabel = useMemo(() => {
-    const separator = filters.envs.length === 2 ? ' + ' : ', ';
+    if (filters.envs.length === superadminDemoData.ENVS.length) {
+      return `All envs · last ${filters.range}`;
+    }
+    const separator = filters.envs.length > 1 ? ' + ' : ', ';
     const envLabel = filters.envs.map((env) => superadminDemoData.ENV_META[env]?.label ?? env).join(separator);
     return `${envLabel} · last ${filters.range}`;
   }, [filters.envs, filters.range]);
@@ -107,19 +105,47 @@ export function OverviewPage() {
     };
   }, [filters, rows]);
 
+  const metricBadgeMap = useMemo(() => {
+    const days = RANGE_DAYS[filters.range];
+    const currentMinDay = superadminDemoData.DAYS - days;
+    const previousMinDay = Math.max(0, currentMinDay - days);
+
+    const previousRows = superadminDemoData.facts.filter(
+      (row) =>
+        filters.envs.includes(row.env) &&
+        row.day >= previousMinDay &&
+        row.day < currentMinDay &&
+        (!filters.client || row.clientId === filters.client) &&
+        (!filters.service || row.service === filters.service),
+    );
+
+    return ['cost', 'revenue', 'messages'].reduce((acc, key) => {
+      const currentValue = sumMetric(rows, key, filters);
+      const previousValue = sumMetric(previousRows, key, filters);
+      const delta = currentValue - previousValue;
+
+      acc[key] = {
+        direction: delta >= 0 ? 'up' : 'down',
+        value: `${delta >= 0 ? '' : '-'}${formatDeltaMetric(key, Math.abs(delta))}`,
+      };
+
+      return acc;
+    }, {});
+  }, [filters, rows]);
+
   const overviewMetrics = useMemo(
     () => [
-      { key: 'cost', value: formatOverviewCurrency(summary.totalCost), meta: null },
-      { key: 'revenue', value: formatOverviewCurrency(summary.totalRevenue), meta: null },
+      { key: 'cost', value: formatOverviewCurrency(summary.totalCost), meta: null, badge: metricBadgeMap.cost },
+      { key: 'revenue', value: formatOverviewCurrency(summary.totalRevenue), meta: null, badge: metricBadgeMap.revenue },
       { key: 'margin', value: `${summary.marginPct.toFixed(1)}%`, meta: formatOverviewCurrency(summary.marginValue) },
-      { key: 'messages', value: formatOverviewMetric(summary.totalMessages), meta: null },
+      { key: 'messages', value: formatOverviewMetric(summary.totalMessages), meta: null, badge: metricBadgeMap.messages },
       { key: 'users', value: String(summary.activeUsers), meta: null },
       { key: 'twins', value: String(summary.activeTwins), meta: null },
     ],
-    [summary],
+    [metricBadgeMap, summary],
   );
 
-  const recentClients = useMemo(
+  const topClients = useMemo(
     () =>
       groupBy(rows, 'clientId', 'cost', filters)
         .slice(0, 5)
@@ -128,74 +154,129 @@ export function OverviewPage() {
           return {
             id: entry.id,
             name: client?.name ?? entry.id,
-            plan: client?.plan ?? 'Unknown',
-            cost: formatCurrency(entry.value),
-            status: entry.id === superadminDemoData.ANOMALY.clientId ? 'watch' : 'active',
+            meta: client?.plan ?? 'Unknown',
+            value: entry.value,
           };
         }),
     [filters, rows],
   );
 
-  const serviceHealth = useMemo(
+  const topTwins = useMemo(() => {
+    const costByClient = rows.reduce((acc, row) => {
+      acc[row.clientId] = (acc[row.clientId] || 0) + row.cost;
+      return acc;
+    }, {});
+
+    return superadminDemoData.TWINS.filter((twin) => !filters.client || twin.clientId === filters.client)
+      .map((twin) => ({
+        id: twin.id,
+        name: twin.name,
+        meta: superadminDemoData.byId.client(twin.clientId)?.name ?? '',
+        value: (costByClient[twin.clientId] || 0) * twinShare(twin),
+      }))
+      .sort((left, right) => right.value - left.value)
+      .slice(0, 5);
+  }, [filters.client, rows]);
+
+  const totalScopedCost = useMemo(() => sumMetric(rows, 'cost', filters), [filters, rows]);
+
+  const environmentCards = useMemo(
     () =>
-      superadminDemoData.SERVICES.map((service) => {
-        const serviceRows = rows.filter((row) => row.service === service.id);
-        const cost = sumMetric(serviceRows, 'cost', filters);
-        const messages = sumMetric(serviceRows, 'messages', filters);
+      superadminDemoData.ENVS.map((env) => {
+        const envRows = selectFacts(filters, { envs: [env] });
+        const cost = sumMetric(envRows, 'cost', filters);
+        const revenue = sumMetric(envRows, 'revenue', filters);
+        const messages = sumMetric(envRows, 'messages', filters);
         return {
-          id: service.id,
-          name: service.name,
-          cost: formatCurrency(cost),
-          messages: formatMetricValue(Math.round(messages)),
-          status: service.id === superadminDemoData.ANOMALY.service ? 'watch' : 'healthy',
+          env,
+          label: superadminDemoData.ENV_META[env].label,
+          color: superadminDemoData.ENV_META[env].color,
+          active: filters.envs.includes(env),
+          cost: formatOverviewCurrency(cost),
+          revenue: formatOverviewCurrency(revenue),
+          messages: formatOverviewMetric(messages),
         };
-      }).filter((service) => service.cost !== formatCurrency(0)),
+      }),
     [filters, rows],
   );
 
+  const vendorChartConfig = useMemo(() => {
+    const labels = timeSeries(rows, 'cost', filters).labels;
+    const datasets = superadminDemoData.VENDORS.filter((vendor) =>
+      rows.some((row) => (row.vendorCost[vendor.id] || 0) > 0),
+    ).map((vendor) => ({
+      label: vendor.name,
+      color: vendor.color,
+      data: timeSeries(rows, null, filters, vendor.id).values,
+    }));
+
+    return {
+      labels,
+      datasets,
+    };
+  }, [filters, rows]);
+
   const compareRows = useMemo(() => {
     if (!filters.compare) return [];
-    const envs = filters.envs.length >= 2 ? filters.envs : ['dev', 'staging', 'prod'];
-
-    return envs.map((env) => {
+    return filters.envs.map((env) => {
       const envRows = selectFacts(filters, { envs: [env] });
-      const cost = sumMetric(envRows, 'cost', filters);
-      const revenue = sumMetric(envRows, 'revenue', filters);
-      const messages = sumMetric(envRows, 'messages', filters);
       return {
         env,
         label: superadminDemoData.ENV_META[env].label,
-        cost: formatCurrency(cost),
-        revenue: formatCurrency(revenue),
-        margin: revenue ? `${Math.round(((revenue - cost) / revenue) * 100)}%` : '0%',
-        messages: formatMetricValue(Math.round(messages)),
+        cost: formatOverviewCurrency(sumMetric(envRows, 'cost', filters)),
+        revenue: formatOverviewCurrency(sumMetric(envRows, 'revenue', filters)),
+        margin: `${Math.round(((sumMetric(envRows, 'revenue', filters) - sumMetric(envRows, 'cost', filters)) / Math.max(sumMetric(envRows, 'revenue', filters), 1)) * 100)}%`,
+        messages: formatOverviewMetric(sumMetric(envRows, 'messages', filters)),
       };
     });
   }, [filters]);
 
-  const pointLabels = useMemo(() => timeSeries(rows, 'pointsPurchased', filters).labels, [rows, filters]);
-  const pointsPurchasedSeries = useMemo(
-    () => timeSeries(rows, 'pointsPurchased', filters).values,
-    [rows, filters],
-  );
-  const pointsSpentSeries = useMemo(
-    () => timeSeries(rows, 'pointsSpent', filters).values,
-    [rows, filters],
-  );
+  const trendConfig = useMemo(() => {
+    if (filters.lens === 'usage') {
+      return {
+        title: 'Message volume over time',
+        labels: timeSeries(rows, 'messages', filters).labels,
+        datasets: [
+          { label: 'Messages', color: '#4f46e5', data: timeSeries(rows, 'messages', filters).values },
+          { label: 'API calls', color: '#0ea5e9', data: timeSeries(rows, 'apiCalls', filters).values },
+        ],
+        formatter: formatOverviewMetric,
+      };
+    }
+
+    if (filters.lens === 'economy') {
+      return {
+        title: 'Points purchased vs spent',
+        labels: timeSeries(rows, 'pointsPurchased', filters).labels,
+        datasets: [
+          { label: 'Points purchased', color: '#10b981', data: timeSeries(rows, 'pointsPurchased', filters).values },
+          { label: 'Points spent', color: '#f59e0b', data: timeSeries(rows, 'pointsSpent', filters).values },
+        ],
+        formatter: formatOverviewMetric,
+      };
+    }
+
+    return {
+      title: 'Cost vs Revenue over time',
+      labels: timeSeries(rows, 'cost', filters).labels,
+      datasets: [
+        { label: 'Revenue', color: '#10b981', data: timeSeries(rows, 'revenue', filters).values },
+        { label: 'Cost', color: '#ef4444', data: timeSeries(rows, 'cost', filters).values },
+      ],
+      formatter: formatOverviewCurrency,
+    };
+  }, [filters, rows]);
 
   useEffect(() => {
     const charts = [];
 
-    if (pointsChartRef.current) {
+    if (trendChartRef.current) {
       charts.push(
         areaChart(
-          pointsChartRef.current,
-          pointLabels,
-          [
-            { label: 'Points purchased', color: '#10b981', data: pointsPurchasedSeries },
-            { label: 'Points spent', color: '#f59e0b', data: pointsSpentSeries },
-          ],
-          { fmt: formatOverviewMetric, yfmt: formatOverviewMetric },
+          trendChartRef.current,
+          trendConfig.labels,
+          trendConfig.datasets,
+          { fmt: trendConfig.formatter, yfmt: trendConfig.formatter },
         ),
       );
     }
@@ -212,8 +293,52 @@ export function OverviewPage() {
       );
     }
 
+    if (vendorChartRef.current && vendorChartConfig.datasets.length > 0) {
+      charts.push(
+        stackedBar(vendorChartRef.current, vendorChartConfig.labels, vendorChartConfig.datasets, {
+          fmt: formatOverviewCurrency,
+          yfmt: formatOverviewCurrency,
+          legend: true,
+        }),
+      );
+    }
+
     return () => charts.forEach((chart) => chart.destroy());
-  }, [pointLabels, pointsPurchasedSeries, pointsSpentSeries, summary.modalityValues]);
+  }, [summary.modalityValues, trendConfig, vendorChartConfig]);
+
+  const renderRankList = (items, type) => {
+    const max = Math.max(...items.map((item) => item.value), 1);
+
+    return (
+      <div className={`overview-rank-list overview-rank-list-${type}`}>
+        {items.map((item, index) => (
+          <button
+            key={item.id}
+            type="button"
+            className={`overview-rank-row overview-rank-row-${type}`}
+            onClick={() => navigate(type === 'client' ? '/clients' : '/twins')}
+          >
+            <span className="overview-rank-index">{index + 1}</span>
+            <div className="overview-rank-avatar">{item.name.slice(0, 2).toUpperCase()}</div>
+            <div className="overview-rank-main">
+              <div className="overview-rank-head">
+                <span className="overview-rank-name">{item.name}</span>
+                <span className="overview-rank-value">{formatOverviewCurrency(item.value)}</span>
+              </div>
+              <div className="overview-rank-bar">
+                <span className="overview-rank-bar-fill" style={{ width: `${(item.value / max) * 100}%` }} />
+              </div>
+              <div className="overview-rank-meta">
+                <span>{item.meta}</span>
+                <span>{((item.value / Math.max(totalScopedCost, 1)) * 100).toFixed(1)}% of total</span>
+              </div>
+            </div>
+            <span className="overview-rank-arrow">›</span>
+          </button>
+        ))}
+      </div>
+    );
+  };
 
   return (
     <section className="page-section">
@@ -253,7 +378,12 @@ export function OverviewPage() {
                 <span className={`overview-kpi-icon overview-kpi-icon-${config.tone}`}>
                   <Icon size={18} />
                 </span>
-                <span className="overview-kpi-dash">-</span>
+                {metric.badge ? (
+                  <span className={`overview-kpi-badge overview-kpi-badge-${metric.badge.direction}`}>
+                    <span className={`overview-kpi-badge-arrow overview-kpi-badge-arrow-${metric.badge.direction}`} />
+                    {metric.badge.value}
+                  </span>
+                ) : null}
               </div>
               <h2>{metric.value}</h2>
               <p className="overview-kpi-label">
@@ -268,14 +398,18 @@ export function OverviewPage() {
       <div className="overview-chart-grid">
         <section className="table-card overview-chart-card overview-chart-card-wide">
           <div className="overview-chart-header">
-            <h2 className="section-title">Points purchased vs spent</h2>
+            <h2 className="section-title">{trendConfig.title}</h2>
             <div className="overview-chart-legend">
-              <span><i className="legend-dot legend-dot-green" />Points purchased</span>
-              <span><i className="legend-dot legend-dot-amber" />Points spent</span>
+              {trendConfig.datasets.map((dataset) => (
+                <span key={dataset.label}>
+                  <i className="legend-dot" style={{ background: dataset.color }} />
+                  {dataset.label}
+                </span>
+              ))}
             </div>
           </div>
           <div className="chart-wrapper overview-chart-wrapper">
-            <canvas ref={pointsChartRef} />
+            <canvas ref={trendChartRef} />
           </div>
         </section>
 
@@ -324,6 +458,69 @@ export function OverviewPage() {
         </section>
       </div>
 
+      <div className="overview-lower-grid">
+        <section className="table-card overview-chart-card overview-vendor-card">
+          <div className="overview-chart-header">
+            <h2 className="section-title">Cost by vendor</h2>
+            <div className="overview-card-kicker">stacked, per {filters.gran}</div>
+          </div>
+          <div className="chart-wrapper overview-vendor-wrapper">
+            <canvas ref={vendorChartRef} />
+          </div>
+        </section>
+
+        <section className="table-card overview-env-card">
+          <div className="overview-chart-header">
+            <h2 className="section-title">Environment comparison</h2>
+          </div>
+          <div className="overview-env-list">
+            {environmentCards.map((item) => (
+              <article key={item.env} className={`overview-env-item${item.active ? '' : ' is-muted'}`}>
+                <div className="overview-env-head">
+                  <span className="overview-env-label">
+                    <i className="legend-dot" style={{ background: item.color }} />
+                    {item.label}
+                  </span>
+                  {!item.active ? <span className="overview-env-muted">filtered out</span> : null}
+                </div>
+                <div className="overview-env-metrics">
+                  <div>
+                    <strong>{item.cost}</strong>
+                    <span>Cost</span>
+                  </div>
+                  <div>
+                    <strong>{item.revenue}</strong>
+                    <span>Revenue</span>
+                  </div>
+                  <div>
+                    <strong>{item.messages}</strong>
+                    <span>Messages</span>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      </div>
+
+      <div className="overview-rank-grid">
+        <section className="table-card overview-rank-card overview-rank-card-client">
+          <div className="overview-chart-header">
+            <h2 className="section-title">Top 5 Clients by cost</h2>
+            <div className="overview-card-kicker">click to drill</div>
+          </div>
+          {renderRankList(topClients, 'client')}
+        </section>
+
+        <section className="table-card overview-rank-card overview-rank-card-twin">
+          <div className="overview-chart-header">
+            <h2 className="section-title">Top 5 Twins by cost</h2>
+            <div className="overview-card-kicker">click to drill</div>
+          </div>
+          {renderRankList(topTwins, 'twin')}
+        </section>
+      </div>
+
       {filters.compare ? (
         <div className="compare-grid">
           {compareRows.map((item) => (
@@ -352,17 +549,6 @@ export function OverviewPage() {
           ))}
         </div>
       ) : null}
-
-      <div className="content-grid">
-        <div>
-          <h2 className="section-title">Recent clients</h2>
-          <DataTable columns={clientColumns} rows={recentClients} statusKey="status" />
-        </div>
-        <div>
-          <h2 className="section-title">Service health</h2>
-          <DataTable columns={serviceColumns} rows={serviceHealth} statusKey="status" />
-        </div>
-      </div>
     </section>
   );
 }

@@ -9,6 +9,7 @@ import { TwinsPage } from '../pages/TwinsPage';
 import { UsersPage } from '../pages/UsersPage';
 import { UsagePage } from '../pages/UsagePage';
 import { TelemetryPage } from '../pages/TelemetryPage';
+import { VaultPage } from '../pages/VaultPage';
 
 export const router = createBrowserRouter([
   {
@@ -21,6 +22,7 @@ export const router = createBrowserRouter([
       { path: 'twins', element: <TwinsPage /> },
       { path: 'users', element: <UsersPage /> },
       { path: 'services', element: <ServicesPage /> },
+      { path: 'vault', element: <VaultPage /> },
       { path: 'financial', element: <FinancialPage /> },
       { path: 'usage', element: <UsagePage /> },
       { path: 'telemetry', element: <TelemetryPage /> },
