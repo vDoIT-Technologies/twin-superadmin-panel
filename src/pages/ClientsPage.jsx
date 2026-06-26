@@ -1,5 +1,6 @@
 import { useContext, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Download, Search } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { FilterContext } from '../app/FilterContext';
 import { superadminDemoData } from '../demo-data/superadminDemoData';
 import { groupBy, selectFacts, sumMetric, timeSeries } from '../demo-data/superadminSelectors';
@@ -40,6 +41,7 @@ function buildSparklinePath(values, width = 92, height = 28) {
 
 export function ClientsPage() {
   const { filters } = useContext(FilterContext);
+  const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [sortConfig, setSortConfig] = useState({ key: 'cost', direction: 'desc' });
 
@@ -254,7 +256,7 @@ export function ClientsPage() {
             </thead>
             <tbody>
               {sortedRows.map((client) => (
-                <tr key={client.id}>
+                <tr key={client.id} className="entity-row-clickable" onClick={() => navigate(`/clients/${client.id}`)}>
                   <td>
                     <div className="clients-demo-client">
                       <span className="clients-demo-avatar">{getClientInitials(client.name)}</span>

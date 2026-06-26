@@ -1,5 +1,6 @@
 import { useContext, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Download, Search } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { FilterContext } from '../app/FilterContext';
 import { superadminDemoData } from '../demo-data/superadminDemoData';
 import { selectFacts, sumMetric, userShare } from '../demo-data/superadminSelectors';
@@ -30,6 +31,7 @@ function formatLastActive(daysAgo) {
 export function UsersPage() {
   const PAGE_SIZE = 12;
   const { filters } = useContext(FilterContext);
+  const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [sortConfig, setSortConfig] = useState({ key: 'pointsSpent', direction: 'desc' });
   const [page, setPage] = useState(1);
@@ -243,7 +245,7 @@ export function UsersPage() {
             </thead>
             <tbody>
               {paginatedRows.map((user) => (
-                <tr key={user.id}>
+                <tr key={user.id} className="entity-row-clickable" onClick={() => navigate(`/users/${user.id}`)}>
                   <td>
                     <div className="users-demo-user">
                       <span className="users-demo-avatar">{getUserInitials(user.name)}</span>

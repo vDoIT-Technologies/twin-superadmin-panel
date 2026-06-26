@@ -1,6 +1,4 @@
-# Twin Superadmin Panel React
-
-Starter React dashboard scaffolded in a sibling folder beside the original static HTML app.
+# Twin Superadmin Panel 
 
 ## Stack
 
