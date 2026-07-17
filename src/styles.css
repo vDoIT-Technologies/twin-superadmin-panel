@@ -1681,6 +1681,22 @@ button {
   justify-content: flex-start;
 }
 
+.users-table-loading-cell {
+  padding: 32px 18px;
+}
+
+.users-table-loader {
+  width: 16px;
+  height: 16px;
+  display: inline-block;
+  margin-right: 10px;
+  border: 2px solid #d7e2f0;
+  border-top-color: #2563eb;
+  border-radius: 999px;
+  vertical-align: text-bottom;
+  animation: users-table-loader-spin 0.7s linear infinite;
+}
+
 .users-demo-user {
   display: flex;
   align-items: center;
@@ -1741,6 +1757,12 @@ button {
 .users-demo-pagination span {
   color: #536e91;
   font-weight: 600;
+}
+
+@keyframes users-table-loader-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .cost-page {
