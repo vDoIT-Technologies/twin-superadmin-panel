@@ -1,10 +1,15 @@
-import { useContext, useEffect, useMemo, useRef } from 'react';
+import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Cpu, HardDrive, MessageSquareMore, Mic, Video } from 'lucide-react';
 import { FilterContext } from '../app/FilterContext';
 import { superadminDemoData } from '../demo-data/superadminDemoData';
 import { selectFacts, sumMetric, timeSeries } from '../demo-data/superadminSelectors';
 import { areaChart, stackedBar } from '../utils/chartHelpers';
 import { deltaPercent, formatNumber } from '../utils/dashboardUtils.jsx';
+import { DataTable } from '../components/common/DataTable.jsx';
+import { loadTokenUsage } from '../services/usageService';
+
+const formatUSD = (value) =>
+  `$${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const metricCards = [
   { key: 'messages', label: 'Messages', icon: MessageSquareMore, tone: 'indigo' },
@@ -82,6 +87,72 @@ export function UsagePage() {
     [rows, scopedFilters],
   );
 
+  // Live OpenAI token usage from the SuperAdmin backend (falls back to demo).
+  const [liveUsage, setLiveUsage] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    loadTokenUsage(scopedFilters).then((result) => {
+      if (!cancelled) setLiveUsage(result);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [scopedFilters]);
+
+  const isLive = Boolean(liveUsage?.live);
+  // When live, the OpenAI-tokens card, chart and breakdown tables use real data.
+  const tokensValue = isLive ? liveUsage.totalTokens : summary.tokens;
+  const tokenLabels = isLive && liveUsage.labels?.length ? liveUsage.labels : labels;
+  const tokenChartSeries = useMemo(
+    () =>
+      isLive
+        ? [{ label: 'Tokens', color: '#10b981', data: liveUsage.values || [] }]
+        : tokenSeries,
+    [isLive, liveUsage, tokenSeries],
+  );
+
+  // Per-user / per-client OpenAI token usage tables (live only).
+  const userUsageColumns = useMemo(
+    () => [
+      {
+        key: 'userId',
+        label: 'User (personaUserId)',
+        render: (r) => (r.userId && r.userId !== 'anonymous' ? `${String(r.userId).slice(0, 14)}…` : 'anonymous'),
+      },
+      { key: 'clientName', label: 'Client' },
+      { key: 'tokens', label: 'Tokens', render: (r) => formatNumber(r.tokens) },
+      { key: 'promptTokens', label: 'Prompt', render: (r) => formatNumber(r.promptTokens) },
+      { key: 'completionTokens', label: 'Completion', render: (r) => formatNumber(r.completionTokens) },
+      { key: 'apiCalls', label: 'Calls', render: (r) => formatNumber(r.apiCalls) },
+      { key: 'cost', label: 'Cost', render: (r) => formatUSD(r.cost) },
+    ],
+    [],
+  );
+  const userUsageRows = useMemo(
+    () => (liveUsage?.byUser || []).map((u) => ({ ...u, userId: u.userId || 'anonymous' })),
+    [liveUsage],
+  );
+
+  const clientUsageColumns = useMemo(
+    () => [
+      { key: 'clientName', label: 'Client' },
+      { key: 'tokens', label: 'Tokens', render: (r) => formatNumber(r.tokens) },
+      { key: 'promptTokens', label: 'Prompt', render: (r) => formatNumber(r.promptTokens) },
+      { key: 'completionTokens', label: 'Completion', render: (r) => formatNumber(r.completionTokens) },
+      { key: 'apiCalls', label: 'Calls', render: (r) => formatNumber(r.apiCalls) },
+      { key: 'cost', label: 'Cost', render: (r) => formatUSD(r.cost) },
+    ],
+    [],
+  );
+  const clientUsageRows = useMemo(
+    () =>
+      (liveUsage?.byClient || []).map((c, i) => ({
+        ...c,
+        clientKey: c.clientId || c.clientName || `row-${i}`,
+      })),
+    [liveUsage],
+  );
+
   const videoSeries = useMemo(
     () => [{ label: 'Video minutes', color: '#a855f7', data: timeSeries(rows, 'videoMins', scopedFilters).values }],
     [rows, scopedFilters],
@@ -139,7 +210,7 @@ export function UsagePage() {
 
     if (tokensRef.current) {
       charts.push(
-        areaChart(tokensRef.current, labels, tokenSeries, {
+        areaChart(tokensRef.current, tokenLabels, tokenChartSeries, {
           fmt: formatNumber,
           yfmt: formatAxisBillions,
         }),
@@ -183,7 +254,7 @@ export function UsagePage() {
     }
 
     return () => charts.forEach((chart) => chart.destroy());
-  }, [apiSeries, labels, modalityData, storageSeries, tokenSeries, videoSeries, voiceSeries]);
+  }, [apiSeries, labels, modalityData, storageSeries, tokenChartSeries, tokenLabels, videoSeries, voiceSeries]);
 
   return (
     <section className="page-section usage-demo-page">
@@ -202,6 +273,7 @@ export function UsagePage() {
         {metricCards.map((card) => {
           const Icon = card.icon;
           const delta = card.key === 'storageGB' ? null : deltaPercent(scopedFilters, card.key);
+          const cardValue = card.key === 'tokens' ? tokensValue : summary[card.key];
 
           return (
             <article key={card.key} className="table-card usage-demo-metric-card">
@@ -209,9 +281,13 @@ export function UsagePage() {
                 <span className={`usage-demo-metric-icon usage-demo-metric-icon-${card.tone}`}>
                   <Icon size={17} />
                 </span>
-                {delta != null ? <span className="usage-demo-metric-delta">^ {Math.abs(delta).toFixed(1)}%</span> : null}
+                {card.key === 'tokens' && isLive ? (
+                  <span className="usage-demo-metric-delta">live</span>
+                ) : delta != null ? (
+                  <span className="usage-demo-metric-delta">^ {Math.abs(delta).toFixed(1)}%</span>
+                ) : null}
               </div>
-              <h2>{formatNumber(summary[card.key])}</h2>
+              <h2>{formatNumber(cardValue)}</h2>
               <p>{card.label}</p>
             </article>
           );
@@ -232,6 +308,7 @@ export function UsagePage() {
         <section className="table-card usage-demo-chart-card">
           <div className="usage-demo-card-head">
             <h2>OpenAI tokens</h2>
+            <span>{isLive ? 'live · PERSONA usage' : 'demo data'}</span>
           </div>
           <div className="chart-wrapper usage-demo-chart-wrapper">
             <canvas ref={tokensRef} />
@@ -323,6 +400,46 @@ export function UsagePage() {
               </div>
             </div>
           </div>
+        </section>
+      </div>
+
+      <div className="usage-demo-chart-grid">
+        <section className="table-card usage-demo-chart-card">
+          <div className="usage-demo-card-head">
+            <h2>OpenAI tokens by user</h2>
+            <span>{isLive ? 'live · per personaUserId' : 'connect backend for live data'}</span>
+          </div>
+          {isLive ? (
+            <DataTable
+              columns={userUsageColumns}
+              rows={userUsageRows}
+              rowKey="userId"
+              emptyMessage="No token usage in range"
+            />
+          ) : (
+            <p className="usage-demo-empty-hint">
+              Set <code>VITE_API_BASE_URL</code> (and a SuperAdmin token) to load real per-user OpenAI token usage.
+            </p>
+          )}
+        </section>
+
+        <section className="table-card usage-demo-chart-card">
+          <div className="usage-demo-card-head">
+            <h2>OpenAI tokens by client</h2>
+            <span>{isLive ? 'live · reconciled to TWIN client' : 'connect backend for live data'}</span>
+          </div>
+          {isLive ? (
+            <DataTable
+              columns={clientUsageColumns}
+              rows={clientUsageRows}
+              rowKey="clientKey"
+              emptyMessage="No token usage in range"
+            />
+          ) : (
+            <p className="usage-demo-empty-hint">
+              Set <code>VITE_API_BASE_URL</code> (and a SuperAdmin token) to load real per-client OpenAI token usage.
+            </p>
+          )}
         </section>
       </div>
     </section>
