@@ -1,5 +1,6 @@
 import { useContext, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Download, Search } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { FilterContext } from '../app/FilterContext';
 import { superadminDemoData } from '../demo-data/superadminDemoData';
 import { groupBy, selectFacts, sumMetric, twinShare } from '../demo-data/superadminSelectors';
@@ -25,6 +26,7 @@ function getTwinInitials(name) {
 
 export function TwinsPage() {
   const { filters } = useContext(FilterContext);
+  const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [sortConfig, setSortConfig] = useState({ key: 'cost', direction: 'desc' });
 
@@ -261,7 +263,7 @@ export function TwinsPage() {
             </thead>
             <tbody>
               {sortedRows.map((twin) => (
-                <tr key={twin.id}>
+                <tr key={twin.id} className="entity-row-clickable" onClick={() => navigate(`/twins/${twin.id}`)}>
                   <td>
                     <div className="twins-demo-twin">
                       <span className="twins-demo-avatar">{getTwinInitials(twin.name)}</span>

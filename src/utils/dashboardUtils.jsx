@@ -100,6 +100,7 @@ export function getPageTitle(pathname) {
     '/financial': 'Cost & Billing',
     '/usage': 'Usage Analytics',
     '/telemetry': 'Telemetry',
+    '/profile': 'Profile',
   };
   return map[pathname] || 'Overview';
 }

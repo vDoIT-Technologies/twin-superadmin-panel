@@ -1,6 +1,7 @@
 import { superadminDemoData } from '../demo-data/superadminDemoData';
 import { defaultDemoFilters, groupBy, selectFacts, sumMetric } from '../demo-data/superadminSelectors';
 import { mockGet } from './apiClient';
+import api from './httpClient';
 
 const overviewFilters = defaultDemoFilters;
 
@@ -105,6 +106,15 @@ export const dashboardService = {
   },
   getUsers() {
     return mockGet(buildUsers());
+  },
+  async getEntityUsers(params = {}) {
+    const response = await api.get('/api/v1/entities/users', {
+      params: {
+        page: params.page,
+        limit: params.limit,
+      },
+    });
+    return response.data;
   },
   getServices() {
     return mockGet(buildServices());
