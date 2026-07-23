@@ -2817,6 +2817,10 @@ button {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
+.entity-detail-metric-grid-six {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
 .entity-metric-card {
   padding: 16px 18px 18px;
 }
@@ -3714,7 +3718,8 @@ button {
   .entity-detail-grid-sidebar,
   .entity-detail-grid-even,
   .entity-detail-metric-grid-five,
-  .entity-detail-metric-grid-four {
+  .entity-detail-metric-grid-four,
+  .entity-detail-metric-grid-six {
     grid-template-columns: 1fr;
   }
 

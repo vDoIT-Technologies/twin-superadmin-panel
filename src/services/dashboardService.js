@@ -20,23 +20,6 @@ function buildOverviewMetrics() {
   ];
 }
 
-function buildClients() {
-  return superadminDemoData.CLIENTS.map((client) => {
-    const rows = selectFacts(overviewFilters, { client: client.id });
-    const twins = superadminDemoData.TWINS.filter((twin) => twin.clientId === client.id).length;
-    const messages = sumMetric(rows, 'messages', overviewFilters);
-    return {
-      id: client.id,
-      name: client.name,
-      plan: client.plan,
-      status: client.id === superadminDemoData.ANOMALY.clientId ? 'watch' : 'active',
-      region: client.industry,
-      twins,
-      messages: Math.round(messages),
-    };
-  });
-}
-
 function buildTwins() {
   return superadminDemoData.TWINS.map((twin) => ({
     id: twin.id,
@@ -94,18 +77,41 @@ export const dashboardService = {
   getOverview() {
     return mockGet({
       metrics: buildOverviewMetrics(),
-      recentClients: buildClients().slice(0, 5),
       serviceHealth: buildServices(),
     });
-  },
-  getClients() {
-    return mockGet(buildClients());
   },
   getTwins() {
     return mockGet(buildTwins());
   },
   getUsers() {
     return mockGet(buildUsers());
+  },
+  async getEntityClientById(clientId) {
+    const response = await api.get(`/api/v1/entities/clients/${clientId}`);
+    return response.data;
+  },
+  async getEntityClientTwins(clientId) {
+    const response = await api.get(`/api/v1/entities/clients/${clientId}/twins`);
+    return response.data;
+  },
+  async getEntityClientUsers(clientId) {
+    const response = await api.get(`/api/v1/entities/clients/${clientId}/users`);
+    return response.data;
+  },
+  async getEntityClientVault(clientId) {
+    const response = await api.get(`/api/v1/entities/clients/${clientId}/vault`);
+    return response.data;
+  },
+  async getEntityClients(params = {}) {
+    const response = await api.get('/api/v1/entities/clients', {
+      params: {
+        page: params.page,
+        limit: params.limit,
+        env: params.env,
+        range: params.range,
+      },
+    });
+    return response.data;
   },
   async getEntityUsers(params = {}) {
     const response = await api.get('/api/v1/entities/users', {

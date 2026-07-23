@@ -1,21 +1,12 @@
-import { useContext, useMemo, useState } from 'react';
+import { useContext, useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Download, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { FilterContext } from '../app/FilterContext';
-import { superadminDemoData } from '../demo-data/superadminDemoData';
-import { groupBy, selectFacts, sumMetric, timeSeries } from '../demo-data/superadminSelectors';
+import { dashboardService } from '../services';
 import { envBadge, formatNumber } from '../utils/dashboardUtils';
 
-function formatScopeLabel(filters) {
-  if (filters.envs.length === superadminDemoData.ENVS.length) {
-    return `All envs · last ${filters.range}`;
-  }
-  const separator = filters.envs.length > 1 ? ' + ' : ', ';
-  const envLabel = filters.envs.map((env) => superadminDemoData.ENV_META[env]?.label ?? env).join(separator);
-  return `${envLabel} · last ${filters.range}`;
-}
-
 function getClientInitials(name) {
+  if (!name) return '?';
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length <= 1) return name.trim().slice(0, 1).toUpperCase();
   return parts
@@ -24,86 +15,144 @@ function getClientInitials(name) {
     .join('');
 }
 
-function buildSparklinePath(values, width = 92, height = 28) {
-  if (!values.length) return '';
-  const max = Math.max(...values, 1);
-  const min = Math.min(...values, 0);
-  const range = Math.max(max - min, 1);
+function parseDecimal(value) {
+  if (value == null) return 0;
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }
+  if (typeof value === 'object' && '$numberDecimal' in value) {
+    const parsed = Number(value.$numberDecimal);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }
+  return 0;
+}
 
-  return values
-    .map((value, index) => {
-      const x = values.length === 1 ? width / 2 : (index / (values.length - 1)) * width;
-      const y = height - ((value - min) / range) * height;
-      return `${index === 0 ? 'M' : 'L'}${x.toFixed(2)} ${y.toFixed(2)}`;
-    })
-    .join(' ');
+function formatOptionalNumber(value) {
+  if (value == null) return '';
+  return formatNumber(value);
+}
+
+function formatLastActive(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const daysAgo = Math.floor((Date.now() - date.getTime()) / 86400000);
+  if (daysAgo <= 0) return 'today';
+  if (daysAgo === 1) return '1d ago';
+  return `${daysAgo}d ago`;
+}
+
+function getEnvList(client) {
+  // Try envs array first, then fall back to __env
+  if (Array.isArray(client.envs) && client.envs.length > 0) return client.envs;
+  if (client.__env) return [client.__env];
+  return [];
+}
+
+function getClientsPayload(response) {
+  if (Array.isArray(response?.data)) {
+    return {
+      clients: response.data,
+      pagination: response?.pagination ?? null,
+    };
+  }
+
+  if (Array.isArray(response?.data?.data)) {
+    return {
+      clients: response.data.data,
+      pagination: response?.data?.pagination ?? response?.pagination ?? null,
+    };
+  }
+
+  return {
+    clients: [],
+    pagination: response?.data?.pagination ?? response?.pagination ?? null,
+  };
 }
 
 export function ClientsPage() {
+  const PAGE_SIZE = 10;
   const { filters } = useContext(FilterContext);
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [sortConfig, setSortConfig] = useState({ key: 'cost', direction: 'desc' });
+  const [page, setPage] = useState(1);
+  const [apiClients, setApiClients] = useState([]);
+  const [isTableLoading, setIsTableLoading] = useState(true);
+  const [pagination, setPagination] = useState({
+    total: 0,
+    page: 1,
+    limit: PAGE_SIZE,
+    totalPages: 1,
+  });
 
-  const scopedFilters = useMemo(
-    () => ({
-      ...filters,
-      service: null,
-      vendor: null,
-      twin: null,
-      user: null,
-    }),
-    [filters],
-  );
+  useEffect(() => {
+    let isActive = true;
 
-  const rows = useMemo(() => selectFacts(scopedFilters), [scopedFilters]);
-  const scopeLabel = useMemo(() => formatScopeLabel(filters), [filters]);
+    async function loadClients() {
+      setIsTableLoading(true);
+      try {
+        const data = await dashboardService.getEntityClients({
+          page,
+          limit: PAGE_SIZE,
+        });
+
+        if (!isActive) return;
+
+        const payload = getClientsPayload(data);
+        setApiClients(payload.clients);
+        setPagination({
+          total: Number(payload.pagination?.total) || 0,
+          page: Number(payload.pagination?.page) || page,
+          limit: Number(payload.pagination?.limit) || PAGE_SIZE,
+          totalPages: Number(payload.pagination?.totalPages) || 1,
+        });
+      } catch (error) {
+        if (!isActive) return;
+        console.error('GET /api/v1/entities/clients failed:', error);
+        setApiClients([]);
+        setPagination((prev) => ({ ...prev, total: 0, totalPages: 1 }));
+      } finally {
+        if (isActive) setIsTableLoading(false);
+      }
+    }
+
+    loadClients();
+    return () => { isActive = false; };
+  }, [page]);
 
   const clientRows = useMemo(() => {
-    const costMap = new Map(groupBy(rows, 'clientId', 'cost', scopedFilters).map((entry) => [entry.id, entry.value]));
-    const revenueMap = new Map(groupBy(rows, 'clientId', 'revenue', scopedFilters).map((entry) => [entry.id, entry.value]));
-    const messageMap = new Map(groupBy(rows, 'clientId', 'messages', scopedFilters).map((entry) => [entry.id, entry.value]));
-    const pointMap = new Map(
-      groupBy(rows, 'clientId', 'pointsSpent', scopedFilters).map((entry) => [entry.id, entry.value]),
-    );
+    return apiClients.map((client, index) => {
+      const name = client.name || client.organizationName || '';
+      const plan = client.plan || '';
+      const envs = getEnvList(client);
+      const twinsCount = client.twinsCount ?? 0;
+      const usersCount = client.usersCount ?? 0;
+      const messages = client.messages ?? 0;
+      const pointsSpent = parseDecimal(client.pointsSpent);
+      const revenue = parseDecimal(client.revenue);
+      const cost = parseDecimal(client.cost ?? client.usage?.cost);
+      const margin = parseDecimal(client.margin);
+      const lastActive = client.lastActive;
 
-    return superadminDemoData.CLIENTS.filter((client) => !filters.client || client.id === filters.client)
-      .map((client) => {
-        const cost = costMap.get(client.id) ?? 0;
-        const revenue = revenueMap.get(client.id) ?? 0;
-        const messages = messageMap.get(client.id) ?? 0;
-        const pointsSpent = pointMap.get(client.id) ?? 0;
-        const twins = superadminDemoData.TWINS.filter((twin) => twin.clientId === client.id).length;
-        const users = superadminDemoData.USERS.filter(
-          (user) => user.clientId === client.id && filters.envs.includes(user.env),
-        ).length;
-        const margin = revenue ? ((revenue - cost) / revenue) * 100 : 0;
-        const lastActive = 'today';
-        const trendValues = timeSeries(
-          rows.filter((row) => row.clientId === client.id),
-          'cost',
-          scopedFilters,
-        ).values;
-        const envs = superadminDemoData.ENVS.filter((env) => client.envWeights[env] >= 0.2);
-
-        return {
-          id: client.id,
-          name: client.name,
-          plan: client.plan,
-          envs,
-          twins,
-          users,
-          messages,
-          pointsSpent,
-          revenue,
-          cost,
-          margin,
-          lastActive,
-          trendPath: buildSparklinePath(trendValues),
-        };
-      })
-      .sort((left, right) => right.cost - left.cost);
-  }, [filters.client, filters.envs, rows, scopedFilters]);
+      return {
+        id: client._id || client.id || `client-row-${index}`,
+        name,
+        plan,
+        envs,
+        twins: twinsCount,
+        users: usersCount,
+        messages,
+        pointsSpent,
+        revenue,
+        cost,
+        margin,
+        lastActive,
+      };
+    });
+  }, [apiClients]);
 
   const filteredRows = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -111,36 +160,24 @@ export function ClientsPage() {
     return clientRows.filter(
       (client) =>
         client.name.toLowerCase().includes(q) ||
-        client.plan.toLowerCase().includes(q) ||
-        client.envs.some((env) => superadminDemoData.ENV_META[env].label.toLowerCase().includes(q)),
+        client.plan.toLowerCase().includes(q),
     );
   }, [clientRows, query]);
 
   const sortedRows = useMemo(() => {
     const getSortValue = (client) => {
       switch (sortConfig.key) {
-        case 'client':
-          return client.name;
-        case 'env':
-          return client.envs.map((env) => superadminDemoData.ENV_META[env].label).join(' ');
-        case 'twins':
-          return client.twins;
-        case 'users':
-          return client.users;
-        case 'messages':
-          return client.messages;
-        case 'pointsSpent':
-          return client.pointsSpent;
-        case 'revenue':
-          return client.revenue;
-        case 'cost':
-          return client.cost;
-        case 'margin':
-          return client.margin;
-        case 'lastActive':
-          return client.lastActive;
-        default:
-          return client.name;
+        case 'client': return client.name;
+        case 'env': return client.envs.join(' ');
+        case 'twins': return client.twins;
+        case 'users': return client.users;
+        case 'messages': return client.messages;
+        case 'pointsSpent': return client.pointsSpent;
+        case 'revenue': return client.revenue;
+        case 'cost': return client.cost;
+        case 'margin': return client.margin;
+        case 'lastActive': return client.lastActive || '';
+        default: return client.name;
       }
     };
 
@@ -158,6 +195,11 @@ export function ClientsPage() {
     });
   }, [filteredRows, sortConfig]);
 
+  const totalPages = Math.max(1, pagination.totalPages || 1);
+  const currentPage = Math.min(page, totalPages);
+  const pageStart = sortedRows.length === 0 ? 0 : (currentPage - 1) * (pagination.limit || PAGE_SIZE) + 1;
+  const pageEnd = sortedRows.length === 0 ? 0 : pageStart + sortedRows.length - 1;
+
   const toggleSort = (key) => {
     setSortConfig((prev) =>
       prev.key === key
@@ -168,17 +210,17 @@ export function ClientsPage() {
 
   const exportCsv = () => {
     const header = ['Client', 'Plan', 'Envs', 'Twins', 'Users', 'Messages', 'Points Spent', 'Revenue', 'COGS', 'Margin'];
-    const lines = filteredRows.map((client) =>
+    const lines = sortedRows.map((client) =>
       [
         client.name,
         client.plan,
-        client.envs.map((env) => superadminDemoData.ENV_META[env].label).join(' | '),
+        client.envs.join(' | '),
         client.twins,
         client.users,
-        formatNumber(client.messages),
-        formatNumber(client.pointsSpent),
-        `$${formatNumber(client.revenue)}`,
-        `$${formatNumber(client.cost)}`,
+        formatOptionalNumber(client.messages),
+        formatOptionalNumber(client.pointsSpent),
+        `$${formatOptionalNumber(client.revenue)}`,
+        `$${formatOptionalNumber(client.cost)}`,
         `${Math.round(client.margin)}%`,
       ]
         .map((value) => `"${String(value).replaceAll('"', '""')}"`)
@@ -202,10 +244,6 @@ export function ClientsPage() {
           <h1>Clients</h1>
           <p>White-label tenants — usage, revenue, COGS and margin</p>
         </div>
-        <div className="clients-scope">
-          <span className="clients-scope-label">Scope</span>
-          <span className="clients-scope-value">{scopeLabel}</span>
-        </div>
       </header>
 
       <section className="table-card clients-demo-card">
@@ -215,7 +253,9 @@ export function ClientsPage() {
             <input
               type="text"
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={(event) => {
+                setQuery(event.target.value);
+              }}
               placeholder="Search clients..."
             />
           </label>
@@ -251,59 +291,80 @@ export function ClientsPage() {
                     </button>
                   </th>
                 ))}
-                <th>Trend</th>
               </tr>
             </thead>
             <tbody>
-              {sortedRows.map((client) => (
-                <tr key={client.id} className="entity-row-clickable" onClick={() => navigate(`/clients/${client.id}`)}>
-                  <td>
-                    <div className="clients-demo-client">
-                      <span className="clients-demo-avatar">{getClientInitials(client.name)}</span>
-                      <div>
-                        <strong>{client.name}</strong>
-                        <span>{client.plan}</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td>
-                    <div className="clients-demo-envs">
-                      {client.envs.map((env) => (
-                        <span key={env} className="clients-demo-env-badge">
-                          {envBadge(env)}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                  <td>{client.twins}</td>
-                  <td>{client.users}</td>
-                  <td>{formatNumber(client.messages)}</td>
-                  <td>{formatNumber(client.pointsSpent)}</td>
-                  <td>${formatNumber(client.revenue)}</td>
-                  <td>${formatNumber(client.cost)}</td>
-                  <td className="clients-demo-margin">{Math.round(client.margin)}%</td>
-                  <td>{client.lastActive}</td>
-                  <td>
-                    <svg className="clients-demo-sparkline" viewBox="0 0 92 28" aria-hidden="true">
-                      <path d={client.trendPath} fill="none" stroke="#5b5ce6" strokeWidth="1.8" strokeLinecap="round" />
-                    </svg>
+              {isTableLoading ? (
+                <tr>
+                  <td colSpan={10} className="table-empty users-table-loading-cell">
+                    <span className="users-table-loader" aria-hidden="true" />
+                    Loading clients...
                   </td>
                 </tr>
-              ))}
+              ) : sortedRows.length === 0 ? (
+                <tr>
+                  <td colSpan={10} className="table-empty">
+                    No clients found
+                  </td>
+                </tr>
+              ) : (
+                sortedRows.map((client) => (
+                  <tr key={client.id} className="entity-row-clickable" onClick={() => navigate(`/clients/${client.id}`)}>
+                    <td>
+                      <div className="clients-demo-client">
+                        <span className="clients-demo-avatar">{getClientInitials(client.name)}</span>
+                        <div>
+                          <strong>{client.name}</strong>
+                          <span>{client.plan}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="clients-demo-envs">
+                        {client.envs.map((env) => (
+                          <span key={env} className="clients-demo-env-badge">
+                            {envBadge(env)}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td>{formatOptionalNumber(client.twins)}</td>
+                    <td>{formatOptionalNumber(client.users)}</td>
+                    <td>{formatOptionalNumber(client.messages)}</td>
+                    <td>{formatOptionalNumber(client.pointsSpent)}</td>
+                    <td>${formatOptionalNumber(client.revenue)}</td>
+                    <td>${formatOptionalNumber(client.cost)}</td>
+                    <td className="clients-demo-margin">{Math.round(client.margin)}%</td>
+                    <td>{formatLastActive(client.lastActive)}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
 
         <div className="clients-demo-footer">
           <span>
-            1-{sortedRows.length} of {sortedRows.length}
+            {pageStart}-{pageEnd} of {pagination.total}
           </span>
           <div className="clients-demo-pagination">
-            <button type="button" disabled aria-label="Previous page">
+            <button
+              type="button"
+              disabled={currentPage === 1 || isTableLoading}
+              aria-label="Previous page"
+              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+            >
               <ChevronLeft size={14} />
             </button>
-            <span>1 / 1</span>
-            <button type="button" disabled aria-label="Next page">
+            <span>
+              {currentPage} / {totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={currentPage === totalPages || isTableLoading}
+              aria-label="Next page"
+              onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+            >
               <ChevronRight size={14} />
             </button>
           </div>

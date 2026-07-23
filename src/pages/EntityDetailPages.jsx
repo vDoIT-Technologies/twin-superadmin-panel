@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { FilterContext } from '../app/FilterContext';
+import { dashboardService } from '../services';
 import { superadminDemoData } from '../demo-data/superadminDemoData';
 import { selectFacts, sumMetric, timeSeries, twinShare, userShare } from '../demo-data/superadminSelectors';
 import { areaChart, donut, hBar, stackedBar } from '../utils/chartHelpers';
@@ -142,144 +143,88 @@ function useClientRows(filters, clientId) {
   );
 }
 
+function parseDecimal(value) {
+  if (value == null) return 0;
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') return Number(value) || 0;
+  if (typeof value === 'object' && '$numberDecimal' in value) return Number(value.$numberDecimal) || 0;
+  return 0;
+}
+
 export function ClientDetailPage() {
   const navigate = useNavigate();
   const { clientId } = useParams();
-  const { filters } = useContext(FilterContext);
+  const [clientData, setClientData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
-  const trendRef = useRef(null);
-  const serviceShareRef = useRef(null);
-  const serviceTrendRef = useRef(null);
-  const vendorCostRef = useRef(null);
-  const client = superadminDemoData.byId.client(clientId);
-  const detailFilters = useMemo(
-    () => ({
-      ...filters,
-      client: null,
-      twin: null,
-      user: null,
-      service: null,
-      vendor: null,
-    }),
-    [filters],
-  );
-  const rows = useClientRows(detailFilters, clientId);
+
+  // Lazy-loaded tab data (cached in state — don't re-fetch on tab switch back).
+  const [tabData, setTabData] = useState({ twins: null, users: null, vault: null });
+  const [tabLoading, setTabLoading] = useState('');
 
   useEffect(() => {
     setActiveTab('overview');
+    let isActive = true;
+
+    async function loadClient() {
+      setIsLoading(true);
+      try {
+        const response = await dashboardService.getEntityClientById(clientId);
+        if (!isActive) return;
+        // response may be wrapped in { data: ... } by SuccessResponse
+        const payload = response?.data || response;
+        setClientData(payload);
+      } catch (error) {
+        console.error('GET /entities/clients/:id failed:', error);
+        if (isActive) setClientData(null);
+      } finally {
+        if (isActive) setIsLoading(false);
+      }
+    }
+
+    loadClient();
+    setTabData({ twins: null, users: null, vault: null });
+    return () => { isActive = false; };
   }, [clientId]);
 
-  const summary = useMemo(() => {
-    if (!client) return null;
-
-    const cost = sumMetric(rows, 'cost', detailFilters);
-    const revenue = sumMetric(rows, 'revenue', detailFilters);
-    const messages = sumMetric(rows, 'messages', detailFilters);
-    const pointsSpent = sumMetric(rows, 'pointsSpent', detailFilters);
-    const twins = superadminDemoData.TWINS.filter((twin) => twin.clientId === client.id);
-    const users = superadminDemoData.USERS.filter(
-      (user) => user.clientId === client.id && detailFilters.envs.includes(user.env),
-    );
-    const margin = revenue ? ((revenue - cost) / revenue) * 100 : 0;
-
-    return {
-      cost,
-      revenue,
-      messages,
-      pointsSpent,
-      twins,
-      users,
-      margin,
-    };
-  }, [client, detailFilters, rows]);
-
-  const serviceBreakdown = useMemo(() => {
-    if (!client) return [];
-    return superadminDemoData.SERVICES.map((service) => {
-      const serviceRows = rows.filter((row) => row.service === service.id);
-      const cost = sumMetric(serviceRows, 'cost', detailFilters);
-      return { ...service, cost };
-    }).filter((service) => service.cost > 0);
-  }, [client, detailFilters, rows]);
-
-  const vendorBreakdown = useMemo(() => {
-    if (!client) return [];
-    return superadminDemoData.VENDORS.map((vendor) => ({
-      ...vendor,
-      cost: sumMetric(rows, null, detailFilters, vendor.id),
-    }))
-      .filter((vendor) => vendor.cost > 0)
-      .sort((left, right) => right.cost - left.cost);
-  }, [client, detailFilters, rows]);
-
-  const events = useMemo(
-    () => superadminDemoData.EVENTS.filter((event) => event.clientId === clientId).slice(0, 30),
-    [clientId],
-  );
-
+  // Lazy-load tab data on tab click.
   useEffect(() => {
-    if (!client || activeTab !== 'overview' || !trendRef.current || !serviceShareRef.current) return undefined;
+    if (!clientData || activeTab === 'overview') return;
+    if (tabData[activeTab] !== null) return; // already loaded
 
-    const trend = areaChart(
-      trendRef.current,
-      timeSeries(rows, 'cost', detailFilters).labels,
-      [
-        { label: 'Revenue', color: '#10b981', data: timeSeries(rows, 'revenue', detailFilters).values },
-        { label: 'Cost', color: '#ef4444', data: timeSeries(rows, 'cost', detailFilters).values },
-      ],
-      { fmt: formatCurrency, yfmt: formatCurrency },
+    let isActive = true;
+    setTabLoading(activeTab);
+
+    async function loadTab() {
+      try {
+        let data;
+        if (activeTab === 'twins') data = await dashboardService.getEntityClientTwins(clientId);
+        else if (activeTab === 'users') data = await dashboardService.getEntityClientUsers(clientId);
+        else if (activeTab === 'vault') data = await dashboardService.getEntityClientVault(clientId);
+        if (!isActive) return;
+        const payload = data?.data || data;
+        setTabData((prev) => ({ ...prev, [activeTab]: payload }));
+      } catch (error) {
+        console.error(`Tab ${activeTab} load failed:`, error);
+        if (isActive) setTabData((prev) => ({ ...prev, [activeTab]: { error: true } }));
+      } finally {
+        if (isActive) setTabLoading('');
+      }
+    }
+
+    loadTab();
+    return () => { isActive = false; };
+  }, [activeTab, clientData, clientId, tabData]);
+
+  if (isLoading) {
+    return (
+      <section className="page-section entity-detail-page">
+        <div className="empty-state">Loading client...</div>
+      </section>
     );
+  }
 
-    const colors = ['#4f46e5', '#10b981', '#f59e0b', '#0ea5e9'];
-    const share = donut(
-      serviceShareRef.current,
-      serviceBreakdown.map((service) => service.name),
-      serviceBreakdown.map((service) => service.cost),
-      serviceBreakdown.map((_, index) => colors[index % colors.length]),
-      { fmt: formatCurrency },
-    );
-
-    return () => {
-      trend.destroy();
-      share.destroy();
-    };
-  }, [activeTab, client, detailFilters, rows, serviceBreakdown]);
-
-  useEffect(() => {
-    if (!client || activeTab !== 'services' || !serviceTrendRef.current) return undefined;
-
-    const vendorsInScope = superadminDemoData.VENDORS.filter((vendor) =>
-      rows.some((row) => (row.vendorCost[vendor.id] || 0) > 0),
-    );
-    const chart = stackedBar(
-      serviceTrendRef.current,
-      timeSeries(rows, 'cost', detailFilters).labels,
-      vendorsInScope.map((vendor) => ({
-        label: vendor.name,
-        color: vendor.color,
-        data: timeSeries(rows, null, detailFilters, vendor.id).values,
-      })),
-      { fmt: formatCurrency, yfmt: formatCurrency, legend: true },
-    );
-
-    return () => chart.destroy();
-  }, [activeTab, client, detailFilters, rows]);
-
-  useEffect(() => {
-    if (!client || activeTab !== 'cost' || !vendorCostRef.current) return undefined;
-
-    const chart = hBar(
-      vendorCostRef.current,
-      vendorBreakdown.map((vendor) => vendor.name),
-      vendorBreakdown.map((vendor) => vendor.cost),
-      vendorBreakdown.map((vendor) => vendor.color),
-      { fmt: formatCurrency, xfmt: formatCurrency },
-    );
-
-    return () => chart.destroy();
-  }, [activeTab, client, vendorBreakdown]);
-
-  if (!client || !summary) {
+  if (!clientData) {
     return (
       <section className="page-section entity-detail-page">
         <div className="empty-state">Client not found.</div>
@@ -287,25 +232,51 @@ export function ClientDetailPage() {
     );
   }
 
-  const tabs = ['overview', 'twins', 'users', 'services', 'cost', 'timeline'];
-  const totalServiceCost = serviceBreakdown.reduce((sum, service) => sum + service.cost, 0) || 1;
+  const { profile, kpis, usage } = clientData;
+  const twins = tabData.twins?.twins || [];
+  const users = tabData.users?.users || [];
+  const vault = tabData.vault?.vault || [];
+  const clientName = profile?.name || profile?.organizationName || '';
+  const plan = profile?.plan || '';
+
+  const formatBytes = (bytes) => {
+    if (!bytes) return '0 B';
+    const num = Number(bytes);
+    if (num >= 1099511627776) return `${(num / 1099511627776).toFixed(2)} TB`;
+    if (num >= 1073741824) return `${(num / 1073741824).toFixed(2)} GB`;
+    if (num >= 1048576) return `${(num / 1048576).toFixed(1)} MB`;
+    if (num >= 1024) return `${(num / 1024).toFixed(0)} KB`;
+    return `${num} B`;
+  };
+
+  const formatDateShort = (val) => {
+    if (!val) return '-';
+    const d = new Date(val);
+    if (Number.isNaN(d.getTime())) return '-';
+    const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+    if (days <= 0) return 'today';
+    if (days === 1) return '1d ago';
+    return `${days}d ago`;
+  };
+
+  const tabs = ['overview', 'twins', 'users', 'vault'];
 
   return (
     <section className="page-section entity-detail-page">
       <DetailHeader
         avatarClassName="client"
-        initials={getInitials(client.name)}
-        title={client.name}
-        subtitle={`${client.industry} · ${client.plan} plan`}
+        initials={getInitials(clientName)}
+        title={clientName}
+        subtitle={`${profile?.organizationName || ''} · ${plan} plan`}
         onBack={() => navigate('/clients')}
       />
 
       <div className="entity-detail-metric-grid entity-detail-metric-grid-five">
-        <MetricCard icon={Wallet} label="COGS" value={formatCurrency(summary.cost)} tone="indigo" />
-        <MetricCard icon={TrendingUp} label="Revenue" value={formatCurrency(summary.revenue)} tone="emerald" />
-        <MetricCard icon={Percent} label="Margin" value={`${summary.margin.toFixed(1)}%`} tone="violet" />
-        <MetricCard icon={Bot} label="Twins" value={String(summary.twins.length)} tone="rose" />
-        <MetricCard icon={Users} label="Users" value={String(summary.users.length)} tone="amber" />
+        <MetricCard icon={Wallet} label="COGS" value={formatCurrency(kpis?.cost || 0)} tone="indigo" />
+        <MetricCard icon={TrendingUp} label="Revenue" value={formatCurrency(kpis?.revenue || 0)} tone="emerald" />
+        <MetricCard icon={Percent} label="Margin" value={`${kpis?.margin || 0}%`} tone="violet" />
+        <MetricCard icon={Bot} label="Twins" value={String(kpis?.twinsCount || 0)} tone="rose" />
+        <MetricCard icon={Users} label="Users" value={String(kpis?.usersCount || 0)} tone="amber" />
       </div>
 
       <div className="entity-tabs">
@@ -322,42 +293,60 @@ export function ClientDetailPage() {
       </div>
 
       {activeTab === 'overview' ? (
-        <div className="entity-detail-grid entity-detail-grid-sidebar">
-          <CardSection title="Cost vs Revenue" subtitle="Last 30 days">
-            <div className="entity-chart-wrap entity-chart-tall">
-              <canvas ref={trendRef} />
+        <div className="entity-detail-grid entity-detail-grid-even">
+          <CardSection title="Client Info" flush>
+            <div className="entity-stats-list">
+              <div className="entity-stat-row"><span>Organization</span><strong>{profile?.organizationName || '-'}</strong></div>
+              <div className="entity-stat-row"><span>Plan</span><strong>{plan || '-'}</strong></div>
+              <div className="entity-stat-row"><span>Email</span><strong>{profile?.email || '-'}</strong></div>
+              <div className="entity-stat-row"><span>Environment</span><strong>{profile?.env || '-'}</strong></div>
+              <div className="entity-stat-row"><span>Created</span><strong>{profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString() : '-'}</strong></div>
             </div>
           </CardSection>
-          <CardSection title="Cost by Service" subtitle={`${serviceBreakdown.length} services`}>
-            <div className="entity-donut-wrap">
-              <canvas ref={serviceShareRef} />
+          <CardSection title="Usage Summary" flush>
+            <div className="entity-stats-list">
+              <div className="entity-stat-row"><span>Total Tokens</span><strong>{formatNumber(usage?.tokens || 0)}</strong></div>
+              <div className="entity-stat-row"><span>Prompt Tokens</span><strong>{formatNumber(usage?.promptTokens || 0)}</strong></div>
+              <div className="entity-stat-row"><span>Completion Tokens</span><strong>{formatNumber(usage?.completionTokens || 0)}</strong></div>
+              <div className="entity-stat-row"><span>API Calls</span><strong>{formatNumber(usage?.apiCalls || 0)}</strong></div>
+              <div className="entity-stat-row"><span>Cost</span><strong>{formatCurrency(usage?.cost || 0)}</strong></div>
             </div>
-            <LegendList
-              formatter={formatCurrency}
-              items={serviceBreakdown.map((service, index) => ({
-                label: service.name,
-                value: service.cost,
-                color: ['#4f46e5', '#10b981', '#f59e0b', '#0ea5e9'][index % 4],
-              }))}
-            />
           </CardSection>
         </div>
       ) : null}
 
-      {activeTab === 'twins' ? (
-        <CardSection title={`${summary.twins.length} twins`} flush>
-          {summary.twins.length ? (
-            <div className="entity-list">
-              {summary.twins.map((twin) => (
-                <EntityListRow
-                  key={twin.id}
-                  avatarClassName="twin"
-                  initials={getInitials(twin.name)}
-                  title={twin.name}
-                  subtitle={twin.role}
-                  meta={`${(twinShare(twin) * 100).toFixed(1)}% share`}
-                  onClick={() => navigate(`/twins/${twin.id}`)}
-                />
+      {activeTab === 'twins' && tabLoading === 'twins' ? (
+        <CardSection title="Twins" flush><EmptyDetailState message="Loading twins..." /></CardSection>
+      ) : null}
+
+      {activeTab === 'twins' && tabLoading !== 'twins' ? (
+        <CardSection title={`${twins?.length || 0} twins`} flush>
+          {twins?.length ? (
+            <div className="entity-table-list">
+              <div className="entity-table-row entity-table-header">
+                <span className="entity-table-name">Twin</span>
+                <span>Est. Cost</span>
+                <span>Share</span>
+              </div>
+              {twins.map((twin) => (
+                <div
+                  key={twin._id}
+                  className="entity-table-row entity-row-clickable"
+                  onClick={() => navigate(`/twins/${twin._id}`)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => e.key === 'Enter' && navigate(`/twins/${twin._id}`)}
+                >
+                  <span className="entity-table-name">
+                    <span className="entity-link-avatar twin">{getInitials(twin.name || '')}</span>
+                    <span>
+                      <strong>{twin.name || 'Unnamed'}</strong>
+                      {twin.role ? <span className="entity-table-sub">{twin.role}</span> : null}
+                    </span>
+                  </span>
+                  <span>{formatCurrency(twin.estCost || 0)}</span>
+                  <span>{twin.share || 0}%</span>
+                </div>
               ))}
             </div>
           ) : (
@@ -366,82 +355,98 @@ export function ClientDetailPage() {
         </CardSection>
       ) : null}
 
-      {activeTab === 'users' ? (
-        <CardSection title={`${summary.users.length} users`} flush>
-          {summary.users.length ? (
-            <div className="entity-list">
-              {summary.users.map((user) => (
-                <EntityListRow
-                  key={user.id}
-                  avatarClassName="user"
-                  initials={getInitials(user.name)}
-                  title={user.name}
-                  subtitle={`${superadminDemoData.ENV_META[user.env].label} · ${formatNumber(user.pointsBalance)} points`}
-                  meta={formatLastActive(user.lastActiveDaysAgo)}
-                  onClick={() => navigate(`/users/${user.id}`)}
-                />
+      {activeTab === 'users' && tabLoading === 'users' ? (
+        <CardSection title="Users" flush><EmptyDetailState message="Loading users..." /></CardSection>
+      ) : null}
+
+      {activeTab === 'users' && tabLoading !== 'users' ? (
+        <CardSection title={`${users?.length || 0} users`} flush>
+          {users?.length ? (
+            <div className="entity-table-list">
+              <div className="entity-table-row entity-table-header">
+                <span className="entity-table-name">User</span>
+                <span>Env</span>
+                <span>Points</span>
+                <span>Twins used</span>
+                <span>Last active</span>
+              </div>
+              {users.map((user) => (
+                <div
+                  key={user._id}
+                  className="entity-table-row entity-row-clickable"
+                  onClick={() => navigate(`/users/${user._id}`)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => e.key === 'Enter' && navigate(`/users/${user._id}`)}
+                >
+                  <span className="entity-table-name">
+                    <span className="entity-link-avatar user">{getInitials(user.name || '')}</span>
+                    <span>
+                      <strong>{user.name || 'Unnamed'}</strong>
+                      <span className="entity-table-sub">{user.email || ''}</span>
+                    </span>
+                  </span>
+                  <span>{envBadge(user.env)}</span>
+                  <span>{formatNumber(parseDecimal(user.points))}</span>
+                  <span>{user.twinsUsed || 0}</span>
+                  <span>{formatDateShort(user.lastActive)}</span>
+                </div>
               ))}
             </div>
           ) : (
-            <EmptyDetailState message="No users found in the selected environments." />
+            <EmptyDetailState message="No users found for this client." />
           )}
         </CardSection>
       ) : null}
 
-      {activeTab === 'services' ? (
-        <CardSection title="Service Usage" subtitle="Vendor cost over time">
-          <div className="entity-chart-wrap entity-chart-tall">
-            <canvas ref={serviceTrendRef} />
-          </div>
-        </CardSection>
+      {activeTab === 'vault' && tabLoading === 'vault' ? (
+        <CardSection title="Vault" flush><EmptyDetailState message="Loading vault data..." /></CardSection>
       ) : null}
 
-      {activeTab === 'cost' ? (
-        <div className="entity-detail-grid entity-detail-grid-sidebar">
-          <CardSection title="Cost by Vendor" subtitle="Current scope">
-            <div className="entity-chart-wrap entity-chart-tall">
-              <canvas ref={vendorCostRef} />
-            </div>
-          </CardSection>
-          <CardSection title="Vendor Breakdown" subtitle={formatCurrencyFull(summary.cost)} flush>
-            <div className="entity-table-list">
-              {vendorBreakdown.map((vendor) => (
-                <div key={vendor.id} className="entity-table-row">
-                  <span className="entity-table-name">
-                    <span className="entity-legend-dot" style={{ backgroundColor: vendor.color }} />
-                    {vendor.name}
-                  </span>
-                  <span>{formatCurrencyFull(vendor.cost)}</span>
-                  <span>{((vendor.cost / totalServiceCost) * 100).toFixed(1)}%</span>
-                </div>
-              ))}
-            </div>
-          </CardSection>
+      {activeTab === 'vault' && tabLoading !== 'vault' ? (
+        <div className="entity-detail-metric-grid entity-detail-metric-grid-six">
+          <MetricCard icon={Activity} label="Stored on IPFS" value={formatBytes(vault?.reduce((s, v) => s + Number(v.storageUsed || 0), 0) || 0)} tone="indigo" />
+          <MetricCard icon={BookOpen} label="Files pinned" value={formatNumber(vault?.reduce((s, v) => s + (v.filesCount || 0), 0) || 0)} tone="sky" />
+          <MetricCard icon={Users} label="Active drives · users" value={String(vault?.filter((v) => Number(v.storageUsed || 0) > 0).length || 0)} tone="rose" />
+          <MetricCard icon={Wallet} label="Filebase / IPFS · cost" value={formatCurrency(kpis?.cost || 0)} tone="violet" />
+          <MetricCard icon={TrendingUp} label="Storage revenue" value={formatCurrency(kpis?.revenue || 0)} tone="emerald" />
+          <MetricCard icon={Percent} label="Margin" value={`${kpis?.margin || 0}%`} tone="amber" />
         </div>
       ) : null}
 
-      {activeTab === 'timeline' ? (
-        <CardSection title="Recent Activity" subtitle={`${events.length} latest events`} flush>
-          {events.length ? (
-            <div className="entity-timeline-list">
-              {events.map((event) => {
-                const twin = superadminDemoData.byId.twin(event.twinId);
-                return (
-                  <div key={`${event.ts}-${event.event}-${event.userId}`} className="entity-timeline-row">
-                    <span className={`entity-timeline-status ${event.level}`} />
-                    <span className="entity-timeline-ts">{event.tsLabel}</span>
-                    <span>{envBadge(event.env)}</span>
-                    <span className="entity-timeline-event">{event.event}</span>
-                    <span className="entity-timeline-meta">{twin?.name ?? 'Unknown twin'}</span>
-                    <span className="entity-timeline-units">
-                      {formatNumber(event.units)} {event.unitLabel}
+      {activeTab === 'vault' && tabLoading !== 'vault' ? (
+        <CardSection title={`${vault?.length || 0} vault drives`} flush>
+          {vault?.length ? (
+            <div className="entity-table-list">
+              <div className="entity-table-row entity-table-header">
+                <span className="entity-table-name">User / Drive</span>
+                <span>Env</span>
+                <span>Plan</span>
+                <span>Used</span>
+                <span>Quota</span>
+                <span>Files</span>
+                <span>Last active</span>
+              </div>
+              {vault.map((v) => (
+                <div key={v.id} className="entity-table-row">
+                  <span className="entity-table-name">
+                    <span className="entity-link-avatar user">{getInitials(v.name || '')}</span>
+                    <span>
+                      <strong>{v.name || v.email || 'Unknown'}</strong>
+                      <span className="entity-table-sub">{v.vaultId || ''}</span>
                     </span>
-                  </div>
-                );
-              })}
+                  </span>
+                  <span>{envBadge(v.__env)}</span>
+                  <span>{v.planName || 'Free'}</span>
+                  <span>{formatBytes(v.storageUsed)}</span>
+                  <span>{formatBytes(v.storageLimit)}</span>
+                  <span>{v.filesCount || 0}</span>
+                  <span>{formatDateShort(v.updatedAt)}</span>
+                </div>
+              ))}
             </div>
           ) : (
-            <EmptyDetailState message="No recent activity in this scope." />
+            <EmptyDetailState message="No vault data found for this client." />
           )}
         </CardSection>
       ) : null}
