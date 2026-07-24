@@ -171,37 +171,44 @@ export function UsersPage() {
   }, [pagination]);
 
   const userRows = useMemo(() => {
-    const mappedUsers = apiUsers
+    return apiUsers
       .map((user, index) => {
         const firstName = user?.firstName?.trim?.() ?? '';
         const lastName = user?.lastName?.trim?.() ?? '';
         const fullName = [firstName, lastName].filter(Boolean).join(' ');
         const env = user?.__env ?? '';
-        const clientName = user?.client?.name ?? '';
+        // Backend sends clientName as flat string, not nested object
+        const clientName = user?.clientName ?? user?.client?.name ?? '';
         const balance = parseDecimal(user?.points);
         const twinCount = getTwinCount(user?.twinIds);
+        const pointsSpent = parseDecimal(user?.pointsSpent);
+        const lastDaysAgo = user?.lastActiveDaysAgo;
+        let lastActiveLabel = '';
+        if (lastDaysAgo != null) {
+          lastActiveLabel = lastDaysAgo <= 0 ? 'today' : `${lastDaysAgo}d ago`;
+        } else if (user?.updatedAt) {
+          const days = Math.floor((Date.now() - new Date(user.updatedAt).getTime()) / 86400000);
+          lastActiveLabel = days <= 0 ? 'today' : `${days}d ago`;
+        }
 
         return {
-          id: user?._id || user?.id || user?.personalUserId || user?.email || `user-row-${index}`,
+          id: user?._id || user?.id || user?.email || `user-row-${index}`,
           name: fullName || user?.email || '',
           client: clientName,
-          clientId: user?.client?._id ?? user?.client?.id ?? null,
+          clientId: user?.clientId ?? null,
           env,
-          messages: null,
-          sessions: null,
+          messages: user?.messages ?? 0,
+          sessions: user?.sessions ?? 0,
           balance,
-          pointsSpent: null,
-          value: null,
+          pointsSpent,
+          value: pointsSpent ? pointsSpent * 0.01 : 0,
           twins: twinCount,
-          lastActiveDaysAgo: null,
-          lastActiveLabel: '',
+          lastActiveDaysAgo: lastDaysAgo,
+          lastActiveLabel,
         };
       })
       .filter((user) => (!filters.client ? true : user.clientId === filters.client))
       .filter((user) => (user.env ? filters.envs.includes(user.env) : true));
-
-    console.log('UsersPage mapped userRows:', mappedUsers,apiUsers);
-    return mappedUsers;
   }, [apiUsers, filters.client, filters.envs]);
 
   const filteredRows = useMemo(() => {

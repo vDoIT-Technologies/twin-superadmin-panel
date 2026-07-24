@@ -457,169 +457,68 @@ export function ClientDetailPage() {
 export function TwinDetailPage() {
   const navigate = useNavigate();
   const { twinId } = useParams();
-  const { filters } = useContext(FilterContext);
-  const trendRef = useRef(null);
-  const modalityRef = useRef(null);
-  const vendorRef = useRef(null);
-  const twin = superadminDemoData.byId.twin(twinId);
-  const client = twin ? superadminDemoData.byId.client(twin.clientId) : null;
-  const detailFilters = useMemo(
-    () => ({
-      ...filters,
-      client: null,
-      twin: null,
-      user: null,
-      service: null,
-      vendor: null,
-    }),
-    [filters],
-  );
-  const rows = useClientRows(detailFilters, twin?.clientId);
-
-  const summary = useMemo(() => {
-    if (!twin) return null;
-    const share = twinShare(twin);
-    const messages = sumMetric(rows, 'messages', detailFilters) * share;
-    const cost = sumMetric(rows, 'cost', detailFilters) * share;
-    const revenue = sumMetric(rows, 'revenue', detailFilters) * share;
-    const tokens = sumMetric(rows, 'tokens', detailFilters) * share;
-    const voiceChars = sumMetric(rows, 'voiceChars', detailFilters) * share;
-    const videoMins = sumMetric(rows, 'videoMins', detailFilters) * share;
-    const textMessages = messages * twin.modalityMix.text;
-    const audioMessages = messages * twin.modalityMix.audio;
-    const videoMessages = messages * twin.modalityMix.video;
-    const sources = Math.round(96 + twin.weight * 48 + twin.createdDaysAgo * 0.12);
-    return {
-      share,
-      messages,
-      cost,
-      revenue,
-      tokens,
-      voiceChars,
-      videoMins,
-      textMessages,
-      audioMessages,
-      videoMessages,
-      sources,
-    };
-  }, [detailFilters, rows, twin]);
-
-  const vendorBreakdown = useMemo(() => {
-    if (!summary) return [];
-    return superadminDemoData.VENDORS.map((vendor) => ({
-      ...vendor,
-      cost: sumMetric(rows, null, detailFilters, vendor.id) * summary.share,
-    }))
-      .filter((vendor) => vendor.cost > 0)
-      .sort((left, right) => right.cost - left.cost);
-  }, [detailFilters, rows, summary]);
+  const [twinData, setTwinData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!twin || !summary || !trendRef.current || !modalityRef.current || !vendorRef.current) return undefined;
+    let active = true;
+    setIsLoading(true);
 
-    const labels = timeSeries(rows, 'messages', detailFilters).labels;
-    const base = timeSeries(rows, 'messages', detailFilters).values.map((value) => value * summary.share);
+    async function load() {
+      try {
+        const response = await dashboardService.getEntityTwinById(twinId);
+        if (!active) return;
+        setTwinData(response?.data || response);
+      } catch (err) {
+        console.error('GET /entities/twins/:id failed:', err);
+        if (active) setTwinData(null);
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    }
 
-    const trend = stackedBar(
-      trendRef.current,
-      labels,
-      [
-        { label: 'Text', color: '#4f46e5', data: base.map((value) => value * twin.modalityMix.text) },
-        { label: 'Audio', color: '#0ea5e9', data: base.map((value) => value * twin.modalityMix.audio) },
-        { label: 'Video', color: '#a855f7', data: base.map((value) => value * twin.modalityMix.video) },
-      ],
-      { fmt: formatNumber, yfmt: formatNumber, legend: true },
-    );
+    load();
+    return () => { active = false; };
+  }, [twinId]);
 
-    const mod = donut(
-      modalityRef.current,
-      ['Text', 'Audio', 'Video'],
-      [summary.textMessages, summary.audioMessages, summary.videoMessages],
-      ['#4f46e5', '#0ea5e9', '#a855f7'],
-      { fmt: formatNumber },
-    );
+  if (isLoading) return <section className="page-section entity-detail-page"><div className="empty-state">Loading twin...</div></section>;
+  if (!twinData) return <section className="page-section entity-detail-page"><div className="empty-state">Twin not found.</div></section>;
 
-    const vendor = hBar(
-      vendorRef.current,
-      vendorBreakdown.map((entry) => entry.name),
-      vendorBreakdown.map((entry) => entry.cost),
-      vendorBreakdown.map((entry) => entry.color),
-      { fmt: formatCurrency, xfmt: formatCurrency },
-    );
-
-    return () => {
-      trend.destroy();
-      mod.destroy();
-      vendor.destroy();
-    };
-  }, [detailFilters, rows, summary, twin, vendorBreakdown]);
-
-  if (!twin || !client || !summary) {
-    return (
-      <section className="page-section entity-detail-page">
-        <div className="empty-state">Twin not found.</div>
-      </section>
-    );
-  }
-
-  const ingestionItems = [
-    ['LinkedIn / Twitter / web', Math.round(summary.sources * 0.55)],
-    ['File uploads', Math.round(summary.sources * 0.3)],
-    ['Manual entries', Math.round(summary.sources * 0.15)],
-    ['Tokens embedded', Math.round(summary.tokens * 0.2)],
-  ];
+  const { profile, kpis, usage } = twinData;
 
   return (
     <section className="page-section entity-detail-page">
       <DetailHeader
         avatarClassName="twin"
-        initials={getInitials(twin.name)}
-        title={twin.name}
-        subtitle={`${twin.role} · ${client.name}`}
+        initials={getInitials(profile?.name || '')}
+        title={profile?.name || 'Unnamed'}
+        subtitle={`${profile?.role || ''} · ${profile?.clientName || ''}`}
         onBack={() => navigate('/twins')}
       />
 
       <div className="entity-detail-metric-grid entity-detail-metric-grid-four">
-        <MetricCard icon={MessagesSquare} label="Messages" value={formatNumber(summary.messages)} tone="indigo" />
-        <MetricCard icon={Wallet} label="Cost" value={formatCurrency(summary.cost)} tone="rose" />
-        <MetricCard icon={TrendingUp} label="Revenue" value={formatCurrency(summary.revenue)} tone="emerald" />
-        <MetricCard icon={BookOpen} label="Knowledge Sources" value={formatNumber(summary.sources)} tone="amber" />
+        <MetricCard icon={MessagesSquare} label="Messages" value={formatNumber(kpis?.messages || 0)} tone="indigo" />
+        <MetricCard icon={Wallet} label="Cost" value={formatCurrency(kpis?.cost || 0)} tone="rose" />
+        <MetricCard icon={TrendingUp} label="Revenue" value={formatCurrency(kpis?.revenue || 0)} tone="emerald" />
+        <MetricCard icon={BookOpen} label="Knowledge Sources" value={formatNumber(kpis?.knowledgeSources || 0)} tone="amber" />
       </div>
 
-      <div className="entity-detail-grid entity-detail-grid-sidebar">
-        <CardSection title="Chat Volume Trend" subtitle="Text, audio, video">
-          <div className="entity-chart-wrap entity-chart-tall">
-            <canvas ref={trendRef} />
-          </div>
-        </CardSection>
-        <CardSection title="Modality Split" subtitle={`${formatNumber(summary.messages)} messages`}>
-          <div className="entity-donut-wrap">
-            <canvas ref={modalityRef} />
-          </div>
-          <LegendList
-            items={[
-              { label: 'Text', value: summary.textMessages, color: '#4f46e5' },
-              { label: 'Audio', value: summary.audioMessages, color: '#0ea5e9' },
-              { label: 'Video', value: summary.videoMessages, color: '#a855f7' },
-            ]}
-          />
-        </CardSection>
-      </div>
-
-      <div className="entity-detail-grid entity-detail-grid-sidebar">
-        <CardSection title="Cost Breakdown by Vendor" subtitle={formatCurrencyFull(summary.cost)}>
-          <div className="entity-chart-wrap">
-            <canvas ref={vendorRef} />
-          </div>
-        </CardSection>
-        <CardSection title="Knowledge & Ingestion" subtitle="Estimated source mix" flush>
+      <div className="entity-detail-grid entity-detail-grid-even">
+        <CardSection title="Twin Info" flush>
           <div className="entity-stats-list">
-            {ingestionItems.map(([label, value]) => (
-              <div key={label} className="entity-stat-row">
-                <span>{label}</span>
-                <strong>{formatNumber(value)}</strong>
-              </div>
-            ))}
+            <div className="entity-stat-row"><span>Name</span><strong>{profile?.name || '-'}</strong></div>
+            <div className="entity-stat-row"><span>Role</span><strong>{profile?.role || '-'}</strong></div>
+            <div className="entity-stat-row"><span>Client</span><strong>{profile?.clientName || '-'}</strong></div>
+            <div className="entity-stat-row"><span>Created</span><strong>{profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString() : '-'}</strong></div>
+          </div>
+        </CardSection>
+        <CardSection title="Usage Summary" flush>
+          <div className="entity-stats-list">
+            <div className="entity-stat-row"><span>Total Tokens</span><strong>{formatNumber(usage?.tokens || 0)}</strong></div>
+            <div className="entity-stat-row"><span>Prompt Tokens</span><strong>{formatNumber(usage?.promptTokens || 0)}</strong></div>
+            <div className="entity-stat-row"><span>Completion Tokens</span><strong>{formatNumber(usage?.completionTokens || 0)}</strong></div>
+            <div className="entity-stat-row"><span>API Calls</span><strong>{formatNumber(usage?.apiCalls || 0)}</strong></div>
+            <div className="entity-stat-row"><span>Audio Seconds</span><strong>{formatNumber(usage?.audioSeconds || 0)}</strong></div>
           </div>
         </CardSection>
       </div>
@@ -630,156 +529,88 @@ export function TwinDetailPage() {
 export function UserDetailPage() {
   const navigate = useNavigate();
   const { userId } = useParams();
-  const { filters } = useContext(FilterContext);
-  const trendRef = useRef(null);
-  const modalityRef = useRef(null);
-  const user = superadminDemoData.byId.user(userId);
-  const client = user ? superadminDemoData.byId.client(user.clientId) : null;
-  const detailFilters = useMemo(
-    () => ({
-      ...filters,
-      envs: user ? [user.env] : filters.envs,
-      client: null,
-      twin: null,
-      user: null,
-      service: null,
-      vendor: null,
-    }),
-    [filters, user],
-  );
-  const rows = useClientRows(detailFilters, user?.clientId);
-
-  const summary = useMemo(() => {
-    if (!user) return null;
-    const share = userShare(user);
-    const messages = sumMetric(rows, 'messages', detailFilters) * share;
-    const sessions = sumMetric(rows, 'sessions', detailFilters) * share;
-    const pointsSpent = sumMetric(rows, 'pointsSpent', detailFilters) * share;
-    const dollarValue = pointsSpent * superadminDemoData.RATE.pointUSD;
-    const text = sumMetric(rows, 'mText', detailFilters) * share;
-    const audio = sumMetric(rows, 'mAudio', detailFilters) * share;
-    const video = sumMetric(rows, 'mVideo', detailFilters) * share;
-    return {
-      share,
-      messages,
-      sessions,
-      pointsSpent,
-      dollarValue,
-      text,
-      audio,
-      video,
-    };
-  }, [detailFilters, rows, user]);
-
-  const twins = useMemo(() => {
-    if (!user) return [];
-    return superadminDemoData.TWINS.filter((twin) => twin.clientId === user.clientId).slice(0, user.twinsUsed);
-  }, [user]);
-
-  const sessionHistory = useMemo(() => {
-    if (!summary) return [];
-    return Array.from({ length: 6 }, (_, index) => ({
-      day: index === 0 ? 'today' : `${index * 2}d ago`,
-      messages: Math.round((summary.messages / 6) * (1.4 - index * 0.12)),
-      minutes: Math.round(8 + (6 - index) * 4),
-      twin: twins[index % Math.max(1, twins.length)],
-    }));
-  }, [summary, twins]);
+  const [userData, setUserData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!user || !summary || !trendRef.current || !modalityRef.current) return undefined;
+    let active = true;
+    setIsLoading(true);
 
-    const trend = areaChart(
-      trendRef.current,
-      timeSeries(rows, 'pointsSpent', detailFilters).labels,
-      [
-        {
-          label: 'Points spent',
-          color: '#f59e0b',
-          data: timeSeries(rows, 'pointsSpent', detailFilters).values.map((value) => value * summary.share),
-        },
-      ],
-      { fmt: formatNumber, yfmt: formatNumber },
-    );
+    async function load() {
+      try {
+        const response = await dashboardService.getEntityUserById(userId);
+        if (!active) return;
+        setUserData(response?.data || response);
+      } catch (err) {
+        console.error('GET /entities/users/:id failed:', err);
+        if (active) setUserData(null);
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    }
 
-    const mod = donut(
-      modalityRef.current,
-      ['Text', 'Audio', 'Video'],
-      [summary.text, summary.audio, summary.video],
-      ['#4f46e5', '#0ea5e9', '#a855f7'],
-      { fmt: formatNumber },
-    );
+    load();
+    return () => { active = false; };
+  }, [userId]);
 
-    return () => {
-      trend.destroy();
-      mod.destroy();
-    };
-  }, [detailFilters, rows, summary, user]);
+  if (isLoading) return <section className="page-section entity-detail-page"><div className="empty-state">Loading user...</div></section>;
+  if (!userData) return <section className="page-section entity-detail-page"><div className="empty-state">User not found.</div></section>;
 
-  if (!user || !client || !summary) {
-    return (
-      <section className="page-section entity-detail-page">
-        <div className="empty-state">User not found.</div>
-      </section>
-    );
-  }
+  const { profile, kpis, modalityMix, twins, sessionHistory } = userData;
 
   return (
     <section className="page-section entity-detail-page">
       <DetailHeader
         avatarClassName="user"
-        initials={getInitials(user.name)}
-        title={user.name}
+        initials={getInitials(profile?.name || '')}
+        title={profile?.name || 'Unnamed'}
         subtitle={
           <>
-            <span>{client.name}</span>
+            <span>{profile?.clientName || ''}</span>
             <span>·</span>
-            <span>{superadminDemoData.ENV_META[user.env].label}</span>
-            <span className="entity-detail-vault-id">vaultId: {getVaultId(user.id)}</span>
+            <span>{profile?.env || ''}</span>
           </>
         }
         onBack={() => navigate('/users')}
       />
 
       <div className="entity-detail-metric-grid entity-detail-metric-grid-four">
-        <MetricCard icon={MessagesSquare} label="Messages" value={formatNumber(summary.messages)} tone="indigo" />
-        <MetricCard icon={Activity} label="Sessions" value={formatNumber(summary.sessions)} tone="sky" />
-        <MetricCard icon={Coins} label="Points Balance" value={formatNumber(user.pointsBalance)} tone="amber" />
-        <MetricCard icon={Wallet} label="Spend Value" value={formatCurrency(summary.dollarValue)} tone="emerald" />
+        <MetricCard icon={MessagesSquare} label="Messages" value={formatNumber(kpis?.messages || 0)} tone="indigo" />
+        <MetricCard icon={Activity} label="Sessions" value={formatNumber(kpis?.sessions || 0)} tone="sky" />
+        <MetricCard icon={Coins} label="Points Balance" value={formatNumber(kpis?.pointsBalance || 0)} tone="amber" />
+        <MetricCard icon={Wallet} label="Spend Value" value={formatCurrency(kpis?.spendValue || 0)} tone="emerald" />
       </div>
 
       <div className="entity-detail-grid entity-detail-grid-sidebar">
-        <CardSection title="Points Spent Over Time" subtitle="Last 30 days">
-          <div className="entity-chart-wrap entity-chart-tall">
-            <canvas ref={trendRef} />
+        <CardSection title="Modality Mix" subtitle={`${formatNumber(kpis?.messages || 0)} messages`} flush>
+          <div className="entity-stats-list">
+            <div className="entity-stat-row"><span>Text</span><strong>{formatNumber(modalityMix?.text || 0)}</strong></div>
+            <div className="entity-stat-row"><span>Audio</span><strong>{formatNumber(modalityMix?.audio || 0)}</strong></div>
+            <div className="entity-stat-row"><span>Video</span><strong>{formatNumber(modalityMix?.video || 0)}</strong></div>
           </div>
         </CardSection>
-        <CardSection title="Modality Mix" subtitle={`${formatNumber(summary.messages)} messages`}>
-          <div className="entity-donut-wrap">
-            <canvas ref={modalityRef} />
+        <CardSection title="User Info" flush>
+          <div className="entity-stats-list">
+            <div className="entity-stat-row"><span>Email</span><strong>{profile?.email || '-'}</strong></div>
+            <div className="entity-stat-row"><span>Client</span><strong>{profile?.clientName || '-'}</strong></div>
+            <div className="entity-stat-row"><span>Environment</span><strong>{profile?.env || '-'}</strong></div>
+            <div className="entity-stat-row"><span>Created</span><strong>{profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString() : '-'}</strong></div>
           </div>
-          <LegendList
-            items={[
-              { label: 'Text', value: summary.text, color: '#4f46e5' },
-              { label: 'Audio', value: summary.audio, color: '#0ea5e9' },
-              { label: 'Video', value: summary.video, color: '#a855f7' },
-            ]}
-          />
         </CardSection>
       </div>
 
       <div className="entity-detail-grid entity-detail-grid-even">
-        <CardSection title="Twins Used" subtitle={`${twins.length} linked twins`} flush>
-          {twins.length ? (
+        <CardSection title="Twins Used" subtitle={`${twins?.length || 0} linked twins`} flush>
+          {twins?.length ? (
             <div className="entity-list">
               {twins.map((twin) => (
                 <EntityListRow
-                  key={twin.id}
+                  key={twin._id}
                   avatarClassName="twin"
-                  initials={getInitials(twin.name)}
-                  title={twin.name}
-                  subtitle={twin.role}
-                  onClick={() => navigate(`/twins/${twin.id}`)}
+                  initials={getInitials(twin.name || '')}
+                  title={twin.name || 'Unnamed'}
+                  subtitle={twin.role || ''}
+                  onClick={() => navigate(`/twins/${twin._id}`)}
                 />
               ))}
             </div>
@@ -788,18 +619,19 @@ export function UserDetailPage() {
           )}
         </CardSection>
 
-        <CardSection title="Session History" subtitle={formatLastActive(user.lastActiveDaysAgo)} flush>
-          <div className="entity-stats-list">
-            {sessionHistory.map((session) => (
-              <div key={`${session.day}-${session.twin?.id ?? 'none'}`} className="entity-stat-row">
-                <span>{session.day}</span>
-                <span>{session.twin?.name ?? 'No twin'}</span>
-                <strong>
-                  {formatNumber(session.messages)} msgs · {session.minutes}m
-                </strong>
-              </div>
-            ))}
-          </div>
+        <CardSection title="Session History" flush>
+          {sessionHistory?.length ? (
+            <div className="entity-stats-list">
+              {sessionHistory.map((session, i) => (
+                <div key={session.sessionId || i} className="entity-stat-row">
+                  <span>{session.twinName || 'Unknown'}</span>
+                  <strong>{session.messages || 0} msgs · {session.duration || '-'}</strong>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyDetailState message="No session history." />
+          )}
         </CardSection>
       </div>
     </section>
