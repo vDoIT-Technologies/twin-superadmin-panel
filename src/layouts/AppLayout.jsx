@@ -5,6 +5,12 @@ import { FilterContext } from '../app/FilterContext';
 import { FilterDropdown } from '../components/common/FilterDropdown';
 import { superadminDemoData } from '../demo-data/superadminDemoData';
 import {
+  dropdownApiAvailable,
+  getClientsDropdown,
+  getTwinsDropdown,
+  getUsersDropdown,
+} from '../services';
+import {
   LayoutDashboard,
   Boxes,
   Database,
@@ -82,15 +88,34 @@ const lensOptions = [
   { id: 'economy', label: 'Economy' },
 ];
 
+const invalidUserNames = new Set([
+  '',
+  '-',
+  '?',
+  '-?',
+  'n/a',
+  'na',
+  'null',
+  'undefined',
+]);
+
+function getUserName(user) {
+  const name = typeof user.name === 'string' ? user.name.trim() : '';
+  return invalidUserNames.has(name.toLowerCase()) ? '' : name;
+}
+
 export function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { logout, profile, user } = useAuth();
+  const { isAuthenticated, logout, profile, user } = useAuth();
   const { filters, setFilters } = useContext(FilterContext);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [clients, setClients] = useState([]);
+  const [twins, setTwins] = useState([]);
+  const [users, setUsers] = useState([]);
   const searchRef = useRef(null);
   const profileMenuRef = useRef(null);
   const showFilterBar = location.pathname !== '/profile';
@@ -117,14 +142,78 @@ export function AppLayout() {
     setFilters((prev) => ({ ...prev, ...partial }));
   };
 
-  const twinOptions = useMemo(
-    () => superadminDemoData.TWINS.filter((twin) => !filters.client || twin.clientId === filters.client),
-    [filters.client],
-  );
-  const userOptions = useMemo(
-    () => superadminDemoData.USERS.filter((user) => !filters.client || user.clientId === filters.client),
-    [filters.client],
-  );
+  const selectedEnv =
+    filters.envs.length === 1 ? filters.envs[0] : undefined;
+
+  useEffect(() => {
+    if (!isAuthenticated || !dropdownApiAvailable()) {
+      return undefined;
+    }
+
+    let active = true;
+
+    getClientsDropdown({ env: selectedEnv })
+      .then((data) => {
+        if (active) setClients(data);
+      })
+      .catch((error) => {
+        console.error('[AppLayout] Failed to load clients:', error);
+        if (active) setClients([]);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [isAuthenticated, selectedEnv]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !dropdownApiAvailable()) {
+      return undefined;
+    }
+
+    let active = true;
+
+    getTwinsDropdown({
+      env: selectedEnv,
+      clientId: filters.client,
+    })
+      .then((data) => {
+        if (active) setTwins(data);
+      })
+      .catch((error) => {
+        console.error('[AppLayout] Failed to load twins:', error);
+        if (active) setTwins([]);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [filters.client, isAuthenticated, selectedEnv]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !dropdownApiAvailable()) {
+      return undefined;
+    }
+
+    let active = true;
+
+    getUsersDropdown({
+      env: selectedEnv,
+      clientId: filters.client,
+    })
+      .then((data) => {
+        if (active) setUsers(data);
+      })
+      .catch((error) => {
+        console.error('[AppLayout] Failed to load users:', error);
+        if (active) setUsers([]);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [filters.client, isAuthenticated, selectedEnv]);
+
   const vendorOptions = useMemo(
     () =>
       superadminDemoData.VENDORS.filter(
@@ -134,30 +223,33 @@ export function AppLayout() {
   );
   const clientDropdownOptions = useMemo(
     () =>
-      superadminDemoData.CLIENTS.map((client) => ({
-        value: client.id,
-        label: client.name,
-        meta: client.plan,
+      clients.map((client) => ({
+        value: client.id ?? client._id ?? client.value,
+        label: client.name ?? client.label,
+        meta: client.plan ?? '',
       })),
-    [],
+    [clients],
   );
   const twinDropdownOptions = useMemo(
     () =>
-      twinOptions.map((twin) => ({
-        value: twin.id,
-        label: twin.name,
-        meta: superadminDemoData.byId.client(twin.clientId)?.name ?? '',
+      twins.map((twin) => ({
+        value: twin.id ?? twin._id ?? twin.value,
+        label: twin.name ?? twin.label,
+        meta: twin.clientName ?? twin.client?.name ?? '',
       })),
-    [twinOptions],
+    [twins],
   );
   const userDropdownOptions = useMemo(
     () =>
-      userOptions.map((user) => ({
-        value: user.id,
-        label: user.name,
-        meta: superadminDemoData.byId.client(user.clientId)?.name ?? '',
-      })),
-    [userOptions],
+      users.map((user) => {
+        const name = getUserName(user);
+
+        return {
+          value: user.id ?? user._id ?? user.value,
+          label: name || user.email || user.label || 'Unknown user',
+        };
+      }),
+    [users],
   );
   const serviceDropdownOptions = useMemo(
     () =>
