@@ -13,6 +13,7 @@ export { dashboardService } from './dashboardService';
 export {
   dropdownApiAvailable,
   getClientsDropdown,
+  getFilebaseQuota,
   getTwinsDropdown,
   getUsersDropdown,
 } from './dropdownService';

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Database, Download, FileUp, Package, Percent, TrendingUp, Users } from 'lucide-react';
-import { dashboardService } from '../services';
+import { dashboardService, getFilebaseQuota } from '../services';
 import { envBadge, formatCurrencyFull, formatNumber, formatPercent } from '../utils/dashboardUtils';
 
 function formatBytes(bytes) {
@@ -11,6 +11,11 @@ function formatBytes(bytes) {
   if (num >= 1048576) return `${(num / 1048576).toFixed(1)} MB`;
   if (num >= 1024) return `${(num / 1024).toFixed(0)} KB`;
   return `${num} B`;
+}
+
+function formatQuotaPercent(percent) {
+  if (!percent) return '0%';
+  return `${percent < 1 ? percent.toFixed(2) : percent.toFixed(1)}%`;
 }
 
 function formatDateShort(val) {
@@ -30,8 +35,65 @@ function getUserInitials(name) {
   return parts.slice(0, 2).map((p) => p[0]?.toUpperCase() ?? '').join('');
 }
 
+function firstNumber(...values) {
+  for (const value of values) {
+    const number = Number(value);
+    if (value !== '' && value != null && Number.isFinite(number)) {
+      return number;
+    }
+  }
+  return null;
+}
+
+function normalizeFilebaseQuota(payload) {
+  const data = payload?.data ?? payload ?? {};
+  const quota = data.filebaseQuota ?? data.filebase ?? data.total ?? data;
+  const totalQuota = firstNumber(
+    quota.totalQuotaBytes,
+    quota.totalQuotaInBytes,
+    quota.totalQuota,
+    quota.storageLimitBytes,
+    quota.storageLimit,
+    quota.quotaBytes,
+    quota.quota,
+  );
+  const totalUsage = firstNumber(
+    quota.totalUsageBytes,
+    quota.totalUsageInBytes,
+    quota.totalUsage,
+    quota.storageUsedBytes,
+    quota.storageUsed,
+    quota.usedBytes,
+    quota.usage,
+    quota.used,
+  );
+  const reportedPercent = firstNumber(
+    quota.usagePercentage,
+    quota.usagePercent,
+    quota.quotaUsedPercentage,
+    quota.quotaPercent,
+    quota.percentageUsed,
+    quota.percentUsed,
+  );
+  const calculatedPercent =
+    totalQuota && totalUsage != null
+      ? (totalUsage / totalQuota) * 100
+      : null;
+  const usagePercent = calculatedPercent ?? reportedPercent;
+
+  return {
+    totalQuota,
+    totalUsage,
+    usagePercent:
+      usagePercent == null
+        ? null
+        : Math.min(100, Math.max(0, usagePercent)),
+  };
+}
+
 export function VaultPage() {
   const [stats, setStats] = useState(null);
+  const [filebaseQuota, setFilebaseQuota] = useState(null);
   const [vaultUsers, setVaultUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [sortConfig, setSortConfig] = useState({ key: 'storage', direction: 'desc' });
@@ -41,20 +103,37 @@ export function VaultPage() {
     setIsLoading(true);
 
     async function load() {
-      try {
-        const [statsData, usersData] = await Promise.all([
+      const [statsResult, usersResult, quotaResult] =
+        await Promise.allSettled([
           dashboardService.getEntityVaultStats(),
           dashboardService.getEntityVaultUsers({ limit: 50 }),
+          getFilebaseQuota(),
         ]);
-        if (!active) return;
+
+      if (!active) return;
+
+      if (statsResult.status === 'fulfilled') {
+        const statsData = statsResult.value;
         setStats(statsData?.data || statsData);
+      } else {
+        console.error('Vault stats load failed:', statsResult.reason);
+      }
+
+      if (usersResult.status === 'fulfilled') {
+        const usersData = usersResult.value;
         const users = usersData?.data?.data || usersData?.data || [];
         setVaultUsers(Array.isArray(users) ? users : []);
-      } catch (err) {
-        console.error('Vault page load failed:', err);
-      } finally {
-        if (active) setIsLoading(false);
+      } else {
+        console.error('Vault users load failed:', usersResult.reason);
       }
+
+      if (quotaResult.status === 'fulfilled') {
+        setFilebaseQuota(normalizeFilebaseQuota(quotaResult.value));
+      } else {
+        console.error('Filebase quota load failed:', quotaResult.reason);
+      }
+
+      setIsLoading(false);
     }
 
     load();
@@ -84,7 +163,20 @@ export function VaultPage() {
       : { key, direction: key === 'user' ? 'asc' : 'desc' });
   };
 
-  const quotaPercent = kpis.quotaPercent || 0;
+  const storageUsed =
+    filebaseQuota?.totalUsage ??
+    firstNumber(kpis.storedOnIpfsBytes) ??
+    0;
+  const storageLimit =
+    filebaseQuota?.totalQuota ??
+    firstNumber(kpis.storageLimitBytes) ??
+    0;
+  const quotaPercent =
+    storageLimit > 0
+      ? (storageUsed / storageLimit) * 100
+      : filebaseQuota?.usagePercent ??
+        firstNumber(kpis.quotaPercent) ??
+        0;
 
   if (isLoading) {
     return (
@@ -111,12 +203,12 @@ export function VaultPage() {
 
       <div className="vault-metric-grid">
         {[
-          { label: 'Stored on IPFS', value: formatBytes(kpis.storedOnIpfsBytes || 0), icon: Database, tone: 'indigo' },
+          { label: 'Stored on IPFS', value: formatBytes(storageUsed), icon: Database, tone: 'indigo' },
           { label: 'Files pinned', value: formatNumber(kpis.filesPinned || 0), icon: FileUp, tone: 'sky' },
           { label: 'Total files', value: formatNumber(kpis.totalFiles || 0), icon: Package, tone: 'violet' },
           { label: 'Active drives · users', value: String(kpis.activeDrives || 0), icon: Users, tone: 'rose' },
-          { label: 'Quota used', value: `${quotaPercent}%`, icon: Percent, tone: 'amber' },
-          { label: 'Storage limit', value: formatBytes(kpis.storageLimitBytes || 0), icon: TrendingUp, tone: 'emerald' },
+          { label: 'Quota used', value: formatQuotaPercent(quotaPercent), icon: Percent, tone: 'amber' },
+          { label: 'Storage limit', value: formatBytes(storageLimit), icon: TrendingUp, tone: 'emerald' },
         ].map((metric) => {
           const Icon = metric.icon;
           return (

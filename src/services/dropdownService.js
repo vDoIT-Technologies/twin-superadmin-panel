@@ -31,9 +31,14 @@ export async function getUsersDropdown(params = {}) {
   return extractList(payload, 'users');
 }
 
+export function getFilebaseQuota(params = {}) {
+  return apiGet('/api/v1/dropdown/filebase-quota', params);
+}
+
 export default {
   dropdownApiAvailable,
   getClientsDropdown,
   getTwinsDropdown,
   getUsersDropdown,
+  getFilebaseQuota,
 };
