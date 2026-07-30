@@ -1,5 +1,6 @@
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { useContext, useMemo, useState } from 'react';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useAuth } from '../app/AuthContext';
 import { FilterContext } from '../app/FilterContext';
 import { FilterDropdown } from '../components/common/FilterDropdown';
 import { superadminDemoData } from '../demo-data/superadminDemoData';
@@ -16,6 +17,10 @@ import {
   Search,
   Bell,
   Columns2,
+  CornerDownLeft,
+  ChevronDown,
+  LogOut,
+  UserCircle2,
 } from 'lucide-react';
 
 const navGroups = [
@@ -60,6 +65,7 @@ const breadcrumbTitles = {
   '/financial': 'Cost & Billing',
   '/usage': 'Usage Analytics',
   '/telemetry': 'Telemetry / Logs',
+  '/profile': 'Profile',
 };
 
 const envOptions = [
@@ -77,10 +83,35 @@ const lensOptions = [
 ];
 
 export function AppLayout() {
+  const navigate = useNavigate();
   const location = useLocation();
+  const { logout, profile, user } = useAuth();
   const { filters, setFilters } = useContext(FilterContext);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const currentTitle = breadcrumbTitles[location.pathname] ?? 'Overview';
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const searchRef = useRef(null);
+  const profileMenuRef = useRef(null);
+  const showFilterBar = location.pathname !== '/profile';
+  const currentTitle =
+    breadcrumbTitles[location.pathname] ??
+    (location.pathname.startsWith('/clients/')
+      ? 'Clients'
+      : location.pathname.startsWith('/twins/')
+        ? 'Twins'
+        : location.pathname.startsWith('/users/')
+          ? 'Users'
+          : 'Overview');
+  const profileName = profile.name || user?.name || 'Super Admin';
+  const profileEmail = profile.email || user?.email || 'No email';
+  const initials =
+    profileName
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join('') || 'SA';
 
   const updateFilters = (partial) => {
     setFilters((prev) => ({ ...prev, ...partial }));
@@ -169,6 +200,93 @@ export function AppLayout() {
     updateFilters({ [key]: value });
   };
 
+  const searchHits = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [];
+
+    const clients = superadminDemoData.CLIENTS.filter((client) => client.name.toLowerCase().includes(q))
+      .slice(0, 4)
+      .map((client) => ({
+        key: `client-${client.id}`,
+        type: 'client',
+        id: client.id,
+        name: client.name,
+        sub: client.plan,
+        icon: <Building2 size={14} />,
+        path: `/clients/${client.id}`,
+      }));
+
+    const twins = superadminDemoData.TWINS.filter((twin) => twin.name.toLowerCase().includes(q))
+      .slice(0, 4)
+      .map((twin) => ({
+        key: `twin-${twin.id}`,
+        type: 'twin',
+        id: twin.id,
+        name: twin.name,
+        sub: superadminDemoData.byId.client(twin.clientId)?.name ?? '',
+        icon: <Bot size={14} />,
+        path: `/twins/${twin.id}`,
+      }));
+
+    const users = superadminDemoData.USERS.filter((user) => user.name.toLowerCase().includes(q))
+      .slice(0, 4)
+      .map((user) => ({
+        key: `user-${user.id}`,
+        type: 'user',
+        id: user.id,
+        name: user.name,
+        sub: superadminDemoData.byId.client(user.clientId)?.name ?? '',
+        icon: <Users size={14} />,
+        path: `/users/${user.id}`,
+      }));
+
+    return [...clients, ...twins, ...users];
+  }, [searchQuery]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!searchRef.current?.contains(event.target)) {
+        setSearchOpen(false);
+      }
+
+      if (!profileMenuRef.current?.contains(event.target)) {
+        setProfileMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    setSearchQuery('');
+    setSearchOpen(false);
+    setProfileMenuOpen(false);
+  }, [location.pathname]);
+
+  const openSearch = () => {
+    if (searchQuery.trim()) {
+      setSearchOpen(true);
+    }
+  };
+
+  const selectSearchHit = (hit) => {
+    setSearchQuery('');
+    setSearchOpen(false);
+    navigate(hit.path);
+  };
+
+  const handleProfileAction = (path) => {
+    setProfileMenuOpen(false);
+    navigate(path);
+  };
+
+  const handleLogout = async () => {
+    setProfileMenuOpen(false);
+    await logout();
+    navigate('/login', { replace: true });
+  };
+
   return (
     <div className="app-shell">
       <aside className={`sidebar${isSidebarCollapsed ? ' collapsed' : ''}`}>
@@ -219,10 +337,10 @@ export function AppLayout() {
         </nav>
 
         <div className="sidebar-profile">
-          <div className="avatar-badge">SA</div>
+          <div className="avatar-badge">{initials}</div>
           <div className="profile-copy">
-            <p className="profile-name">Super Admin</p>
-            <p className="profile-email">admin@twinprotocol.dev</p>
+            <p className="profile-name">{profileName}</p>
+            <p className="profile-email">{profileEmail}</p>
           </div>
         </div>
       </aside>
@@ -246,144 +364,206 @@ export function AppLayout() {
             </div>
 
             <div className="topbar-actions">
-              <label className="search-shell">
+              <div className="search-shell" ref={searchRef}>
                 <Search className="search-icon" size={16} />
-                <input type="text" placeholder="Search clients, twins, users..." />
-              </label>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  placeholder="Search clients, twins, users..."
+                  onChange={(event) => {
+                    const nextQuery = event.target.value;
+                    setSearchQuery(nextQuery);
+                    setSearchOpen(Boolean(nextQuery.trim()));
+                  }}
+                  onFocus={openSearch}
+                />
+                {searchOpen ? (
+                  <div className="search-results" role="listbox" aria-label="Global search results">
+                    {searchHits.length ? (
+                      searchHits.map((hit) => (
+                        <button
+                          key={hit.key}
+                          type="button"
+                          className="search-result-button"
+                          onClick={() => selectSearchHit(hit)}
+                        >
+                          <span className="search-result-icon">{hit.icon}</span>
+                          <span className="search-result-copy">
+                            <span className="search-result-name">{hit.name}</span>
+                            <span className="search-result-meta">
+                              {hit.type} · {hit.sub}
+                            </span>
+                          </span>
+                          <CornerDownLeft size={14} className="search-result-enter" />
+                        </button>
+                      ))
+                    ) : (
+                      <div className="search-results-empty">No matches for "{searchQuery.trim()}"</div>
+                    )}
+                  </div>
+                ) : null}
+              </div>
               <button className="icon-button" type="button" aria-label="Notifications">
                 <Bell size={16} />
               </button>
-              <div className="avatar-badge compact">SA</div>
+              <div className="profile-menu-shell" ref={profileMenuRef}>
+                <button
+                  className="profile-menu-trigger"
+                  type="button"
+                  aria-label="Open profile menu"
+                  aria-expanded={profileMenuOpen}
+                  onClick={() => setProfileMenuOpen((value) => !value)}
+                >
+                  <div className="avatar-badge compact">{initials}</div>
+                  <ChevronDown size={14} className="profile-menu-caret" />
+                </button>
+                {profileMenuOpen ? (
+                  <div className="profile-menu-dropdown">
+                    <button type="button" className="profile-menu-item" onClick={() => handleProfileAction('/profile')}>
+                      <UserCircle2 size={15} />
+                      <span>Profile</span>
+                    </button>
+                    <button type="button" className="profile-menu-item danger" onClick={handleLogout}>
+                      <LogOut size={15} />
+                      <span>Logout</span>
+                    </button>
+                  </div>
+                ) : null}
+              </div>
             </div>
           </header>
 
-          <div className="filterbar">
-            <div className="filter-group">
-              <span className="filter-label">Env</span>
-              {envOptions.map((option) => {
-                const active = filters.envs.includes(option.id);
-                return (
+          {showFilterBar ? (
+            <>
+              <div className="filterbar">
+                <div className="filter-group">
+                  <span className="filter-label">Env</span>
+                  {envOptions.map((option) => {
+                    const active = filters.envs.includes(option.id);
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        className={`filter-chip filter-chip-env filter-chip-env-${option.id}${active ? ' active' : ''}`}
+                        onClick={() => {
+                          const next = active
+                            ? filters.envs.filter((id) => id !== option.id)
+                            : [...filters.envs, option.id];
+                          if (next.length === 0) return;
+                          updateFilters({ envs: next });
+                        }}
+                      >
+                        <span className="filter-chip-dot" aria-hidden="true" />
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="filter-group">
+                  {rangeOptions.map((range) => (
+                    <button
+                      key={range}
+                      type="button"
+                      className={`filter-chip${filters.range === range ? ' active' : ''}`}
+                      onClick={() => updateFilters({ range })}
+                    >
+                      {range}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="filter-group">
+                  <FilterDropdown
+                    value={filters.gran}
+                    onChange={(value) => updateFilters({ gran: value ?? 'day' })}
+                    options={granDropdownOptions}
+                    placeholder="by day"
+                    searchable={false}
+                  />
+                </div>
+
+                <div className="filter-group">
+                  <FilterDropdown
+                    value={filters.client}
+                    onChange={(value) => updateScopeFilter('client', value)}
+                    options={clientDropdownOptions}
+                    placeholder="All clients"
+                    searchPlaceholder="Search client..."
+                  />
+                </div>
+
+                <div className="filter-group">
+                  <FilterDropdown
+                    value={filters.twin}
+                    onChange={(value) => updateScopeFilter('twin', value)}
+                    options={twinDropdownOptions}
+                    placeholder="All twins"
+                    searchPlaceholder="Search twin..."
+                  />
+                </div>
+
+                <div className="filter-group">
+                  <FilterDropdown
+                    value={filters.user}
+                    onChange={(value) => updateScopeFilter('user', value)}
+                    options={userDropdownOptions}
+                    placeholder="All users"
+                    searchPlaceholder="Search user..."
+                  />
+                </div>
+
+                <div className="filter-group">
+                  <FilterDropdown
+                    value={filters.service}
+                    onChange={(value) => updateScopeFilter('service', value)}
+                    options={serviceDropdownOptions}
+                    placeholder="All services"
+                    searchPlaceholder="Search service..."
+                  />
+                </div>
+
+                <div className="filter-group">
+                  <FilterDropdown
+                    value={filters.vendor}
+                    onChange={(value) => updateScopeFilter('vendor', value)}
+                    options={vendorDropdownOptions}
+                    placeholder="All vendors"
+                    searchPlaceholder="Search vendor..."
+                    align="right"
+                  />
+                </div>
+
+                <div className="filter-group filter-group-spacer" />
+
+                <div className="filter-group">
                   <button
-                    key={option.id}
                     type="button"
-                    className={`filter-chip filter-chip-env filter-chip-env-${option.id}${active ? ' active' : ''}`}
-                    onClick={() => {
-                      const next = active
-                        ? filters.envs.filter((id) => id !== option.id)
-                        : [...filters.envs, option.id];
-                      if (next.length === 0) return;
-                      updateFilters({ envs: next });
-                    }}
+                    className={`filter-chip filter-chip-compare${filters.compare ? ' active' : ''}`}
+                    onClick={() => updateFilters({ compare: !filters.compare })}
                   >
-                    <span className="filter-chip-dot" aria-hidden="true" />
-                    {option.label}
+                    <Columns2 size={15} />
+                    Compare
                   </button>
-                );
-              })}
-            </div>
+                </div>
+              </div>
 
-            <div className="filter-group">
-              {rangeOptions.map((range) => (
-                <button
-                  key={range}
-                  type="button"
-                  className={`filter-chip${filters.range === range ? ' active' : ''}`}
-                  onClick={() => updateFilters({ range })}
-                >
-                  {range}
-                </button>
-              ))}
-            </div>
-
-            <div className="filter-group">
-              <FilterDropdown
-                value={filters.gran}
-                onChange={(value) => updateFilters({ gran: value ?? 'day' })}
-                options={granDropdownOptions}
-                placeholder="by day"
-                searchable={false}
-              />
-            </div>
-
-            <div className="filter-group">
-              <FilterDropdown
-                value={filters.client}
-                onChange={(value) => updateScopeFilter('client', value)}
-                options={clientDropdownOptions}
-                placeholder="All clients"
-                searchPlaceholder="Search client..."
-              />
-            </div>
-
-            <div className="filter-group">
-              <FilterDropdown
-                value={filters.twin}
-                onChange={(value) => updateScopeFilter('twin', value)}
-                options={twinDropdownOptions}
-                placeholder="All twins"
-                searchPlaceholder="Search twin..."
-              />
-            </div>
-
-            <div className="filter-group">
-              <FilterDropdown
-                value={filters.user}
-                onChange={(value) => updateScopeFilter('user', value)}
-                options={userDropdownOptions}
-                placeholder="All users"
-                searchPlaceholder="Search user..."
-              />
-            </div>
-
-            <div className="filter-group">
-              <FilterDropdown
-                value={filters.service}
-                onChange={(value) => updateScopeFilter('service', value)}
-                options={serviceDropdownOptions}
-                placeholder="All services"
-                searchPlaceholder="Search service..."
-              />
-            </div>
-
-            <div className="filter-group">
-              <FilterDropdown
-                value={filters.vendor}
-                onChange={(value) => updateScopeFilter('vendor', value)}
-                options={vendorDropdownOptions}
-                placeholder="All vendors"
-                searchPlaceholder="Search vendor..."
-                align="right"
-              />
-            </div>
-
-            <div className="filter-group filter-group-spacer" />
-
-            <div className="filter-group">
-              <button
-                type="button"
-                className={`filter-chip filter-chip-compare${filters.compare ? ' active' : ''}`}
-                onClick={() => updateFilters({ compare: !filters.compare })}
-              >
-                <Columns2 size={15} />
-                Compare
-              </button>
-            </div>
-          </div>
-
-          <div className="filterbar filterbar-secondary">
-            <div className="filter-group filter-group-lens">
-              {lensOptions.map((lens) => (
-                <button
-                  key={lens.id}
-                  type="button"
-                  className={`filter-chip filter-chip-lens${filters.lens === lens.id ? ' active' : ''}`}
-                  onClick={() => updateFilters({ lens: lens.id })}
-                >
-                  {lens.label}
-                </button>
-              ))}
-            </div>
-          </div>
+              <div className="filterbar filterbar-secondary">
+                <div className="filter-group filter-group-lens">
+                  {lensOptions.map((lens) => (
+                    <button
+                      key={lens.id}
+                      type="button"
+                      className={`filter-chip filter-chip-lens${filters.lens === lens.id ? ' active' : ''}`}
+                      onClick={() => updateFilters({ lens: lens.id })}
+                    >
+                      {lens.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          ) : null}
         </div>
 
         <main className="main-content">
