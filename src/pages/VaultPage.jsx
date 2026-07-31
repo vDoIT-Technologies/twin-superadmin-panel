@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Database, Download, FileUp, Package, Percent, TrendingUp, Users } from 'lucide-react';
+import { AlertTriangle, Database, Download, FileUp, Package, Percent, TrendingUp, Users } from 'lucide-react';
 import { dashboardService, getFilebaseQuota } from '../services';
 import { envBadge, formatCurrencyFull, formatNumber, formatPercent } from '../utils/dashboardUtils';
 
@@ -224,6 +224,50 @@ export function VaultPage() {
           );
         })}
       </div>
+
+      <section className="table-card vault-detail-card vault-quota-card vault-quota-card-full">
+        <div className="vault-card-head">
+          <h2>Filebase quota</h2>
+        </div>
+        <div className="vault-quota-summary">
+          <div className="vault-quota-stats">
+            <div>
+              <strong>{formatQuotaPercent(quotaPercent)}</strong>
+              <span>of provisioned quota</span>
+            </div>
+            <div className="vault-quota-totals">
+              <b>{formatBytes(storageUsed)}</b>
+              <span>of {formatBytes(storageLimit)}</span>
+            </div>
+          </div>
+          <div
+            className="vault-quota-progress-row"
+            role="progressbar"
+            aria-label="Filebase quota used"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-valuenow={Math.min(100, quotaPercent)}
+          >
+            <div className="vault-quota-track">
+              <span
+                className="vault-quota-fill vault-quota-fill-warning"
+                style={{ width: `${Math.min(100, quotaPercent)}%` }}
+              />
+            </div>
+            <span>{formatQuotaPercent(quotaPercent)}</span>
+          </div>
+          <div className="vault-quota-alert">
+            <span className="vault-quota-alert-icon">
+              <AlertTriangle size={15} />
+            </span>
+            <p>
+              {quotaPercent >= 75
+                ? 'Filebase is approaching its provisioned quota. Consider raising the pin quota.'
+                : 'Filebase quota is within a safe range. No quota increase is currently required.'}
+            </p>
+          </div>
+        </div>
+      </section>
 
       <div className="vault-bottom-grid">
         <section className="table-card vault-detail-card vault-users-card">

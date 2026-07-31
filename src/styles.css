@@ -4213,6 +4213,14 @@ button {
   min-height: 212px;
 }
 
+.vault-quota-card-full {
+  min-height: 0;
+}
+
+.vault-quota-card-full .vault-quota-summary {
+  padding-bottom: 20px;
+}
+
 .vault-quota-summary {
   display: grid;
   gap: 16px;

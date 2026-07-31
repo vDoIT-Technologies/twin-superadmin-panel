@@ -32,7 +32,7 @@ export async function getUsersDropdown(params = {}) {
 }
 
 export function getFilebaseQuota(params = {}) {
-  return apiGet('/api/v1/dropdown/filebase-quota', params);
+  return apiGet('/api/v1/vault/filebase-quota', params);
 }
 
 export default {
