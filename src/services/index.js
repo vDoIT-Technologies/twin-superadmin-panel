@@ -14,6 +14,7 @@ export {
   dropdownApiAvailable,
   getClientsDropdown,
   getFilebaseQuota,
+  getFilebaseTopUsers,
   getTwinsDropdown,
   getUsersDropdown,
 } from './dropdownService';

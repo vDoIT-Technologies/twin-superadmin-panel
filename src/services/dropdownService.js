@@ -7,6 +7,11 @@ function extractList(payload, key) {
 
   const candidates = [
     payload?.[key],
+    payload?.data,
+    payload?.data?.[key],
+    payload?.data?.users,
+    payload?.data?.topUsers,
+    payload?.topUsersByStorage,
     payload?.items,
     payload?.results,
   ];
@@ -35,10 +40,17 @@ export function getFilebaseQuota(params = {}) {
   return apiGet('/api/v1/vault/filebase-quota', params);
 }
 
+export async function getFilebaseTopUsers(params = {}) {
+  const payload = await apiGet('/api/v1/vault/top-users', params);
+  const topUsers = extractList(payload, 'topUsers');
+  return topUsers.length ? topUsers : extractList(payload, 'users');
+}
+
 export default {
   dropdownApiAvailable,
   getClientsDropdown,
   getTwinsDropdown,
   getUsersDropdown,
   getFilebaseQuota,
+  getFilebaseTopUsers,
 };

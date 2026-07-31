@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, Database, Download, FileUp, Package, Percent, TrendingUp, Users } from 'lucide-react';
-import { dashboardService, getFilebaseQuota } from '../services';
-import { envBadge, formatCurrencyFull, formatNumber, formatPercent } from '../utils/dashboardUtils';
+import { dashboardService, getFilebaseQuota, getFilebaseTopUsers } from '../services';
+import { envBadge, formatNumber } from '../utils/dashboardUtils';
+
+const BYTES_PER_GB = 1024 ** 3;
+const BYTES_PER_TB = 1024 ** 4;
 
 function formatBytes(bytes) {
   if (!bytes) return '0 B';
@@ -28,6 +31,36 @@ function formatDateShort(val) {
   return `${days}d ago`;
 }
 
+function formatLastActive(val) {
+  if (typeof val === 'string' && (/^\d+d ago$/i.test(val.trim()) || val.trim().toLowerCase() === 'today')) {
+    return val.trim();
+  }
+  return formatDateShort(val);
+}
+
+function formatActivityTimestamp(value) {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  const part = (number) => String(number).padStart(2, '0');
+  return `${date.getFullYear()}-${part(date.getMonth() + 1)}-${part(date.getDate())} ${part(date.getHours())}:${part(date.getMinutes())}`;
+}
+
+function getActivityStorage(item) {
+  const bytes = firstNumber(
+    item.storageBytes,
+    item.sizeBytes,
+    item.fileSizeBytes,
+    item.bytes,
+  );
+  if (bytes != null) return formatBytes(bytes);
+
+  const gigabytes = firstNumber(item.storageGB, item.sizeGB, item.fileSizeGB);
+  if (gigabytes != null) return `${formatNumber(gigabytes)} GB`;
+
+  return item.storage ?? item.size ?? item.fileSize ?? '-';
+}
+
 function getUserInitials(name) {
   if (!name) return '?';
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -48,7 +81,7 @@ function firstNumber(...values) {
 function normalizeFilebaseQuota(payload) {
   const data = payload?.data ?? payload ?? {};
   const quota = data.filebaseQuota ?? data.filebase ?? data.total ?? data;
-  const totalQuota = firstNumber(
+  const quotaBytes = firstNumber(
     quota.totalQuotaBytes,
     quota.totalQuotaInBytes,
     quota.totalQuota,
@@ -57,7 +90,25 @@ function normalizeFilebaseQuota(payload) {
     quota.quotaBytes,
     quota.quota,
   );
-  const totalUsage = firstNumber(
+  const quotaTb = firstNumber(
+    quota.totalQuotaTB,
+    quota.totalQuotaTb,
+    quota.quotaTB,
+    quota.quotaTb,
+  );
+  const quotaGb = firstNumber(
+    quota.totalQuotaGB,
+    quota.totalQuotaGb,
+    quota.quotaGB,
+    quota.quotaGb,
+  );
+  const totalQuota =
+    quotaTb != null
+      ? quotaTb * BYTES_PER_TB
+      : quotaGb != null
+        ? quotaGb * BYTES_PER_GB
+        : quotaBytes;
+  const usageBytes = firstNumber(
     quota.totalUsageBytes,
     quota.totalUsageInBytes,
     quota.totalUsage,
@@ -67,6 +118,28 @@ function normalizeFilebaseQuota(payload) {
     quota.usage,
     quota.used,
   );
+  const usageTb = firstNumber(
+    quota.totalUsageTB,
+    quota.totalUsageTb,
+    quota.usageTB,
+    quota.usageTb,
+    quota.usedTB,
+    quota.usedTb,
+  );
+  const usageGb = firstNumber(
+    quota.totalUsageGB,
+    quota.totalUsageGb,
+    quota.usageGB,
+    quota.usageGb,
+    quota.usedGB,
+    quota.usedGb,
+  );
+  const totalUsage =
+    usageTb != null
+      ? usageTb * BYTES_PER_TB
+      : usageGb != null
+        ? usageGb * BYTES_PER_GB
+        : usageBytes;
   const reportedPercent = firstNumber(
     quota.usagePercentage,
     quota.usagePercent,
@@ -91,10 +164,70 @@ function normalizeFilebaseQuota(payload) {
   };
 }
 
+function getTopUserStorageBytes(user) {
+  const storageTb = firstNumber(user.storageTB, user.storageTb);
+  if (storageTb != null && storageTb > 0) return storageTb * BYTES_PER_TB;
+
+  const storageGb = firstNumber(user.storageGB, user.storageGb);
+  if (storageGb != null) return storageGb * BYTES_PER_GB;
+
+  if (storageTb === 0) return 0;
+
+  const rawStorage =
+    user.storageBytes ??
+    user.storageUsedBytes ??
+    user.storageUsed ??
+    user.storage ??
+    0;
+
+  if (typeof rawStorage === 'string') {
+    const match = rawStorage.trim().match(/^([\d.]+)\s*(TB|GB|MB|KB|B)?$/i);
+    if (match) {
+      const value = Number(match[1]);
+      const unit = match[2]?.toUpperCase() ?? 'B';
+      const multipliers = {
+        TB: BYTES_PER_TB,
+        GB: BYTES_PER_GB,
+        MB: 1024 ** 2,
+        KB: 1024,
+        B: 1,
+      };
+      return value * multipliers[unit];
+    }
+  }
+
+  return firstNumber(rawStorage) ?? 0;
+}
+
+function normalizeTopUser(user) {
+  const client = user.client;
+  const rawEnv = String(user.env ?? user.environment ?? user.__env ?? 'dev').toLowerCase();
+  const env = rawEnv === 'development' ? 'dev' : rawEnv === 'production' ? 'prod' : rawEnv;
+  const clientName =
+    user.clientName ??
+    (typeof client === 'string' ? client : client?.name) ??
+    user.clientId ??
+    '-';
+  return {
+    id: user.id ?? user._id ?? user.userId,
+    name: user.name?.trim() || user.userName?.trim() || user.email || 'Unknown user',
+    email: user.email ?? '',
+    client: typeof clientName === 'string' ? clientName.trim() : clientName,
+    env,
+    storageBytes: getTopUserStorageBytes(user),
+    files: firstNumber(user.files, user.fileCount, user.filesCount, user.totalFiles, user.twinPoints) ?? 0,
+    lastActive:
+      user.lastActive ??
+      user.lastActiveAt ??
+      user.lastActiveDate ??
+      user.updatedAt,
+  };
+}
+
 export function VaultPage() {
   const [stats, setStats] = useState(null);
   const [filebaseQuota, setFilebaseQuota] = useState(null);
-  const [vaultUsers, setVaultUsers] = useState([]);
+  const [topUsers, setTopUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [sortConfig, setSortConfig] = useState({ key: 'storage', direction: 'desc' });
 
@@ -106,7 +239,7 @@ export function VaultPage() {
       const [statsResult, usersResult, quotaResult] =
         await Promise.allSettled([
           dashboardService.getEntityVaultStats(),
-          dashboardService.getEntityVaultUsers({ limit: 50 }),
+          getFilebaseTopUsers(),
           getFilebaseQuota(),
         ]);
 
@@ -120,11 +253,9 @@ export function VaultPage() {
       }
 
       if (usersResult.status === 'fulfilled') {
-        const usersData = usersResult.value;
-        const users = usersData?.data?.data || usersData?.data || [];
-        setVaultUsers(Array.isArray(users) ? users : []);
+        setTopUsers(usersResult.value.map(normalizeTopUser));
       } else {
-        console.error('Vault users load failed:', usersResult.reason);
+        console.error('Top users by storage load failed:', usersResult.reason);
       }
 
       if (quotaResult.status === 'fulfilled') {
@@ -143,13 +274,16 @@ export function VaultPage() {
   const kpis = stats?.kpis || {};
   const recentUploads = stats?.recentUploads || [];
 
-  const sortedUsers = [...vaultUsers].sort((a, b) => {
+  const sortedUsers = [...topUsers].sort((a, b) => {
     const getVal = (u) => {
       switch (sortConfig.key) {
         case 'user': return u.name || '';
-        case 'storage': return Number(u.storageUsed) || 0;
-        case 'files': return Number(u.twinPoints) || 0;
-        default: return Number(u.storageUsed) || 0;
+        case 'client': return u.client || '';
+        case 'env': return u.env || '';
+        case 'storage': return u.storageBytes;
+        case 'files': return u.files;
+        case 'lastActive': return new Date(u.lastActive).getTime() || 0;
+        default: return u.storageBytes;
       }
     };
     const av = getVal(a), bv = getVal(b);
@@ -161,6 +295,28 @@ export function VaultPage() {
     setSortConfig((prev) => prev.key === key
       ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' }
       : { key, direction: key === 'user' ? 'asc' : 'desc' });
+  };
+
+  const exportTopUsersCsv = () => {
+    const header = ['User', 'Email', 'Client', 'Env', 'Storage', 'Files', 'Last Active'];
+    const rows = sortedUsers.map((user) => [
+      user.name,
+      user.email,
+      user.client,
+      user.env,
+      formatBytes(user.storageBytes),
+      user.files,
+      user.lastActive ?? '',
+    ]);
+    const csv = [header, ...rows]
+      .map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(','))
+      .join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'top-users-by-storage.csv';
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   const storageUsed =
@@ -270,15 +426,19 @@ export function VaultPage() {
       </section>
 
       <div className="vault-bottom-grid">
-        <section className="table-card vault-detail-card vault-users-card">
+        <section className="table-card vault-detail-card vault-users-card vault-top-users-card">
           <div className="vault-card-head">
-            <h2>Vault Users</h2>
+            <h2>Top users by storage</h2>
+            <button type="button" className="vault-export-button" onClick={exportTopUsersCsv}>
+              <Download size={14} />
+              Export CSV
+            </button>
           </div>
           <div className="vault-users-table-wrap">
             <table className="vault-users-table">
               <thead>
                 <tr>
-                  {[['user','User'],['storage','Storage Used'],['limit','Limit'],['points','Twin Points'],['env','Env'],['lastActive','Last active']].map(([key,label]) => (
+                  {[['user','User'],['client','Client'],['env','Env'],['storage','Storage'],['files','Files'],['lastActive','Last active']].map(([key,label]) => (
                     <th key={key}>
                       <button type="button" className="table-sort-button" onClick={() => toggleSort(key)}>
                         <span>{label}</span>
@@ -292,23 +452,20 @@ export function VaultPage() {
               </thead>
               <tbody>
                 {sortedUsers.length === 0 ? (
-                  <tr><td colSpan={6} className="table-empty">No vault users found</td></tr>
+                  <tr><td colSpan={6} className="table-empty">No storage users found</td></tr>
                 ) : sortedUsers.map((user) => (
-                  <tr key={user.id || user.vaultId}>
+                  <tr key={user.id || `${user.email}-${user.client}`}>
                     <td>
                       <div className="vault-user-cell">
                         <span className="vault-user-avatar">{getUserInitials(user.name)}</span>
-                        <div>
-                          <strong>{user.name || user.email || 'Unknown'}</strong>
-                          <span style={{ fontSize: '0.75rem', opacity: 0.6 }}>{user.vaultId || ''}</span>
-                        </div>
+                        <strong>{user.name}</strong>
                       </div>
                     </td>
-                    <td className="cell-primary">{formatBytes(user.storageUsed)}</td>
-                    <td>{formatBytes(user.storageLimit)}</td>
-                    <td>{formatNumber(user.twinPoints || 0)}</td>
-                    <td>{envBadge(user.__env)}</td>
-                    <td>{formatDateShort(user.updatedAt)}</td>
+                    <td>{user.client}</td>
+                    <td>{envBadge(user.env)}</td>
+                    <td className="cell-primary">{formatBytes(user.storageBytes)}</td>
+                    <td>{formatNumber(user.files)}</td>
+                    <td>{formatLastActive(user.lastActive)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -316,9 +473,9 @@ export function VaultPage() {
           </div>
         </section>
 
-        <section className="table-card vault-detail-card vault-activity-card">
+        <section className="table-card vault-detail-card vault-activity-card vault-recent-uploads-card">
           <div className="vault-card-head">
-            <h2>Recent uploads</h2>
+            <h2>Recent pin activity</h2>
           </div>
           <div className="vault-activity-list">
             {recentUploads.length === 0 ? (
@@ -328,13 +485,13 @@ export function VaultPage() {
                 <span className="vault-activity-icon"><FileUp size={14} /></span>
                 <div className="vault-activity-main">
                   <div className="vault-activity-head">
-                    <strong>{item.userName || item.name || 'Unknown'}</strong>
-                    <span>{item.name || ''}</span>
+                    <strong>{item.clientName || item.userName || item.name || 'Unknown'}</strong>
+                    <div className="vault-activity-values">
+                      {envBadge(item.env ?? item.environment ?? item.__env)}
+                      <span>{getActivityStorage(item)}</span>
+                    </div>
                   </div>
-                  <div className="vault-activity-meta">
-                    <span>{formatDateShort(item.createdAt)}</span>
-                    <span>{envBadge(item.__env)}</span>
-                  </div>
+                  <div className="vault-activity-meta">{formatActivityTimestamp(item.createdAt ?? item.updatedAt ?? item.lastActive)}</div>
                 </div>
               </div>
             ))}
