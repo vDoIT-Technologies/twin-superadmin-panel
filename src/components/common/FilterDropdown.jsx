@@ -9,6 +9,7 @@ export function FilterDropdown({
   searchPlaceholder = 'Search...',
   searchable = true,
   align = 'left',
+  showPlaceholderOption = true,
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -68,16 +69,18 @@ export function FilterDropdown({
           ) : null}
 
           <div className="filter-dropdown-list">
-            <button
-              type="button"
-              className={`filter-dropdown-item${value == null ? ' selected' : ''}`}
-              onClick={() => {
-                onChange(null);
-                setOpen(false);
-              }}
-            >
-              <span className="filter-dropdown-item-label">{placeholder}</span>
-            </button>
+            {showPlaceholderOption ? (
+              <button
+                type="button"
+                className={`filter-dropdown-item${value == null ? ' selected' : ''}`}
+                onClick={() => {
+                  onChange(null);
+                  setOpen(false);
+                }}
+              >
+                <span className="filter-dropdown-item-label">{placeholder}</span>
+              </button>
+            ) : null}
 
             {filteredOptions.map((option) => (
               <button
