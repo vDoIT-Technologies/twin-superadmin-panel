@@ -113,6 +113,10 @@ export function UsersPage() {
         const data = await dashboardService.getEntityUsers({
           page,
           limit: PAGE_SIZE,
+          clientId: filters.client,
+          userId: filters.user,
+          env: filters.envs.length === 1 ? filters.envs[0] : undefined,
+          range: filters.range,
         });
 
         if (!isActive) {
@@ -154,7 +158,11 @@ export function UsersPage() {
     return () => {
       isActive = false;
     };
-  }, [page]);
+  }, [filters.client, filters.envs, filters.range, filters.user, page]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filters.client, filters.envs, filters.range, filters.user]);
 
   const scopeLabel = useMemo(() => formatScopeLabel(filters), [filters]);
 
@@ -208,8 +216,9 @@ export function UsersPage() {
         };
       })
       .filter((user) => (!filters.client ? true : user.clientId === filters.client))
+      .filter((user) => (!filters.user ? true : String(user.id) === String(filters.user)))
       .filter((user) => (user.env ? filters.envs.includes(user.env) : true));
-  }, [apiUsers, filters.client, filters.envs]);
+  }, [apiUsers, filters.client, filters.envs, filters.user]);
 
   const filteredRows = useMemo(() => {
     const q = query.trim().toLowerCase();

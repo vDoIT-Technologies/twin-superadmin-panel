@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, Search } from 'lucide-react';
+import { ChevronDown, Search, X } from 'lucide-react';
 
 export function FilterDropdown({
   value,
@@ -9,22 +9,41 @@ export function FilterDropdown({
   searchPlaceholder = 'Search...',
   searchable = true,
   align = 'left',
+  showPlaceholderOption = true,
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const rootRef = useRef(null);
 
-  const selected = options.find((option) => option.value === value) ?? null;
+  const uniqueOptions = useMemo(() => {
+    const seen = new Set();
+
+    return (Array.isArray(options) ? options : []).filter((option) => {
+      if (option?.value == null || option.value === '') return false;
+      const key = String(option.value);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [options]);
+
+  const selected = uniqueOptions.find((option) => String(option.value) === String(value)) ?? null;
+  const canClear = Boolean(selected && showPlaceholderOption);
+
+  const clearSelection = () => {
+    onChange(null);
+    setOpen(false);
+  };
 
   const filteredOptions = useMemo(() => {
-    if (!searchable || !query.trim()) return options;
+    if (!searchable || !query.trim()) return uniqueOptions;
     const normalized = query.trim().toLowerCase();
-    return options.filter(
+    return uniqueOptions.filter(
       (option) =>
-        option.label.toLowerCase().includes(normalized) ||
-        option.meta?.toLowerCase().includes(normalized),
+        String(option.label ?? '').toLowerCase().includes(normalized) ||
+        String(option.meta ?? '').toLowerCase().includes(normalized),
     );
-  }, [options, query, searchable]);
+  }, [query, searchable, uniqueOptions]);
 
   useEffect(() => {
     if (!open) {
@@ -43,15 +62,28 @@ export function FilterDropdown({
   }, [open]);
 
   return (
-    <div ref={rootRef} className={`filter-dropdown${open ? ' open' : ''}`}>
-      <button
-        type="button"
-        className="filter-select-button"
-        onClick={() => setOpen((current) => !current)}
-      >
-        <span>{selected?.buttonLabel ?? selected?.label ?? placeholder}</span>
-        <ChevronDown size={14} className="filter-select-caret" />
-      </button>
+    <div ref={rootRef} className={`filter-dropdown${open ? ' open' : ''}${selected ? ' has-value' : ''}`}>
+      <div className="filter-select-control">
+        <button
+          type="button"
+          className="filter-select-button"
+          onClick={() => setOpen((current) => !current)}
+          aria-expanded={open}
+        >
+          <span className="filter-select-label">{selected?.buttonLabel ?? selected?.label ?? placeholder}</span>
+          {!canClear ? <ChevronDown size={14} className="filter-select-caret" /> : null}
+        </button>
+        {canClear ? (
+          <button
+            type="button"
+            className="filter-select-clear"
+            aria-label={`Clear ${selected.label}`}
+            onClick={clearSelection}
+          >
+            <X size={15} aria-hidden="true" />
+          </button>
+        ) : null}
+      </div>
 
       {open ? (
         <div className={`filter-dropdown-panel filter-dropdown-panel-${align}`}>
@@ -68,22 +100,24 @@ export function FilterDropdown({
           ) : null}
 
           <div className="filter-dropdown-list">
-            <button
-              type="button"
-              className={`filter-dropdown-item${value == null ? ' selected' : ''}`}
-              onClick={() => {
-                onChange(null);
-                setOpen(false);
-              }}
-            >
-              <span className="filter-dropdown-item-label">{placeholder}</span>
-            </button>
+            {showPlaceholderOption ? (
+              <button
+                type="button"
+                className={`filter-dropdown-item${value == null ? ' selected' : ''}`}
+                onClick={() => {
+                  onChange(null);
+                  setOpen(false);
+                }}
+              >
+                <span className="filter-dropdown-item-label">{placeholder}</span>
+              </button>
+            ) : null}
 
             {filteredOptions.map((option) => (
               <button
                 key={option.value}
                 type="button"
-                className={`filter-dropdown-item${option.value === value ? ' selected' : ''}`}
+                className={`filter-dropdown-item${String(option.value) === String(value) ? ' selected' : ''}`}
                 onClick={() => {
                   onChange(option.value);
                   setOpen(false);

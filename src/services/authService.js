@@ -1,5 +1,7 @@
 import api from './httpClient';
 
+const AUTH_REQUEST_TIMEOUT_MS = 60_000;
+
 function getPayload(data) {
   if (data?.data && typeof data.data === 'object' && !Array.isArray(data.data)) {
     return data.data;
@@ -27,6 +29,10 @@ function getMessage(source, fallbackMessage) {
 function toAuthError(error, fallbackMessage) {
   const status = error?.response?.status;
   const message = getMessage(error?.response?.data, error?.message || fallbackMessage);
+
+  if (error?.code === 'ECONNABORTED' || /timeout of \d+ms exceeded/i.test(message)) {
+    return new Error('The authentication server did not respond in time. Confirm the local backend is running on port 8000 and that OTP email delivery is configured.');
+  }
 
   if (status === 404 && /verify-login-otp|resend-login-otp/i.test(message)) {
     return new Error('OTP verification service is unavailable right now. Please make sure the superadmin backend is running with the latest auth routes.');
@@ -99,7 +105,7 @@ export const authService = {
       const response = await api.post('/api/v1/auth/login', {
         email: credentials.email,
         password: credentials.password,
-      });
+      }, { timeout: AUTH_REQUEST_TIMEOUT_MS });
 
       assertSuccessfulResponse(response.data, 'Unable to login. Please verify your credentials and try again.');
       return toLoginChallenge(response.data, credentials.email);
@@ -113,7 +119,7 @@ export const authService = {
       const response = await api.post('/api/v1/auth/verify-login-otp', {
         email: payload.email,
         otp: payload.otp,
-      });
+      }, { timeout: AUTH_REQUEST_TIMEOUT_MS });
 
       assertSuccessfulResponse(response.data, 'Unable to verify the login code. Please try again.');
       return assertCompleteSession(
@@ -129,7 +135,7 @@ export const authService = {
     try {
       const response = await api.post('/api/v1/auth/resend-login-otp', {
         email: payload.email,
-      });
+      }, { timeout: AUTH_REQUEST_TIMEOUT_MS });
 
       assertSuccessfulResponse(response.data, 'Unable to resend the login code right now. Please wait a minute and try again.');
       return {

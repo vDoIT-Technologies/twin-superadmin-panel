@@ -106,6 +106,8 @@ export function HomeAuthPage() {
               <span>Email</span>
               <input
                 type="email"
+                name="email"
+                autoComplete="username"
                 required
                 value={form.email}
                 onChange={(event) => handleChange('email', event.target.value)}
@@ -116,6 +118,8 @@ export function HomeAuthPage() {
               <div className="auth-password-field">
                 <input
                   type={showPassword ? 'text' : 'password'}
+                  name="password"
+                  autoComplete="current-password"
                   required
                   placeholder="Enter password"
                   value={form.password}

@@ -1,38 +1,28 @@
-import { useEffect, useState } from 'react';
-import { Database, Download, FileUp, Package, Percent, TrendingUp, Users } from 'lucide-react';
-import { dashboardService } from '../services';
-import { envBadge, formatCurrencyFull, formatNumber, formatPercent } from '../utils/dashboardUtils';
-
-function formatBytes(bytes) {
-  if (!bytes) return '0 B';
-  const num = Number(bytes);
-  if (num >= 1099511627776) return `${(num / 1099511627776).toFixed(2)} TB`;
-  if (num >= 1073741824) return `${(num / 1073741824).toFixed(2)} GB`;
-  if (num >= 1048576) return `${(num / 1048576).toFixed(1)} MB`;
-  if (num >= 1024) return `${(num / 1024).toFixed(0)} KB`;
-  return `${num} B`;
-}
-
-function formatDateShort(val) {
-  if (!val) return '-';
-  const d = new Date(val);
-  if (Number.isNaN(d.getTime())) return '-';
-  const days = Math.floor((Date.now() - d.getTime()) / 86400000);
-  if (days <= 0) return 'today';
-  if (days === 1) return '1d ago';
-  return `${days}d ago`;
-}
-
-function getUserInitials(name) {
-  if (!name) return '?';
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length <= 1) return name.trim().slice(0, 1).toUpperCase();
-  return parts.slice(0, 2).map((p) => p[0]?.toUpperCase() ?? '').join('');
-}
+import { useContext, useEffect, useMemo, useState } from 'react';
+import { Database, FileUp, Package, Percent, TrendingUp, Users } from 'lucide-react';
+import { TopUsersTable } from '../components/vault/TopUsersTable';
+import { FilterContext } from '../app/FilterContext';
+import { StorageByClientCard } from '../components/vault/StorageByClientCard';
+import { VaultQuotaCard } from '../components/vault/VaultQuotaCard';
+import { dashboardService, getFilebaseTopUsers, getStorageByClient, getStorageUsage } from '../services';
+import { formatNumber } from '../utils/dashboardUtils';
+import {
+  exportTopUsersCsv,
+  firstNumber,
+  formatBytes,
+  formatQuotaPercent,
+  normalizeStorageUsage,
+  normalizeStorageClient,
+  normalizeTopUser,
+  sortTopUsers,
+} from '../utils/vaultFormatters';
 
 export function VaultPage() {
+  const { filters } = useContext(FilterContext);
   const [stats, setStats] = useState(null);
-  const [vaultUsers, setVaultUsers] = useState([]);
+  const [filebaseQuota, setFilebaseQuota] = useState(null);
+  const [storageClients, setStorageClients] = useState([]);
+  const [topUsers, setTopUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [sortConfig, setSortConfig] = useState({ key: 'storage', direction: 'desc' });
 
@@ -41,42 +31,65 @@ export function VaultPage() {
     setIsLoading(true);
 
     async function load() {
-      try {
-        const [statsData, usersData] = await Promise.all([
-          dashboardService.getEntityVaultStats(),
-          dashboardService.getEntityVaultUsers({ limit: 50 }),
+      const env = filters.envs.length === 1 ? filters.envs[0] : undefined;
+      const params = {
+        env,
+        clientId: filters.client || undefined,
+        twinId: filters.twin || undefined,
+        userId: filters.user || undefined,
+      };
+      const [statsResult, usersResult, quotaResult, clientsResult] =
+        await Promise.allSettled([
+          dashboardService.getEntityVaultStats(params),
+          getFilebaseTopUsers(params),
+          getStorageUsage(params),
+          getStorageByClient(params),
         ]);
-        if (!active) return;
+
+      if (!active) return;
+
+      if (statsResult.status === 'fulfilled') {
+        const statsData = statsResult.value;
         setStats(statsData?.data || statsData);
-        const users = usersData?.data?.data || usersData?.data || [];
-        setVaultUsers(Array.isArray(users) ? users : []);
-      } catch (err) {
-        console.error('Vault page load failed:', err);
-      } finally {
-        if (active) setIsLoading(false);
+      } else {
+        console.error('Vault stats load failed:', statsResult.reason);
       }
+
+      if (usersResult.status === 'fulfilled') {
+        setTopUsers(usersResult.value.map(normalizeTopUser));
+      } else {
+        console.error('Top users by storage load failed:', usersResult.reason);
+      }
+
+      if (quotaResult.status === 'fulfilled') {
+        setFilebaseQuota(normalizeStorageUsage(quotaResult.value));
+      } else {
+        console.error('Storage usage load failed:', quotaResult.reason);
+      }
+
+      if (clientsResult.status === 'fulfilled') {
+        setStorageClients(clientsResult.value.map(normalizeStorageClient));
+      } else {
+        console.error('Storage by client load failed:', clientsResult.reason);
+      }
+
+      setIsLoading(false);
     }
 
     load();
     return () => { active = false; };
-  }, []);
+  }, [filters.client, filters.envs, filters.twin, filters.user]);
 
   const kpis = stats?.kpis || {};
-  const recentUploads = stats?.recentUploads || [];
-
-  const sortedUsers = [...vaultUsers].sort((a, b) => {
-    const getVal = (u) => {
-      switch (sortConfig.key) {
-        case 'user': return u.name || '';
-        case 'storage': return Number(u.storageUsed) || 0;
-        case 'files': return Number(u.twinPoints) || 0;
-        default: return Number(u.storageUsed) || 0;
-      }
-    };
-    const av = getVal(a), bv = getVal(b);
-    if (typeof av === 'number' && typeof bv === 'number') return sortConfig.direction === 'asc' ? av - bv : bv - av;
-    return sortConfig.direction === 'asc' ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
-  });
+  const scopedStorageClients = useMemo(
+    () => filters.client ? storageClients.filter((client) => String(client.id) === String(filters.client)) : storageClients,
+    [filters.client, storageClients],
+  );
+  const scopedTopUsers = useMemo(
+    () => filters.client ? topUsers.filter((user) => String(user.clientId) === String(filters.client)) : topUsers,
+    [filters.client, topUsers],
+  );
+  const sortedUsers = sortTopUsers(scopedTopUsers, sortConfig);
 
   const toggleSort = (key) => {
     setSortConfig((prev) => prev.key === key
@@ -84,7 +97,18 @@ export function VaultPage() {
       : { key, direction: key === 'user' ? 'asc' : 'desc' });
   };
 
-  const quotaPercent = kpis.quotaPercent || 0;
+  const storageUsed =
+    filebaseQuota?.totalUsage ??
+    firstNumber(kpis.storedOnIpfsBytes) ??
+    0;
+  const storageLimit =
+    filebaseQuota?.totalQuota ??
+    firstNumber(kpis.storageLimitBytes) ??
+    0;
+  const quotaPercent =
+    filebaseQuota?.usagePercent ??
+    firstNumber(kpis.quotaPercent) ??
+    0;
 
   if (isLoading) {
     return (
@@ -111,12 +135,12 @@ export function VaultPage() {
 
       <div className="vault-metric-grid">
         {[
-          { label: 'Stored on IPFS', value: formatBytes(kpis.storedOnIpfsBytes || 0), icon: Database, tone: 'indigo' },
+          { label: 'Stored on IPFS', value: formatBytes(storageUsed), icon: Database, tone: 'indigo' },
           { label: 'Files pinned', value: formatNumber(kpis.filesPinned || 0), icon: FileUp, tone: 'sky' },
           { label: 'Total files', value: formatNumber(kpis.totalFiles || 0), icon: Package, tone: 'violet' },
           { label: 'Active drives · users', value: String(kpis.activeDrives || 0), icon: Users, tone: 'rose' },
-          { label: 'Quota used', value: `${quotaPercent}%`, icon: Percent, tone: 'amber' },
-          { label: 'Storage limit', value: formatBytes(kpis.storageLimitBytes || 0), icon: TrendingUp, tone: 'emerald' },
+          { label: 'Quota used', value: formatQuotaPercent(quotaPercent), icon: Percent, tone: 'amber' },
+          { label: 'Storage limit', value: formatBytes(storageLimit), icon: TrendingUp, tone: 'emerald' },
         ].map((metric) => {
           const Icon = metric.icon;
           return (
@@ -133,77 +157,19 @@ export function VaultPage() {
         })}
       </div>
 
-      <div className="vault-bottom-grid">
-        <section className="table-card vault-detail-card vault-users-card">
-          <div className="vault-card-head">
-            <h2>Vault Users</h2>
-          </div>
-          <div className="vault-users-table-wrap">
-            <table className="vault-users-table">
-              <thead>
-                <tr>
-                  {[['user','User'],['storage','Storage Used'],['limit','Limit'],['points','Twin Points'],['env','Env'],['lastActive','Last active']].map(([key,label]) => (
-                    <th key={key}>
-                      <button type="button" className="table-sort-button" onClick={() => toggleSort(key)}>
-                        <span>{label}</span>
-                        <span className={`table-sort-indicator${sortConfig.key === key ? ' active' : ''}`}>
-                          {sortConfig.key === key ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}
-                        </span>
-                      </button>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {sortedUsers.length === 0 ? (
-                  <tr><td colSpan={6} className="table-empty">No vault users found</td></tr>
-                ) : sortedUsers.map((user) => (
-                  <tr key={user.id || user.vaultId}>
-                    <td>
-                      <div className="vault-user-cell">
-                        <span className="vault-user-avatar">{getUserInitials(user.name)}</span>
-                        <div>
-                          <strong>{user.name || user.email || 'Unknown'}</strong>
-                          <span style={{ fontSize: '0.75rem', opacity: 0.6 }}>{user.vaultId || ''}</span>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="cell-primary">{formatBytes(user.storageUsed)}</td>
-                    <td>{formatBytes(user.storageLimit)}</td>
-                    <td>{formatNumber(user.twinPoints || 0)}</td>
-                    <td>{envBadge(user.__env)}</td>
-                    <td>{formatDateShort(user.updatedAt)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
+      <div className="vault-storage-overview-grid">
+        <VaultQuotaCard percentage={quotaPercent} storageUsed={storageUsed} storageLimit={storageLimit} />
+        <StorageByClientCard clients={scopedStorageClients} />
+      </div>
 
-        <section className="table-card vault-detail-card vault-activity-card">
-          <div className="vault-card-head">
-            <h2>Recent uploads</h2>
-          </div>
-          <div className="vault-activity-list">
-            {recentUploads.length === 0 ? (
-              <div className="entity-empty-state">No recent uploads</div>
-            ) : recentUploads.map((item, i) => (
-              <div key={item.id || i} className="vault-activity-row">
-                <span className="vault-activity-icon"><FileUp size={14} /></span>
-                <div className="vault-activity-main">
-                  <div className="vault-activity-head">
-                    <strong>{item.userName || item.name || 'Unknown'}</strong>
-                    <span>{item.name || ''}</span>
-                  </div>
-                  <div className="vault-activity-meta">
-                    <span>{formatDateShort(item.createdAt)}</span>
-                    <span>{envBadge(item.__env)}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
+      <div className="vault-bottom-grid">
+        <TopUsersTable
+          users={sortedUsers}
+          sortConfig={sortConfig}
+          onSort={toggleSort}
+          onExport={() => exportTopUsersCsv(sortedUsers)}
+        />
+
       </div>
     </section>
   );

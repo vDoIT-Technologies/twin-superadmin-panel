@@ -97,6 +97,9 @@ export function ClientsPage() {
         const data = await dashboardService.getEntityClients({
           page,
           limit: PAGE_SIZE,
+          clientId: filters.client,
+          env: filters.envs.length === 1 ? filters.envs[0] : undefined,
+          range: filters.range,
         });
 
         if (!isActive) return;
@@ -121,7 +124,11 @@ export function ClientsPage() {
 
     loadClients();
     return () => { isActive = false; };
-  }, [page]);
+  }, [filters.client, filters.envs, filters.range, page]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filters.client, filters.envs, filters.range]);
 
   const clientRows = useMemo(() => {
     return apiClients.map((client, index) => {
@@ -156,13 +163,16 @@ export function ClientsPage() {
 
   const filteredRows = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return clientRows;
-    return clientRows.filter(
+    const scopedRows = filters.client
+      ? clientRows.filter((client) => String(client.id) === String(filters.client))
+      : clientRows;
+    if (!q) return scopedRows;
+    return scopedRows.filter(
       (client) =>
         client.name.toLowerCase().includes(q) ||
         client.plan.toLowerCase().includes(q),
     );
-  }, [clientRows, query]);
+  }, [clientRows, filters.client, query]);
 
   const sortedRows = useMemo(() => {
     const getSortValue = (client) => {

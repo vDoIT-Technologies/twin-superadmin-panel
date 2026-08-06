@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useContext, useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Download, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { dashboardService } from '../services';
+import { FilterContext } from '../app/FilterContext';
 import { formatNumber } from '../utils/dashboardUtils';
 
 function getTwinInitials(name) {
@@ -19,6 +20,7 @@ function getPayload(response) {
 
 export function TwinsPage() {
   const PAGE_SIZE = 10;
+  const { filters } = useContext(FilterContext);
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [sortConfig, setSortConfig] = useState({ key: 'tokens', direction: 'desc' });
@@ -33,7 +35,13 @@ export function TwinsPage() {
 
     async function load() {
       try {
-        const data = await dashboardService.getEntityTwins({ page, limit: PAGE_SIZE });
+        const data = await dashboardService.getEntityTwins({
+          page,
+          limit: PAGE_SIZE,
+          clientId: filters.client,
+          twinId: filters.twin,
+          env: filters.envs.length === 1 ? filters.envs[0] : undefined,
+        });
         if (!active) return;
         const payload = getPayload(data);
         setApiTwins(payload.items);
@@ -53,7 +61,11 @@ export function TwinsPage() {
 
     load();
     return () => { active = false; };
-  }, [page]);
+  }, [filters.client, filters.envs, filters.twin, page]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filters.client, filters.envs, filters.twin]);
 
   const twinRows = useMemo(() => apiTwins.map((t, i) => ({
     id: t._id || t.id || `twin-${i}`,
@@ -69,11 +81,14 @@ export function TwinsPage() {
 
   const filteredRows = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return twinRows;
-    return twinRows.filter((t) =>
+    const scopedRows = filters.twin
+      ? twinRows.filter((twin) => String(twin.id) === String(filters.twin))
+      : twinRows;
+    if (!q) return scopedRows;
+    return scopedRows.filter((t) =>
       t.name.toLowerCase().includes(q) || t.role.toLowerCase().includes(q) || t.client.toLowerCase().includes(q),
     );
-  }, [query, twinRows]);
+  }, [filters.twin, query, twinRows]);
 
   const sortedRows = useMemo(() => {
     const getVal = (t) => {
