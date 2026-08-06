@@ -32,9 +32,9 @@ function BrandMark() {
   );
 }
 
-export function Sidebar({ collapsed, initials, profileName, profileEmail }) {
+export function Sidebar({ collapsed, mobileOpen, onNavigate, initials, profileName, profileEmail }) {
   return (
-    <aside className={`sidebar${collapsed ? ' collapsed' : ''}`}>
+    <aside className={`sidebar${collapsed ? ' collapsed' : ''}${mobileOpen ? ' mobile-open' : ''}`}>
       <div className="brand-block">
         <BrandMark />
         <div className="brand-copy"><p className="brand-name">Twin Protocol</p><p className="brand-kicker">SuperAdmin</p></div>
@@ -45,7 +45,7 @@ export function Sidebar({ collapsed, initials, profileName, profileEmail }) {
             <p className="nav-group-label">{group.label}</p>
             <div className="nav-group-items">
               {group.items.map(({ icon: Icon, ...item }) => (
-                <NavLink key={item.to} end={item.end} to={item.to} className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+                <NavLink key={item.to} end={item.end} to={item.to} onClick={onNavigate} className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
                   <span className="nav-icon"><Icon size={18} /></span><span>{item.label}</span>
                 </NavLink>
               ))}

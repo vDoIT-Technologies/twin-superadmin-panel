@@ -13,7 +13,8 @@ export { dashboardService } from './dashboardService';
 export {
   dropdownApiAvailable,
   getClientsDropdown,
-  getFilebaseQuota,
+  getStorageByClient,
+  getStorageUsage,
   getFilebaseTopUsers,
   getTwinsDropdown,
   getUsersDropdown,

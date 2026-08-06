@@ -11,6 +11,8 @@ function extractList(payload, key) {
     payload?.data?.[key],
     payload?.data?.users,
     payload?.data?.topUsers,
+    payload?.data?.storageByClient,
+    payload?.storageByClient,
     payload?.topUsersByStorage,
     payload?.items,
     payload?.results,
@@ -36,8 +38,13 @@ export async function getUsersDropdown(params = {}) {
   return extractList(payload, 'users');
 }
 
-export function getFilebaseQuota(params = {}) {
-  return apiGet('/api/v1/vault/filebase-quota', params);
+export function getStorageUsage(params = {}) {
+  return apiGet('/api/v1/vault/storage-usage', params);
+}
+
+export async function getStorageByClient(params = {}) {
+  const payload = await apiGet('/api/v1/vault/storage-by-client', params);
+  return extractList(payload, 'clients');
 }
 
 export async function getFilebaseTopUsers(params = {}) {
@@ -51,6 +58,7 @@ export default {
   getClientsDropdown,
   getTwinsDropdown,
   getUsersDropdown,
-  getFilebaseQuota,
+  getStorageUsage,
+  getStorageByClient,
   getFilebaseTopUsers,
 };

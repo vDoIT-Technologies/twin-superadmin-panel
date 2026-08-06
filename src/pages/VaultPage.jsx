@@ -1,22 +1,27 @@
-import { useEffect, useState } from 'react';
+import { useContext, useEffect, useMemo, useState } from 'react';
 import { Database, FileUp, Package, Percent, TrendingUp, Users } from 'lucide-react';
 import { TopUsersTable } from '../components/vault/TopUsersTable';
+import { FilterContext } from '../app/FilterContext';
+import { StorageByClientCard } from '../components/vault/StorageByClientCard';
 import { VaultQuotaCard } from '../components/vault/VaultQuotaCard';
-import { dashboardService, getFilebaseQuota, getFilebaseTopUsers } from '../services';
+import { dashboardService, getFilebaseTopUsers, getStorageByClient, getStorageUsage } from '../services';
 import { formatNumber } from '../utils/dashboardUtils';
 import {
   exportTopUsersCsv,
   firstNumber,
   formatBytes,
   formatQuotaPercent,
-  normalizeFilebaseQuota,
+  normalizeStorageUsage,
+  normalizeStorageClient,
   normalizeTopUser,
   sortTopUsers,
 } from '../utils/vaultFormatters';
 
 export function VaultPage() {
+  const { filters } = useContext(FilterContext);
   const [stats, setStats] = useState(null);
   const [filebaseQuota, setFilebaseQuota] = useState(null);
+  const [storageClients, setStorageClients] = useState([]);
   const [topUsers, setTopUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [sortConfig, setSortConfig] = useState({ key: 'storage', direction: 'desc' });
@@ -26,11 +31,19 @@ export function VaultPage() {
     setIsLoading(true);
 
     async function load() {
-      const [statsResult, usersResult, quotaResult] =
+      const env = filters.envs.length === 1 ? filters.envs[0] : undefined;
+      const params = {
+        env,
+        clientId: filters.client || undefined,
+        twinId: filters.twin || undefined,
+        userId: filters.user || undefined,
+      };
+      const [statsResult, usersResult, quotaResult, clientsResult] =
         await Promise.allSettled([
-          dashboardService.getEntityVaultStats(),
-          getFilebaseTopUsers(),
-          getFilebaseQuota(),
+          dashboardService.getEntityVaultStats(params),
+          getFilebaseTopUsers(params),
+          getStorageUsage(params),
+          getStorageByClient(params),
         ]);
 
       if (!active) return;
@@ -49,9 +62,15 @@ export function VaultPage() {
       }
 
       if (quotaResult.status === 'fulfilled') {
-        setFilebaseQuota(normalizeFilebaseQuota(quotaResult.value));
+        setFilebaseQuota(normalizeStorageUsage(quotaResult.value));
       } else {
-        console.error('Filebase quota load failed:', quotaResult.reason);
+        console.error('Storage usage load failed:', quotaResult.reason);
+      }
+
+      if (clientsResult.status === 'fulfilled') {
+        setStorageClients(clientsResult.value.map(normalizeStorageClient));
+      } else {
+        console.error('Storage by client load failed:', clientsResult.reason);
       }
 
       setIsLoading(false);
@@ -59,10 +78,18 @@ export function VaultPage() {
 
     load();
     return () => { active = false; };
-  }, []);
+  }, [filters.client, filters.envs, filters.twin, filters.user]);
 
   const kpis = stats?.kpis || {};
-  const sortedUsers = sortTopUsers(topUsers, sortConfig);
+  const scopedStorageClients = useMemo(
+    () => filters.client ? storageClients.filter((client) => String(client.id) === String(filters.client)) : storageClients,
+    [filters.client, storageClients],
+  );
+  const scopedTopUsers = useMemo(
+    () => filters.client ? topUsers.filter((user) => String(user.clientId) === String(filters.client)) : topUsers,
+    [filters.client, topUsers],
+  );
+  const sortedUsers = sortTopUsers(scopedTopUsers, sortConfig);
 
   const toggleSort = (key) => {
     setSortConfig((prev) => prev.key === key
@@ -130,7 +157,10 @@ export function VaultPage() {
         })}
       </div>
 
-      <VaultQuotaCard percentage={quotaPercent} storageUsed={storageUsed} storageLimit={storageLimit} />
+      <div className="vault-storage-overview-grid">
+        <VaultQuotaCard percentage={quotaPercent} storageUsed={storageUsed} storageLimit={storageLimit} />
+        <StorageByClientCard clients={scopedStorageClients} />
+      </div>
 
       <div className="vault-bottom-grid">
         <TopUsersTable

@@ -41,7 +41,7 @@ export function getUserInitials(name) {
   return parts.slice(0, 2).map((part) => part[0]?.toUpperCase() ?? '').join('');
 }
 
-export function normalizeFilebaseQuota(payload) {
+export function normalizeStorageUsage(payload) {
   const data = payload?.data ?? payload ?? {};
   const quota = data.filebaseQuota ?? data.filebase ?? data.total ?? data;
   const quotaBytes = firstNumber(
@@ -96,6 +96,7 @@ export function normalizeTopUser(user) {
   const clientName = user.clientName ?? (typeof client === 'string' ? client : client?.name) ?? user.clientId ?? '-';
   return {
     id: user.id ?? user._id ?? user.userId,
+    clientId: user.clientId ?? client?.id ?? client?._id ?? null,
     name: user.name?.trim() || user.userName?.trim() || user.email || 'Unknown user',
     email: user.email ?? '',
     client: typeof clientName === 'string' ? clientName.trim() : clientName,
@@ -104,6 +105,52 @@ export function normalizeTopUser(user) {
     files: firstNumber(user.files, user.fileCount, user.filesCount, user.totalFiles, user.twinPoints) ?? 0,
     lastActive: user.lastActive ?? user.lastActiveAt ?? user.lastActiveDate ?? user.updatedAt,
   };
+}
+
+export function normalizeStorageClient(client, index) {
+  const details = client.client && typeof client.client === 'object' ? client.client : {};
+  const clientId = client.clientId
+    ?? client.clientID
+    ?? client.client_id
+    ?? client.id
+    ?? client._id
+    ?? details.clientId
+    ?? details.id
+    ?? details._id
+    ?? null;
+  const storageTb = firstNumber(
+    client.storageTB, client.storageTb, client.storageInTB, client.totalStorageTB, client.totalStorageTb,
+  );
+  const storageGb = firstNumber(
+    client.storageGB, client.storageGb, client.storageInGB, client.totalStorageGB,
+    client.totalStorageGb, client.totalStorageInGB, client.usedGB,
+  );
+  const storageBytes = firstNumber(client.storageBytes, client.totalStorageBytes, client.storageUsedBytes);
+  const rawStorage = client.storage ?? client.totalStorage;
+  const parsedStorage = typeof rawStorage === 'string'
+    ? rawStorage.trim().match(/^([\d.]+)\s*(TB|GB|MB|KB|B)?$/i)
+    : null;
+  const parsedStorageGb = parsedStorage
+    ? Number(parsedStorage[1]) * ({ TB: 1024, GB: 1, MB: 1 / 1024, KB: 1 / 1024 ** 2, B: 1 / BYTES_PER_GB }[parsedStorage[2]?.toUpperCase() ?? 'GB'])
+    : firstNumber(rawStorage);
+  const activeValue = client.isActive ?? client.active ?? details.isActive ?? details.active;
+  const statusValue = client.clientStatus ?? client.status ?? details.status
+    ?? (activeValue == null ? 'inactive' : activeValue ? 'active' : 'inactive');
+  const envValue = String(client.env ?? client.environment ?? client.__env ?? 'dev').toLowerCase();
+
+  return {
+    id: clientId == null ? null : String(clientId),
+    rank: firstNumber(client.rank) ?? index + 1,
+    name: client.clientName ?? client.name ?? client.companyName ?? details.name ?? details.companyName ?? 'Unknown client',
+    status: String(statusValue).toLowerCase() === 'active' ? 'active' : 'inactive',
+    env: envValue === 'development' ? 'dev' : envValue === 'production' ? 'prod' : envValue,
+    storageGb: storageGb ?? (storageTb != null ? storageTb * 1024 : storageBytes != null ? storageBytes / BYTES_PER_GB : parsedStorageGb ?? 0),
+    files: firstNumber(client.files, client.fileCount, client.filesCount, client.totalFiles) ?? 0,
+  };
+}
+
+export function formatStorageGb(value) {
+  return `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(Number(value) || 0)} GB`;
 }
 
 export function sortTopUsers(users, { key, direction }) {

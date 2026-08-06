@@ -1,0 +1,193 @@
+/*
+ * Production responsive contract.
+ * Loaded after styles.css so legacy page rules cannot override navigation and toolbar behavior.
+ */
+
+.filter-group-range {
+  gap: 2px;
+  padding: 3px;
+  border-radius: 10px;
+  background: #f4f7fb;
+}
+
+.filter-group-range .filter-chip {
+  min-width: 42px;
+  height: 32px;
+  padding-inline: 9px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.filter-group-range .filter-chip.active {
+  border-color: #dde5f0;
+  background: #fff;
+  color: #243b63;
+  box-shadow: 0 2px 7px rgba(15, 23, 42, 0.08);
+}
+
+.filterbar-secondary {
+  justify-content: flex-start;
+  min-height: 50px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  gap: 10px;
+}
+
+@media (min-width: 1281px) {
+  .filterbar-primary {
+    min-height: 58px;
+    gap: 8px;
+    padding: 9px 18px;
+  }
+
+  .filterbar-primary .filter-chip-env {
+    height: 34px;
+    padding-inline: 11px;
+  }
+
+  .filterbar-primary .filter-scope-groups-primary {
+    grid-template-columns: repeat(6, minmax(88px, 1fr));
+    gap: 7px;
+  }
+
+  .filterbar-primary .filter-dropdown-trigger {
+    min-height: 34px;
+    padding-inline: 10px;
+  }
+}
+
+@media (max-width: 1280px) {
+  .filterbar-primary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    min-height: 0;
+    padding: 10px 14px 12px;
+  }
+
+  .filterbar-primary .filter-group-environment,
+  .filterbar-primary .filter-group-range {
+    flex: 0 0 auto;
+  }
+
+  .filterbar-primary .filter-scope-groups-primary {
+    flex: 1 0 100%;
+    width: 100%;
+    margin: 0;
+  }
+}
+
+@media (min-width: 901px) and (max-width: 1280px) {
+  .filterbar-primary .filter-scope-groups-primary {
+    grid-template-columns: repeat(6, minmax(112px, 1fr));
+    gap: 8px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .sidebar,
+  .sidebar.collapsed {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 50;
+    width: min(280px, calc(100vw - 48px));
+    height: 100dvh;
+    gap: 20px;
+    padding: 18px 14px 16px;
+    transform: translateX(-102%);
+    box-shadow: none;
+  }
+
+  .sidebar.mobile-open,
+  .sidebar.collapsed.mobile-open {
+    transform: translateX(0);
+    box-shadow: 18px 0 50px -24px rgba(15, 23, 42, 0.48);
+  }
+
+  .sidebar .brand-copy,
+  .sidebar .nav-group-label,
+  .sidebar .nav-link span:not(.nav-icon),
+  .sidebar .profile-copy,
+  .sidebar.collapsed .brand-copy,
+  .sidebar.collapsed .nav-group-label,
+  .sidebar.collapsed .nav-link span:not(.nav-icon),
+  .sidebar.collapsed .profile-copy {
+    display: block;
+  }
+
+  .sidebar .brand-block,
+  .sidebar .nav-link,
+  .sidebar .sidebar-profile,
+  .sidebar.collapsed .brand-block,
+  .sidebar.collapsed .nav-link,
+  .sidebar.collapsed .sidebar-profile {
+    justify-content: flex-start;
+  }
+
+  .sidebar-backdrop { display: block; }
+  .sidebar-backdrop.visible { opacity: 1; pointer-events: auto; }
+  .workspace { width: 100%; }
+
+  .filter-group-environment,
+  .filterbar-primary .filter-group-environment {
+    display: flex;
+    width: auto;
+    justify-content: flex-start;
+    gap: 8px;
+  }
+
+  .filter-group-environment .filter-label {
+    min-width: 88px;
+    flex: 0 0 auto;
+  }
+
+  .filter-group-environment .filter-chip {
+    width: auto;
+    min-width: 72px;
+    flex: 0 0 auto;
+    padding-inline: 14px;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 900px) {
+  .filterbar-primary .filter-scope-groups-primary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+}
+
+@media (max-width: 640px) {
+  .filterbar-primary .filter-group-environment {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .filter-group-environment .filter-label {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+
+  .filter-group-environment .filter-chip {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .filterbar-primary .filter-scope-groups-primary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .filterbar-secondary {
+    overflow-x: auto;
+    padding-inline: 10px;
+    scrollbar-width: none;
+  }
+}
+
+@media (max-width: 420px) {
+  .filterbar-primary .filter-scope-groups-primary {
+    grid-template-columns: 1fr;
+  }
+}

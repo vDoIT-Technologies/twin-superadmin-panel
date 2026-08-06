@@ -56,6 +56,7 @@ export function AppLayout() {
   const { isAuthenticated, logout, profile, user } = useAuth();
   const { filters, setFilters } = useContext(FilterContext);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
@@ -292,7 +293,19 @@ export function AppLayout() {
     setSearchQuery('');
     setSearchOpen(false);
     setProfileMenuOpen(false);
+    setIsMobileSidebarOpen(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (!isMobileSidebarOpen) return undefined;
+
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') setIsMobileSidebarOpen(false);
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isMobileSidebarOpen]);
 
   const openSearch = () => {
     if (searchQuery.trim()) {
@@ -321,9 +334,19 @@ export function AppLayout() {
     <div className="app-shell">
       <Sidebar
         collapsed={isSidebarCollapsed}
+        mobileOpen={isMobileSidebarOpen}
+        onNavigate={() => setIsMobileSidebarOpen(false)}
         initials={initials}
         profileName={profileName}
         profileEmail={profileEmail}
+      />
+      <button
+        type="button"
+        className={`sidebar-backdrop${isMobileSidebarOpen ? ' visible' : ''}`}
+        aria-label="Close navigation"
+        aria-hidden={!isMobileSidebarOpen}
+        tabIndex={isMobileSidebarOpen ? 0 : -1}
+        onClick={() => setIsMobileSidebarOpen(false)}
       />
 
       <div className="workspace">
@@ -333,9 +356,16 @@ export function AppLayout() {
               <button
                 className="icon-button topbar-toggle"
                 type="button"
-                aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                aria-label={isMobileSidebarOpen ? 'Close navigation' : isSidebarCollapsed ? 'Expand sidebar' : 'Open navigation'}
+                aria-expanded={isMobileSidebarOpen}
                 aria-pressed={isSidebarCollapsed}
-                onClick={() => setIsSidebarCollapsed((value) => !value)}
+                onClick={() => {
+                  if (window.matchMedia('(max-width: 1024px)').matches) {
+                    setIsMobileSidebarOpen((value) => !value);
+                    return;
+                  }
+                  setIsSidebarCollapsed((value) => !value);
+                }}
               >
                 <Columns2 size={16} />
               </button>

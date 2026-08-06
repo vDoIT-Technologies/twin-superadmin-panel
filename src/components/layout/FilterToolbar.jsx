@@ -46,8 +46,8 @@ export function FilterToolbar({
 }) {
   return (
     <>
-      <div className="filterbar filterbar-primary">
-        <div className="filter-group">
+      <div className={`filterbar filterbar-primary${showOverviewControls ? ' filterbar-primary-with-overview' : ''}`}>
+        <div className="filter-group filter-group-environment">
           <span className="filter-label">Environment</span>
           {ENVIRONMENTS.map((option) => {
             const active = filters.envs.includes(option.id);
@@ -66,6 +66,14 @@ export function FilterToolbar({
             );
           })}
         </div>
+
+        {showOverviewControls ? (
+          <div className="filter-group filter-group-range">
+            {RANGES.map((range) => (
+              <button key={range} type="button" className={`filter-chip${filters.range === range ? ' active' : ''}`} onClick={() => updateFilters({ range })}>{range}</button>
+            ))}
+          </div>
+        ) : null}
 
         <div className="filter-scope-groups filter-scope-groups-primary">
           <div className="filter-group filter-group-granularity">
@@ -88,24 +96,17 @@ export function FilterToolbar({
 
       {showOverviewControls ? (
         <div className="filterbar filterbar-secondary">
+          <div className="filter-group">
+            <button type="button" className={`filter-chip filter-chip-compare${filters.compare ? ' active' : ''}`} onClick={() => updateFilters({ compare: !filters.compare })}>
+              <Columns2 size={15} />Compare
+            </button>
+          </div>
           <div className="filter-group filter-group-lens">
             {LENSES.map((lens) => (
               <button key={lens.id} type="button" className={`filter-chip filter-chip-lens${filters.lens === lens.id ? ' active' : ''}`} onClick={() => updateFilters({ lens: lens.id })}>
                 {lens.label}
               </button>
             ))}
-          </div>
-          <div className="filter-scope-divider" aria-hidden="true" />
-          <div className="filter-group">
-            {RANGES.map((range) => (
-              <button key={range} type="button" className={`filter-chip${filters.range === range ? ' active' : ''}`} onClick={() => updateFilters({ range })}>{range}</button>
-            ))}
-          </div>
-          <div className="filter-group filter-group-spacer" />
-          <div className="filter-group">
-            <button type="button" className={`filter-chip filter-chip-compare${filters.compare ? ' active' : ''}`} onClick={() => updateFilters({ compare: !filters.compare })}>
-              <Columns2 size={15} />Compare
-            </button>
           </div>
         </div>
       ) : null}

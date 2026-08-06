@@ -52,8 +52,6 @@ export function UsagePage() {
       ...filters,
       service: null,
       vendor: null,
-      twin: null,
-      user: null,
     }),
     [filters],
   );

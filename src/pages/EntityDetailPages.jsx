@@ -1,9 +1,11 @@
-import { useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Activity,
   ArrowLeft,
   BookOpen,
   Bot,
+  ChevronLeft,
+  ChevronRight,
   Coins,
   MessagesSquare,
   Percent,
@@ -11,13 +13,11 @@ import {
   Users,
   Wallet,
 } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { FilterContext } from '../app/FilterContext';
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { dashboardService } from '../services';
-import { superadminDemoData } from '../demo-data/superadminDemoData';
-import { selectFacts, sumMetric, timeSeries, twinShare, userShare } from '../demo-data/superadminSelectors';
-import { areaChart, donut, hBar, stackedBar } from '../utils/chartHelpers';
-import { envBadge, formatCurrency, formatCurrencyFull, formatNumber } from '../utils/dashboardUtils';
+import { envBadge, formatCurrency, formatNumber } from '../utils/dashboardUtils';
+
+const DETAIL_PAGE_SIZE = 10;
 
 function getInitials(name) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -92,22 +92,6 @@ function CardSection({ title, subtitle, children, flush = false }) {
   );
 }
 
-function LegendList({ items, formatter = formatNumber }) {
-  return (
-    <div className="entity-legend-list">
-      {items.map((item) => (
-        <div key={item.label} className="entity-legend-row">
-          <span className="entity-legend-key">
-            <span className="entity-legend-dot" style={{ backgroundColor: item.color }} />
-            {item.label}
-          </span>
-          <span className="entity-legend-value">{formatter(item.value)}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function EntityListRow({ avatarClassName, initials, title, subtitle, meta, onClick }) {
   return (
     <button type="button" className="entity-link-row" onClick={onClick}>
@@ -125,21 +109,36 @@ function EmptyDetailState({ message }) {
   return <div className="entity-empty-state">{message}</div>;
 }
 
-function useClientRows(filters, clientId) {
-  return useMemo(
-    () =>
-      selectFacts(
-        {
-          ...filters,
-          client: null,
-          twin: null,
-          user: null,
-          service: null,
-          vendor: null,
-        },
-        { client: clientId },
-      ),
-    [clientId, filters],
+function DetailPagination({ currentPage, itemCount, onPageChange }) {
+  const totalPages = Math.max(1, Math.ceil(itemCount / DETAIL_PAGE_SIZE));
+  const pageStart = itemCount === 0 ? 0 : (currentPage - 1) * DETAIL_PAGE_SIZE + 1;
+  const pageEnd = Math.min(currentPage * DETAIL_PAGE_SIZE, itemCount);
+
+  if (itemCount === 0) return null;
+
+  return (
+    <div className="clients-demo-footer entity-detail-pagination-footer">
+      <span>{pageStart}-{pageEnd} of {itemCount}</span>
+      <div className="clients-demo-pagination">
+        <button
+          type="button"
+          disabled={currentPage === 1}
+          aria-label="Previous page"
+          onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+        >
+          <ChevronLeft size={14} />
+        </button>
+        <span>{currentPage} / {totalPages}</span>
+        <button
+          type="button"
+          disabled={currentPage === totalPages}
+          aria-label="Next page"
+          onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+        >
+          <ChevronRight size={14} />
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -153,17 +152,22 @@ function parseDecimal(value) {
 
 export function ClientDetailPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { clientId } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [clientData, setClientData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('overview');
+  const requestedTab = searchParams.get('tab');
+  const clientTabs = ['overview', 'twins', 'users', 'services', 'vault', 'cost', 'timeline'];
+  const initialTab = clientTabs.includes(requestedTab) ? requestedTab : 'overview';
+  const [activeTab, setActiveTab] = useState(initialTab);
 
   // Lazy-loaded tab data (cached in state — don't re-fetch on tab switch back).
   const [tabData, setTabData] = useState({ twins: null, users: null, vault: null });
   const [tabLoading, setTabLoading] = useState('');
+  const [tabPages, setTabPages] = useState({ twins: 1, users: 1, vault: 1 });
 
   useEffect(() => {
-    setActiveTab('overview');
     let isActive = true;
 
     async function loadClient() {
@@ -184,8 +188,24 @@ export function ClientDetailPage() {
 
     loadClient();
     setTabData({ twins: null, users: null, vault: null });
+    setTabPages({ twins: 1, users: 1, vault: 1 });
     return () => { isActive = false; };
   }, [clientId]);
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
+
+  const selectTab = (tab) => {
+    setActiveTab(tab);
+
+    if (tab === 'overview') {
+      setSearchParams({}, { replace: true });
+      return;
+    }
+
+    setSearchParams({ tab }, { replace: true });
+  };
 
   // Lazy-load tab data on tab click.
   useEffect(() => {
@@ -236,6 +256,10 @@ export function ClientDetailPage() {
   const twins = tabData.twins?.twins || [];
   const users = tabData.users?.users || [];
   const vault = tabData.vault?.vault || [];
+  const paginatedTwins = twins.slice((tabPages.twins - 1) * DETAIL_PAGE_SIZE, tabPages.twins * DETAIL_PAGE_SIZE);
+  const paginatedUsers = users.slice((tabPages.users - 1) * DETAIL_PAGE_SIZE, tabPages.users * DETAIL_PAGE_SIZE);
+  const paginatedVault = vault.slice((tabPages.vault - 1) * DETAIL_PAGE_SIZE, tabPages.vault * DETAIL_PAGE_SIZE);
+  const setTabPage = (tab, page) => setTabPages((current) => ({ ...current, [tab]: page }));
   const clientName = profile?.name || profile?.organizationName || '';
   const plan = profile?.plan || '';
 
@@ -259,7 +283,10 @@ export function ClientDetailPage() {
     return `${days}d ago`;
   };
 
-  const tabs = ['overview', 'twins', 'users', 'vault'];
+  const tabs = clientTabs;
+  const vaultStorage = vault.reduce((sum, item) => sum + Number(item.storageUsed || 0), 0);
+  const vaultLimit = vault.reduce((sum, item) => sum + Number(item.storageLimit || 0), 0);
+  const vaultFiles = vault.reduce((sum, item) => sum + Number(item.filesCount || 0), 0);
 
   return (
     <section className="page-section entity-detail-page">
@@ -268,7 +295,7 @@ export function ClientDetailPage() {
         initials={getInitials(clientName)}
         title={clientName}
         subtitle={`${profile?.organizationName || ''} · ${plan} plan`}
-        onBack={() => navigate('/clients')}
+        onBack={() => navigate(location.state?.from || '/clients')}
       />
 
       <div className="entity-detail-metric-grid entity-detail-metric-grid-five">
@@ -285,7 +312,7 @@ export function ClientDetailPage() {
             key={tab}
             type="button"
             className={`entity-tab${activeTab === tab ? ' active' : ''}`}
-            onClick={() => setActiveTab(tab)}
+            onClick={() => selectTab(tab)}
           >
             {tab}
           </button>
@@ -294,22 +321,24 @@ export function ClientDetailPage() {
 
       {activeTab === 'overview' ? (
         <div className="entity-detail-grid entity-detail-grid-even">
-          <CardSection title="Client Info" flush>
+          <CardSection title="Client info" flush>
             <div className="entity-stats-list">
+              <div className="entity-stat-row"><span>Name</span><strong>{clientName || '-'}</strong></div>
               <div className="entity-stat-row"><span>Organization</span><strong>{profile?.organizationName || '-'}</strong></div>
-              <div className="entity-stat-row"><span>Plan</span><strong>{plan || '-'}</strong></div>
               <div className="entity-stat-row"><span>Email</span><strong>{profile?.email || '-'}</strong></div>
+              <div className="entity-stat-row"><span>Plan</span><strong>{plan || '-'}</strong></div>
               <div className="entity-stat-row"><span>Environment</span><strong>{profile?.env || '-'}</strong></div>
               <div className="entity-stat-row"><span>Created</span><strong>{profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString() : '-'}</strong></div>
             </div>
           </CardSection>
-          <CardSection title="Usage Summary" flush>
+          <CardSection title="Usage summary" flush>
             <div className="entity-stats-list">
-              <div className="entity-stat-row"><span>Total Tokens</span><strong>{formatNumber(usage?.tokens || 0)}</strong></div>
-              <div className="entity-stat-row"><span>Prompt Tokens</span><strong>{formatNumber(usage?.promptTokens || 0)}</strong></div>
-              <div className="entity-stat-row"><span>Completion Tokens</span><strong>{formatNumber(usage?.completionTokens || 0)}</strong></div>
-              <div className="entity-stat-row"><span>API Calls</span><strong>{formatNumber(usage?.apiCalls || 0)}</strong></div>
-              <div className="entity-stat-row"><span>Cost</span><strong>{formatCurrency(usage?.cost || 0)}</strong></div>
+              <div className="entity-stat-row"><span>Total tokens</span><strong>{formatNumber(usage?.tokens || 0)}</strong></div>
+              <div className="entity-stat-row"><span>Prompt tokens</span><strong>{formatNumber(usage?.promptTokens || 0)}</strong></div>
+              <div className="entity-stat-row"><span>Completion tokens</span><strong>{formatNumber(usage?.completionTokens || 0)}</strong></div>
+              <div className="entity-stat-row"><span>Audio seconds</span><strong>{formatNumber(usage?.audioSeconds || 0)}</strong></div>
+              <div className="entity-stat-row"><span>API calls</span><strong>{formatNumber(usage?.apiCalls || 0)}</strong></div>
+              <div className="entity-stat-row"><span>Usage cost</span><strong>{formatCurrency(usage?.cost || 0)}</strong></div>
             </div>
           </CardSection>
         </div>
@@ -328,7 +357,7 @@ export function ClientDetailPage() {
                 <span>Est. Cost</span>
                 <span>Share</span>
               </div>
-              {twins.map((twin) => (
+              {paginatedTwins.map((twin) => (
                 <div
                   key={twin._id}
                   className="entity-table-row entity-row-clickable"
@@ -348,6 +377,11 @@ export function ClientDetailPage() {
                   <span>{twin.share || 0}%</span>
                 </div>
               ))}
+              <DetailPagination
+                currentPage={tabPages.twins}
+                itemCount={twins.length}
+                onPageChange={(page) => setTabPage('twins', page)}
+              />
             </div>
           ) : (
             <EmptyDetailState message="No twins found for this client." />
@@ -370,7 +404,7 @@ export function ClientDetailPage() {
                 <span>Twins used</span>
                 <span>Last active</span>
               </div>
-              {users.map((user) => (
+              {paginatedUsers.map((user) => (
                 <div
                   key={user._id}
                   className="entity-table-row entity-row-clickable"
@@ -392,10 +426,21 @@ export function ClientDetailPage() {
                   <span>{formatDateShort(user.lastActive)}</span>
                 </div>
               ))}
+              <DetailPagination
+                currentPage={tabPages.users}
+                itemCount={users.length}
+                onPageChange={(page) => setTabPage('users', page)}
+              />
             </div>
           ) : (
             <EmptyDetailState message="No users found for this client." />
           )}
+        </CardSection>
+      ) : null}
+
+      {activeTab === 'services' ? (
+        <CardSection title="Services" flush>
+          <EmptyDetailState message="A client service-breakdown API is not available, so no estimated values are shown." />
         </CardSection>
       ) : null}
 
@@ -404,50 +449,53 @@ export function ClientDetailPage() {
       ) : null}
 
       {activeTab === 'vault' && tabLoading !== 'vault' ? (
-        <div className="entity-detail-metric-grid entity-detail-metric-grid-six">
-          <MetricCard icon={Activity} label="Stored on IPFS" value={formatBytes(vault?.reduce((s, v) => s + Number(v.storageUsed || 0), 0) || 0)} tone="indigo" />
-          <MetricCard icon={BookOpen} label="Files pinned" value={formatNumber(vault?.reduce((s, v) => s + (v.filesCount || 0), 0) || 0)} tone="sky" />
-          <MetricCard icon={Users} label="Active drives · users" value={String(vault?.filter((v) => Number(v.storageUsed || 0) > 0).length || 0)} tone="rose" />
-          <MetricCard icon={Wallet} label="Filebase / IPFS · cost" value={formatCurrency(kpis?.cost || 0)} tone="violet" />
-          <MetricCard icon={TrendingUp} label="Storage revenue" value={formatCurrency(kpis?.revenue || 0)} tone="emerald" />
-          <MetricCard icon={Percent} label="Margin" value={`${kpis?.margin || 0}%`} tone="amber" />
-        </div>
+        <>
+          <div className="entity-detail-metric-grid entity-detail-metric-grid-six">
+            <MetricCard icon={Activity} label="Stored on IPFS" value={formatBytes(vaultStorage)} tone="indigo" />
+            <MetricCard icon={BookOpen} label="Files pinned" value={formatNumber(vaultFiles)} tone="sky" />
+            <MetricCard icon={Users} label="Active drives · users" value={String(vault?.filter((v) => Number(v.storageUsed || 0) > 0).length || 0)} tone="rose" />
+            <MetricCard icon={Wallet} label="Storage limit" value={formatBytes(vaultLimit)} tone="violet" />
+            <MetricCard icon={TrendingUp} label="Drives" value={formatNumber(vault.length)} tone="emerald" />
+            <MetricCard icon={Percent} label="Average storage" value={formatBytes(vault.length ? vaultStorage / vault.length : 0)} tone="amber" />
+          </div>
+        </>
       ) : null}
 
       {activeTab === 'vault' && tabLoading !== 'vault' ? (
-        <CardSection title={`${vault?.length || 0} vault drives`} flush>
-          {vault?.length ? (
+        <CardSection title="Vault drives" subtitle={`${vault.length} records returned by the client vault API`} flush>
+          {vault.length ? (
             <div className="entity-table-list">
               <div className="entity-table-row entity-table-header">
-                <span className="entity-table-name">User / Drive</span>
-                <span>Env</span>
-                <span>Plan</span>
-                <span>Used</span>
-                <span>Quota</span>
-                <span>Files</span>
-                <span>Last active</span>
+                <span className="entity-table-name">User / drive</span><span>Storage</span><span>Limit</span><span>Files</span><span>Last active</span>
               </div>
-              {vault.map((v) => (
-                <div key={v.id} className="entity-table-row">
-                  <span className="entity-table-name">
-                    <span className="entity-link-avatar user">{getInitials(v.name || '')}</span>
-                    <span>
-                      <strong>{v.name || v.email || 'Unknown'}</strong>
-                      <span className="entity-table-sub">{v.vaultId || ''}</span>
-                    </span>
-                  </span>
-                  <span>{envBadge(v.__env)}</span>
-                  <span>{v.planName || 'Free'}</span>
-                  <span>{formatBytes(v.storageUsed)}</span>
-                  <span>{formatBytes(v.storageLimit)}</span>
-                  <span>{v.filesCount || 0}</span>
-                  <span>{formatDateShort(v.updatedAt)}</span>
+              {paginatedVault.map((drive, index) => (
+                <div key={drive._id || drive.userId || index} className="entity-table-row">
+                  <span className="entity-table-name"><strong>{drive.name || drive.userName || drive.email || drive.vaultId || 'Vault drive'}</strong></span>
+                  <span>{formatBytes(drive.storageUsed || 0)}</span>
+                  <span>{formatBytes(drive.storageLimit || 0)}</span>
+                  <span>{formatNumber(drive.filesCount || 0)}</span>
+                  <span>{formatDateShort(drive.lastActive || drive.updatedAt)}</span>
                 </div>
               ))}
+              <DetailPagination
+                currentPage={tabPages.vault}
+                itemCount={vault.length}
+                onPageChange={(page) => setTabPage('vault', page)}
+              />
             </div>
-          ) : (
-            <EmptyDetailState message="No vault data found for this client." />
-          )}
+          ) : <EmptyDetailState message="No vault records found for this client." />}
+        </CardSection>
+      ) : null}
+
+      {activeTab === 'cost' ? (
+        <CardSection title="Cost breakdown" flush>
+          <EmptyDetailState message="A client vendor-cost breakdown API is not available, so no estimated values are shown." />
+        </CardSection>
+      ) : null}
+
+      {activeTab === 'timeline' ? (
+        <CardSection title="Recent activity" flush>
+          <EmptyDetailState message="A client activity-timeline API is not available, so no generated events are shown." />
         </CardSection>
       ) : null}
     </section>
