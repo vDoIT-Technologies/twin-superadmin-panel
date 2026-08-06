@@ -15,7 +15,18 @@ function getTwinInitials(name) {
 function getPayload(response) {
   if (Array.isArray(response?.data)) return { items: response.data, pagination: response?.pagination ?? null };
   if (Array.isArray(response?.data?.data)) return { items: response.data.data, pagination: response?.data?.pagination ?? response?.pagination ?? null };
+  if (Array.isArray(response?.data?.data?.data)) {
+    return {
+      items: response.data.data.data,
+      pagination: response.data.data.pagination ?? response?.pagination ?? null,
+    };
+  }
   return { items: [], pagination: null };
+}
+
+function getId(value) {
+  const id = value?._id ?? value?.id ?? value;
+  return id == null ? '' : String(id);
 }
 
 export function TwinsPage() {
@@ -68,7 +79,8 @@ export function TwinsPage() {
   }, [filters.client, filters.envs, filters.twin]);
 
   const twinRows = useMemo(() => apiTwins.map((t, i) => ({
-    id: t._id || t.id || `twin-${i}`,
+    id: getId(t._id ?? t.id) || `twin-${i}`,
+    clientId: getId(t.clientId ?? t.client?._id ?? t.client?.id),
     name: t.name || '',
     role: t.role || '',
     client: t.clientName || '',
@@ -81,14 +93,17 @@ export function TwinsPage() {
 
   const filteredRows = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const scopedRows = filters.twin
-      ? twinRows.filter((twin) => String(twin.id) === String(filters.twin))
+    const clientScopedRows = filters.client
+      ? twinRows.filter((twin) => twin.clientId === String(filters.client))
       : twinRows;
+    const scopedRows = filters.twin
+      ? clientScopedRows.filter((twin) => twin.id === String(filters.twin))
+      : clientScopedRows;
     if (!q) return scopedRows;
     return scopedRows.filter((t) =>
       t.name.toLowerCase().includes(q) || t.role.toLowerCase().includes(q) || t.client.toLowerCase().includes(q),
     );
-  }, [filters.twin, query, twinRows]);
+  }, [filters.client, filters.twin, query, twinRows]);
 
   const sortedRows = useMemo(() => {
     const getVal = (t) => {

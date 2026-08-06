@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, Download, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { FilterContext } from '../app/FilterContext';
 import { superadminDemoData } from '../demo-data/superadminDemoData';
-import { dashboardService } from '../services';
+import { dashboardService, getUsersDropdown } from '../services';
 import { envBadge, formatCurrencyFull, formatNumber } from '../utils/dashboardUtils';
 
 function formatScopeLabel(filters) {
@@ -81,10 +81,22 @@ function getUsersPayload(response) {
     };
   }
 
+  if (Array.isArray(response?.data?.data?.data)) {
+    return {
+      users: response.data.data.data,
+      pagination: response.data.data.pagination ?? response?.pagination ?? null,
+    };
+  }
+
   return {
     users: [],
     pagination: response?.data?.pagination ?? response?.pagination ?? null,
   };
+}
+
+function getId(value) {
+  const id = value?._id ?? value?.id ?? value;
+  return id == null ? '' : String(id);
 }
 
 export function UsersPage() {
@@ -106,6 +118,31 @@ export function UsersPage() {
   useEffect(() => {
     let isActive = true;
 
+    const loadDropdownFallback = async () => {
+      const selectedEnv = filters.envs.length === 1 ? filters.envs[0] : undefined;
+      const dropdownUsers = await getUsersDropdown({
+        env: selectedEnv,
+        clientId: filters.client || undefined,
+      });
+      const scopedUsers = dropdownUsers
+        .filter((user) => !filters.client || getId(user.clientId ?? user.client) === String(filters.client))
+        .filter((user) => !filters.user || getId(user.id ?? user._id) === String(filters.user));
+      const total = scopedUsers.length;
+      const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+      const currentPage = Math.min(page, totalPages);
+      const start = (currentPage - 1) * PAGE_SIZE;
+
+      if (!isActive) return;
+
+      setApiUsers(scopedUsers.slice(start, start + PAGE_SIZE));
+      setPagination({
+        total,
+        page: currentPage,
+        limit: PAGE_SIZE,
+        totalPages,
+      });
+    };
+
     async function loadEntityUsers() {
       setIsTableLoading(true);
 
@@ -125,27 +162,30 @@ export function UsersPage() {
 
         const payload = getUsersPayload(data);
 
-        console.log('GET /api/v1/entities/users response:', data);
-        console.log('UsersPage extracted payload:', payload);
-        setApiUsers(payload.users);
-        setPagination({
-          total: Number(payload.pagination?.total) || 0,
-          page: Number(payload.pagination?.page) || page,
-          limit: Number(payload.pagination?.limit) || PAGE_SIZE,
-          totalPages: Number(payload.pagination?.totalPages) || 1,
-        });
+        if (payload.users.length) {
+          setApiUsers(payload.users);
+          setPagination({
+            total: Number(payload.pagination?.total) || payload.users.length,
+            page: Number(payload.pagination?.page) || page,
+            limit: Number(payload.pagination?.limit) || PAGE_SIZE,
+            totalPages: Number(payload.pagination?.totalPages) || 1,
+          });
+        } else {
+          await loadDropdownFallback();
+        }
       } catch (error) {
         if (!isActive) {
           return;
         }
 
         console.error('GET /api/v1/entities/users failed:', error);
-        setApiUsers([]);
-        setPagination((prev) => ({
-          ...prev,
-          total: 0,
-          totalPages: 1,
-        }));
+        try {
+          await loadDropdownFallback();
+        } catch (fallbackError) {
+          console.error('GET /api/v1/dropdown/users fallback failed:', fallbackError);
+          setApiUsers([]);
+          setPagination((prev) => ({ ...prev, total: 0, totalPages: 1 }));
+        }
       } finally {
         if (isActive) {
           setIsTableLoading(false);
@@ -165,18 +205,6 @@ export function UsersPage() {
   }, [filters.client, filters.envs, filters.range, filters.user]);
 
   const scopeLabel = useMemo(() => formatScopeLabel(filters), [filters]);
-
-  useEffect(() => {
-    console.log('UsersPage filters:', filters);
-  }, [filters]);
-
-  useEffect(() => {
-    console.log('UsersPage raw apiUsers:', apiUsers);
-  }, [apiUsers]);
-
-  useEffect(() => {
-    console.log('UsersPage pagination:', pagination);
-  }, [pagination]);
 
   const userRows = useMemo(() => {
     return apiUsers
@@ -199,11 +227,13 @@ export function UsersPage() {
           lastActiveLabel = days <= 0 ? 'today' : `${days}d ago`;
         }
 
+        const suppliedName = typeof user?.name === 'string' ? user.name.trim() : '';
+
         return {
-          id: user?._id || user?.id || user?.email || `user-row-${index}`,
-          name: fullName || user?.email || '',
+          id: getId(user?._id ?? user?.id) || user?.email || `user-row-${index}`,
+          name: fullName || suppliedName || user?.email || '',
           client: clientName,
-          clientId: user?.clientId ?? null,
+          clientId: getId(user?.clientId ?? user?.client?._id ?? user?.client?.id),
           env,
           messages: user?.messages ?? 0,
           sessions: user?.sessions ?? 0,
@@ -215,8 +245,8 @@ export function UsersPage() {
           lastActiveLabel,
         };
       })
-      .filter((user) => (!filters.client ? true : user.clientId === filters.client))
-      .filter((user) => (!filters.user ? true : String(user.id) === String(filters.user)))
+      .filter((user) => (!filters.client ? true : user.clientId === String(filters.client)))
+      .filter((user) => (!filters.user ? true : user.id === String(filters.user)))
       .filter((user) => (user.env ? filters.envs.includes(user.env) : true));
   }, [apiUsers, filters.client, filters.envs, filters.user]);
 
@@ -230,12 +260,6 @@ export function UsersPage() {
         user.client.toLowerCase().includes(q) ||
         getEnvLabel(user.env).toLowerCase().includes(q),
     );
-
-    console.log('UsersPage filteredRows:', {
-      query,
-      count: nextRows.length,
-      rows: nextRows,
-    });
 
     return nextRows;
   }, [query, userRows]);
@@ -281,12 +305,6 @@ export function UsersPage() {
         : String(b).localeCompare(String(a));
     });
 
-    console.log('UsersPage sortedRows:', {
-      sortConfig,
-      count: nextRows.length,
-      rows: nextRows,
-    });
-
     return nextRows;
   }, [filteredRows, sortConfig]);
 
@@ -295,17 +313,6 @@ export function UsersPage() {
   const paginatedRows = sortedRows;
   const pageStart = paginatedRows.length === 0 ? 0 : (currentPage - 1) * (pagination.limit || PAGE_SIZE) + 1;
   const pageEnd = paginatedRows.length === 0 ? 0 : pageStart + paginatedRows.length - 1;
-
-  useEffect(() => {
-    console.log('UsersPage table state:', {
-      page,
-      currentPage,
-      totalPages,
-      pageStart,
-      pageEnd,
-      paginatedRows,
-    });
-  }, [page, currentPage, totalPages, pageStart, pageEnd, paginatedRows]);
 
   const toggleSort = (key) => {
     setSortConfig((prev) =>

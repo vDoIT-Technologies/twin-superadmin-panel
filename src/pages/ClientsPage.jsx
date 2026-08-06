@@ -52,6 +52,9 @@ function getEnvList(client) {
 }
 
 function getClientsPayload(response) {
+  // Entity endpoints return `{ success, data: { data, pagination } }`, while
+  // older environments may return either level directly. Normalize every
+  // supported response shape before the table consumes it.
   if (Array.isArray(response?.data)) {
     return {
       clients: response.data,
@@ -66,10 +69,22 @@ function getClientsPayload(response) {
     };
   }
 
+  if (Array.isArray(response?.data?.data?.data)) {
+    return {
+      clients: response.data.data.data,
+      pagination: response.data.data.pagination ?? response?.pagination ?? null,
+    };
+  }
+
   return {
     clients: [],
     pagination: response?.data?.pagination ?? response?.pagination ?? null,
   };
+}
+
+function getClientId(client) {
+  const id = client?.id ?? client?._id ?? client?.clientId ?? client?.client?.id ?? client?.client?._id;
+  return id == null ? '' : String(id);
 }
 
 export function ClientsPage() {
@@ -145,7 +160,8 @@ export function ClientsPage() {
       const lastActive = client.lastActive;
 
       return {
-        id: client._id || client.id || `client-row-${index}`,
+        id: getClientId(client),
+        rowKey: `${getClientId(client) || 'client-row'}-${client.__env || client.env || 'unknown'}-${index}`,
         name,
         plan,
         envs,
@@ -164,7 +180,10 @@ export function ClientsPage() {
   const filteredRows = useMemo(() => {
     const q = query.trim().toLowerCase();
     const scopedRows = filters.client
-      ? clientRows.filter((client) => String(client.id) === String(filters.client))
+      // The API receives clientId, but retain this guard because it prevents
+      // cross-client rows from leaking into the UI if an older API deployment
+      // ignores that query parameter.
+      ? clientRows.filter((client) => client.id === String(filters.client))
       : clientRows;
     if (!q) return scopedRows;
     return scopedRows.filter(
@@ -206,7 +225,10 @@ export function ClientsPage() {
   }, [filteredRows, sortConfig]);
 
   const totalPages = Math.max(1, pagination.totalPages || 1);
-  const currentPage = Math.min(page, totalPages);
+  const usingClientScope = Boolean(filters.client);
+  const scopedTotal = usingClientScope ? sortedRows.length : pagination.total;
+  const scopedTotalPages = usingClientScope ? 1 : totalPages;
+  const currentPage = Math.min(page, scopedTotalPages);
   const pageStart = sortedRows.length === 0 ? 0 : (currentPage - 1) * (pagination.limit || PAGE_SIZE) + 1;
   const pageEnd = sortedRows.length === 0 ? 0 : pageStart + sortedRows.length - 1;
 
@@ -319,7 +341,7 @@ export function ClientsPage() {
                 </tr>
               ) : (
                 sortedRows.map((client) => (
-                  <tr key={client.id} className="entity-row-clickable" onClick={() => navigate(`/clients/${client.id}`)}>
+                  <tr key={client.rowKey} className="entity-row-clickable" onClick={() => navigate(`/clients/${client.id}`)}>
                     <td>
                       <div className="clients-demo-client">
                         <span className="clients-demo-avatar">{getClientInitials(client.name)}</span>
@@ -355,7 +377,7 @@ export function ClientsPage() {
 
         <div className="clients-demo-footer">
           <span>
-            {pageStart}-{pageEnd} of {pagination.total}
+            {pageStart}-{pageEnd} of {scopedTotal}
           </span>
           <div className="clients-demo-pagination">
             <button
@@ -367,13 +389,13 @@ export function ClientsPage() {
               <ChevronLeft size={14} />
             </button>
             <span>
-              {currentPage} / {totalPages}
+              {currentPage} / {scopedTotalPages}
             </span>
             <button
               type="button"
-              disabled={currentPage === totalPages || isTableLoading}
+              disabled={currentPage === scopedTotalPages || isTableLoading}
               aria-label="Next page"
-              onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+              onClick={() => setPage((prev) => Math.min(scopedTotalPages, prev + 1))}
             >
               <ChevronRight size={14} />
             </button>
