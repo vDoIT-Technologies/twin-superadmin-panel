@@ -58,8 +58,9 @@ export function AppLayout() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+const [searchOpen, setSearchOpen] = useState(false);
+const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
+    const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [clients, setClients] = useState([]);
   const [twins, setTwins] = useState([]);
   const [users, setUsers] = useState([]);
@@ -289,12 +290,13 @@ export function AppLayout() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  useEffect(() => {
-    setSearchQuery('');
-    setSearchOpen(false);
-    setProfileMenuOpen(false);
-    setIsMobileSidebarOpen(false);
-  }, [location.pathname]);
+ useEffect(() => {
+  setSearchQuery('');
+  setSearchOpen(false);
+  setIsMobileSearchOpen(false);
+  setProfileMenuOpen(false);
+  setIsMobileSidebarOpen(false);
+}, [location.pathname]);
 
   useEffect(() => {
     if (!isMobileSidebarOpen) return undefined;
@@ -352,7 +354,9 @@ export function AppLayout() {
       <div className="workspace">
         <div className="workspace-chrome">
           <header className="topbar">
-            <div className="topbar-title-group">
+            <div
+  className={`topbar-title-group${isMobileSearchOpen ? ' mobile-search-active' : ''}`}
+>
               <button
                 className="icon-button topbar-toggle"
                 type="button"
@@ -374,46 +378,102 @@ export function AppLayout() {
               </div>
             </div>
 
-            <div className="topbar-actions">
-              <div className="search-shell" ref={searchRef}>
-                <Search className="search-icon" size={16} />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  placeholder="Search clients, twins, users..."
-                  onChange={(event) => {
-                    const nextQuery = event.target.value;
-                    setSearchQuery(nextQuery);
-                    setSearchOpen(Boolean(nextQuery.trim()));
-                  }}
-                  onFocus={openSearch}
-                />
-                {searchOpen ? (
-                  <div className="search-results" role="listbox" aria-label="Global search results">
-                    {searchHits.length ? (
-                      searchHits.map((hit) => (
-                        <button
-                          key={hit.key}
-                          type="button"
-                          className="search-result-button"
-                          onClick={() => selectSearchHit(hit)}
-                        >
-                          <span className="search-result-icon">{hit.icon}</span>
-                          <span className="search-result-copy">
-                            <span className="search-result-name">{hit.name}</span>
-                            <span className="search-result-meta">
-                              {hit.type} · {hit.sub}
-                            </span>
-                          </span>
-                          <CornerDownLeft size={14} className="search-result-enter" />
-                        </button>
-                      ))
-                    ) : (
-                      <div className="search-results-empty">No matches for "{searchQuery.trim()}"</div>
-                    )}
-                  </div>
-                ) : null}
-              </div>
+            <div
+  className={`topbar-actions${isMobileSearchOpen ? ' mobile-search-active' : ''}`}
+>
+              <div
+  className={`search-shell${isMobileSearchOpen ? ' mobile-search-open' : ''}`}
+  ref={searchRef}
+>
+  <button
+    type="button"
+    className="icon-button mobile-search-trigger"
+    aria-label="Open search"
+    aria-expanded={isMobileSearchOpen}
+    onClick={() => {
+      setIsMobileSearchOpen(true);
+
+      window.requestAnimationFrame(() => {
+        searchRef.current?.querySelector('input')?.focus();
+      });
+    }}
+  >
+    <Search size={16} />
+  </button>
+
+  <Search className="search-icon" size={16} />
+
+  <input
+    type="text"
+    value={searchQuery}
+    placeholder="Search clients, twins, users..."
+    onChange={(event) => {
+      const nextQuery = event.target.value;
+      setSearchQuery(nextQuery);
+      setSearchOpen(Boolean(nextQuery.trim()));
+    }}
+    onFocus={openSearch}
+    onKeyDown={(event) => {
+      if (event.key === 'Escape') {
+        setSearchQuery('');
+        setSearchOpen(false);
+        setIsMobileSearchOpen(false);
+        event.currentTarget.blur();
+      }
+    }}
+  />
+
+  <button
+    type="button"
+    className="mobile-search-close"
+    aria-label="Close search"
+    onClick={() => {
+      setSearchQuery('');
+      setSearchOpen(false);
+      setIsMobileSearchOpen(false);
+    }}
+  >
+    ×
+  </button>
+
+  {searchOpen ? (
+    <div
+      className="search-results"
+      role="listbox"
+      aria-label="Global search results"
+    >
+      {searchHits.length ? (
+        searchHits.map((hit) => (
+          <button
+            key={hit.key}
+            type="button"
+            className="search-result-button"
+            onClick={() => selectSearchHit(hit)}
+          >
+            <span className="search-result-icon">{hit.icon}</span>
+
+            <span className="search-result-copy">
+              <span className="search-result-name">{hit.name}</span>
+
+              <span className="search-result-meta">
+                {hit.type} · {hit.sub}
+              </span>
+            </span>
+
+            <CornerDownLeft
+              size={14}
+              className="search-result-enter"
+            />
+          </button>
+        ))
+      ) : (
+        <div className="search-results-empty">
+          No matches for "{searchQuery.trim()}"
+        </div>
+      )}
+    </div>
+  ) : null}
+</div>
               <button className="icon-button" type="button" aria-label="Notifications">
                 <Bell size={16} />
               </button>
