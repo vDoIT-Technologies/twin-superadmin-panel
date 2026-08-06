@@ -51,7 +51,13 @@ export const dashboardService = {
   // ---- Client APIs ----
   async getEntityClients(params = {}) {
     const response = await api.get('/api/v1/entities/clients', {
-      params: { page: params.page, limit: params.limit, env: params.env, range: params.range },
+      params: {
+        page: params.page,
+        limit: params.limit,
+        clientId: params.clientId,
+        env: params.env,
+        range: params.range,
+      },
     });
     return response.data;
   },
@@ -75,7 +81,13 @@ export const dashboardService = {
   // ---- Twin APIs ----
   async getEntityTwins(params = {}) {
     const response = await api.get('/api/v1/entities/twins', {
-      params: { page: params.page, limit: params.limit, clientId: params.clientId, env: params.env },
+      params: {
+        page: params.page,
+        limit: params.limit,
+        clientId: params.clientId,
+        twinId: params.twinId,
+        env: params.env,
+      },
     });
     return response.data;
   },
@@ -87,7 +99,14 @@ export const dashboardService = {
   // ---- User APIs ----
   async getEntityUsers(params = {}) {
     const response = await api.get('/api/v1/entities/users', {
-      params: { page: params.page, limit: params.limit },
+      params: {
+        page: params.page,
+        limit: params.limit,
+        clientId: params.clientId,
+        userId: params.userId,
+        env: params.env,
+        range: params.range,
+      },
     });
     return response.data;
   },

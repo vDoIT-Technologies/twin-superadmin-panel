@@ -14,9 +14,9 @@ const mapServerFilters = (filters = {}) => {
   const params = {};
   if (Array.isArray(filters.envs) && filters.envs.length === 1) params.env = filters.envs[0];
   if (filters.range) params.range = filters.range;
-  // client/user ids in the demo dataset are synthetic and don't map to real
-  // tenant ids, so we intentionally don't forward them as server filters; the
-  // per-user / per-client tables surface the real entities instead.
+  if (filters.client) params.clientId = filters.client;
+  if (filters.twin) params.twinId = filters.twin;
+  if (filters.user) params.userId = filters.user;
   return params;
 };
 

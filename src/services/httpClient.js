@@ -13,11 +13,13 @@ let refreshRequest = null;
 const api = axios.create({
   baseURL,
   withCredentials: true,
+  timeout: 20_000,
 });
 
 const refreshClient = axios.create({
   baseURL,
   withCredentials: true,
+  timeout: 20_000,
 });
 
 function getPayload(data) {

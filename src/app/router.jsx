@@ -1,20 +1,32 @@
+import { lazy, Suspense } from 'react';
 import { Navigate, Outlet, createBrowserRouter, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { AppLayout } from '../layouts/AppLayout';
-import { ClientsPage } from '../pages/ClientsPage';
-import { ClientDetailPage, TwinDetailPage, UserDetailPage } from '../pages/EntityDetailPages';
-import { FinancialPage } from '../pages/FinancialPage';
 import { HomeAuthPage } from '../pages/HomeAuthPage';
 import { LoginOtpPage } from '../pages/LoginOtpPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
-import { OverviewPage } from '../pages/OverviewPage';
-import { ProfilePage } from '../pages/ProfilePage';
-import { ServicesPage } from '../pages/ServicesPage';
-import { TwinsPage } from '../pages/TwinsPage';
-import { UsersPage } from '../pages/UsersPage';
-import { UsagePage } from '../pages/UsagePage';
-import { TelemetryPage } from '../pages/TelemetryPage';
-import { VaultPage } from '../pages/VaultPage';
+
+const OverviewPage = lazy(() => import('../pages/OverviewPage').then((module) => ({ default: module.OverviewPage })));
+const ProfilePage = lazy(() => import('../pages/ProfilePage').then((module) => ({ default: module.ProfilePage })));
+const ClientsPage = lazy(() => import('../pages/ClientsPage').then((module) => ({ default: module.ClientsPage })));
+const TwinsPage = lazy(() => import('../pages/TwinsPage').then((module) => ({ default: module.TwinsPage })));
+const UsersPage = lazy(() => import('../pages/UsersPage').then((module) => ({ default: module.UsersPage })));
+const ServicesPage = lazy(() => import('../pages/ServicesPage').then((module) => ({ default: module.ServicesPage })));
+const VaultPage = lazy(() => import('../pages/VaultPage').then((module) => ({ default: module.VaultPage })));
+const FinancialPage = lazy(() => import('../pages/FinancialPage').then((module) => ({ default: module.FinancialPage })));
+const UsagePage = lazy(() => import('../pages/UsagePage').then((module) => ({ default: module.UsagePage })));
+const TelemetryPage = lazy(() => import('../pages/TelemetryPage').then((module) => ({ default: module.TelemetryPage })));
+const ClientDetailPage = lazy(() => import('../pages/EntityDetailPages').then((module) => ({ default: module.ClientDetailPage })));
+const TwinDetailPage = lazy(() => import('../pages/EntityDetailPages').then((module) => ({ default: module.TwinDetailPage })));
+const UserDetailPage = lazy(() => import('../pages/EntityDetailPages').then((module) => ({ default: module.UserDetailPage })));
+
+function RouteFallback() {
+  return <div className="route-loading" role="status" aria-live="polite">Loading page...</div>;
+}
+
+function renderLazyPage(element) {
+  return <Suspense fallback={<RouteFallback />}>{element}</Suspense>;
+}
 
 function LegacyAppRedirect() {
   const location = useLocation();
@@ -67,19 +79,19 @@ export const router = createBrowserRouter([
         element: <AppLayout />,
         errorElement: <NotFoundPage />,
         children: [
-          { index: true, element: <OverviewPage /> },
-          { path: 'profile', element: <ProfilePage /> },
-          { path: 'clients', element: <ClientsPage /> },
-          { path: 'clients/:clientId', element: <ClientDetailPage /> },
-          { path: 'twins', element: <TwinsPage /> },
-          { path: 'twins/:twinId', element: <TwinDetailPage /> },
-          { path: 'users', element: <UsersPage /> },
-          { path: 'users/:userId', element: <UserDetailPage /> },
-          { path: 'services', element: <ServicesPage /> },
-          { path: 'vault', element: <VaultPage /> },
-          { path: 'financial', element: <FinancialPage /> },
-          { path: 'usage', element: <UsagePage /> },
-          { path: 'telemetry', element: <TelemetryPage /> },
+          { index: true, element: renderLazyPage(<OverviewPage />) },
+          { path: 'profile', element: renderLazyPage(<ProfilePage />) },
+          { path: 'clients', element: renderLazyPage(<ClientsPage />) },
+          { path: 'clients/:clientId', element: renderLazyPage(<ClientDetailPage />) },
+          { path: 'twins', element: renderLazyPage(<TwinsPage />) },
+          { path: 'twins/:twinId', element: renderLazyPage(<TwinDetailPage />) },
+          { path: 'users', element: renderLazyPage(<UsersPage />) },
+          { path: 'users/:userId', element: renderLazyPage(<UserDetailPage />) },
+          { path: 'services', element: renderLazyPage(<ServicesPage />) },
+          { path: 'vault', element: renderLazyPage(<VaultPage />) },
+          { path: 'financial', element: renderLazyPage(<FinancialPage />) },
+          { path: 'usage', element: renderLazyPage(<UsagePage />) },
+          { path: 'telemetry', element: renderLazyPage(<TelemetryPage />) },
         ],
       },
     ],
