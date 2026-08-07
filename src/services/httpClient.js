@@ -13,13 +13,16 @@ let refreshRequest = null;
 const api = axios.create({
   baseURL,
   withCredentials: true,
-  timeout: 20_000,
+  // Do not abort data requests on a client-side timer. The API response
+  // determines success/failure, which avoids empty dashboard states when a
+  // legitimate aggregate query needs more than 20 seconds.
+  timeout: 0,
 });
 
 const refreshClient = axios.create({
   baseURL,
   withCredentials: true,
-  timeout: 20_000,
+  timeout: 0,
 });
 
 function getPayload(data) {

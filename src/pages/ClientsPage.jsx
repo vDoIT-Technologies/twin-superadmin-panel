@@ -13,6 +13,11 @@ import {
   parseDecimal,
 } from "../utils/clientUtils";
 
+function getClientId(client) {
+  const id = client?.id ?? client?._id ?? client?.clientId ?? client?.client?.id ?? client?.client?._id;
+  return id == null ? '' : String(id);
+}
+
 export function ClientsPage() {
   const PAGE_SIZE = 10;
   const { filters } = useContext(FilterContext);
@@ -92,7 +97,8 @@ export function ClientsPage() {
       const lastActive = client.lastActive;
 
       return {
-        id: client._id || client.id || `client-row-${index}`,
+        id: getClientId(client),
+        rowKey: `${getClientId(client) || 'client-row'}-${client.__env || client.env || 'unknown'}-${index}`,
         name,
         plan,
         envs,
@@ -346,7 +352,7 @@ export function ClientsPage() {
 
         <div className="clients-demo-footer">
           <span>
-            {pageStart}-{pageEnd} of {pagination.total}
+            {pageStart}-{pageEnd} of {scopedTotal}
           </span>
           <div className="clients-demo-pagination">
             <button
@@ -358,13 +364,13 @@ export function ClientsPage() {
               <ChevronLeft size={14} />
             </button>
             <span>
-              {currentPage} / {totalPages}
+              {currentPage} / {scopedTotalPages}
             </span>
             <button
               type="button"
-              disabled={currentPage === totalPages || isTableLoading}
+              disabled={currentPage === scopedTotalPages || isTableLoading}
               aria-label="Next page"
-              onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+              onClick={() => setPage((prev) => Math.min(scopedTotalPages, prev + 1))}
             >
               <ChevronRight size={14} />
             </button>

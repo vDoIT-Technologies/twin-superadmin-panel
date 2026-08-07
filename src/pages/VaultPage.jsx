@@ -1,5 +1,5 @@
 import { useContext, useEffect, useMemo, useState } from 'react';
-import { Database, FileUp, Package, Percent, TrendingUp, Users } from 'lucide-react';
+import { Database, FileUp, Package, Users } from 'lucide-react';
 import { TopUsersTable } from '../components/vault/TopUsersTable';
 import { FilterContext } from '../app/FilterContext';
 import { StorageByClientCard } from '../components/vault/StorageByClientCard';
@@ -10,7 +10,6 @@ import {
   exportTopUsersCsv,
   firstNumber,
   formatBytes,
-  formatQuotaPercent,
   normalizeStorageUsage,
   normalizeStorageClient,
   normalizeTopUser,
@@ -133,14 +132,14 @@ export function VaultPage() {
         </div>
       </header>
 
-      <div className="vault-metric-grid">
+      <div className="vault-metric-grid vault-metric-grid-two-column">
         {[
           { label: 'Stored on IPFS', value: formatBytes(storageUsed), icon: Database, tone: 'indigo' },
           { label: 'Total Bots', value: formatNumber(kpis?.bots || 0), icon: FileUp, tone: 'sky' },
           { label: 'Total files', value: formatNumber(kpis.totalFiles || 0), icon: Package, tone: 'violet' },
           { label: 'Active drives · users', value: String(kpis.activeDrives || 0), icon: Users, tone: 'rose' },
-          { label: 'Quota used', value: formatQuotaPercent(quotaPercent), icon: Percent, tone: 'amber' },
-          { label: 'Storage limit', value: formatBytes(storageLimit), icon: TrendingUp, tone: 'emerald' },
+        //   { label: 'Quota used', value: formatQuotaPercent(quotaPercent), icon: Percent, tone: 'amber' },
+        //   { label: 'Storage limit', value: formatBytes(storageLimit), icon: TrendingUp, tone: 'emerald' },
         ].map((metric) => {
           const Icon = metric.icon;
           return (
