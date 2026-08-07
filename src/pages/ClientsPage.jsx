@@ -77,6 +77,7 @@ export function ClientsPage() {
   }, [filters.client, filters.envs, filters.range]);
 
   const clientRows = useMemo(() => {
+    console.log('apiClients',apiClients);
     return apiClients.map((client, index) => {
       const name = client.name || client.organizationName || "";
       const plan = client.plan || "";
@@ -107,21 +108,6 @@ export function ClientsPage() {
     });
   }, [apiClients]);
 
-  const filteredRows = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const scopedRows = filters.client
-      ? clientRows.filter(
-          (client) => String(client.id) === String(filters.client),
-        )
-      : clientRows;
-    if (!q) return scopedRows;
-    return scopedRows.filter(
-      (client) =>
-        client.name.toLowerCase().includes(q) ||
-        client.plan.toLowerCase().includes(q),
-    );
-  }, [clientRows, filters.client, query]);
-
   const sortedRows = useMemo(() => {
     const getSortValue = (client) => {
       switch (sortConfig.key) {
@@ -150,7 +136,7 @@ export function ClientsPage() {
       }
     };
 
-    return [...filteredRows].sort((left, right) => {
+    return [...clientRows].sort((left, right) => {
       const a = getSortValue(left);
       const b = getSortValue(right);
 
@@ -162,7 +148,7 @@ export function ClientsPage() {
         ? String(a).localeCompare(String(b))
         : String(b).localeCompare(String(a));
     });
-  }, [filteredRows, sortConfig]);
+  }, [clientRows, sortConfig]);
 
   const totalPages = Math.max(1, pagination.totalPages || 1);
   const currentPage = Math.min(page, totalPages);
