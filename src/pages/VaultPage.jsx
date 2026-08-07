@@ -135,7 +135,7 @@ export function VaultPage() {
       <div className="vault-metric-grid vault-metric-grid-two-column">
         {[
           { label: 'Stored on IPFS', value: formatBytes(storageUsed), icon: Database, tone: 'indigo' },
-          { label: 'Files pinned', value: formatNumber(kpis.filesPinned || 0), icon: FileUp, tone: 'sky' },
+          { label: 'Total Bots', value: formatNumber(kpis?.bots || 0), icon: FileUp, tone: 'sky' },
           { label: 'Total files', value: formatNumber(kpis.totalFiles || 0), icon: Package, tone: 'violet' },
           { label: 'Active drives · users', value: String(kpis.activeDrives || 0), icon: Users, tone: 'rose' },
         //   { label: 'Quota used', value: formatQuotaPercent(quotaPercent), icon: Percent, tone: 'amber' },
