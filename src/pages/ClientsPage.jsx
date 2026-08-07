@@ -82,7 +82,6 @@ export function ClientsPage() {
   }, [filters.client, filters.envs, filters.range]);
 
   const clientRows = useMemo(() => {
-    console.log('apiClients',apiClients);
     return apiClients.map((client, index) => {
       const name = client.name || client.organizationName || "";
       const plan = client.plan || "";
@@ -157,7 +156,10 @@ export function ClientsPage() {
   }, [clientRows, sortConfig]);
 
   const totalPages = Math.max(1, pagination.totalPages || 1);
-  const currentPage = Math.min(page, totalPages);
+  const usingClientScope = Boolean(filters.client);
+  const scopedTotal = usingClientScope ? sortedRows.length : pagination.total;
+  const scopedTotalPages = usingClientScope ? 1 : totalPages;
+  const currentPage = Math.min(page, scopedTotalPages);
   const pageStart =
     sortedRows.length === 0
       ? 0

@@ -37,16 +37,12 @@ export function ProfilePage() {
             <UserCircle2 size={30} />
           </div>
           <h2>{draft.name}</h2>
-          <p>{draft.role}</p>
+          <p>{draft?.role?.name == 'twin' ? 'Twin Super Admin' : draft?.role?.name == 'vault' ? 'Vault Super Admin' : ''}</p>
 
           <div className="profile-summary-list">
             <div className="profile-summary-row">
               <Mail size={15} />
               <span>{draft.email}</span>
-            </div>
-            <div className="profile-summary-row">
-              <Phone size={15} />
-              <span>{draft.phone || 'Add a contact number'}</span>
             </div>
             <div className="profile-summary-row">
               <Shield size={15} />
@@ -71,15 +67,11 @@ export function ProfilePage() {
             </label>
             <label className="profile-field">
               <span>Role</span>
-              <input value={draft.role} onChange={(event) => updateField('role', event.target.value)} />
+              <input disabled value={draft?.role?.name == 'twin' ? 'Twin Super Admin' : draft?.role?.name == 'vault' ? 'Vault Super Admin' : ''} />
             </label>
             <label className="profile-field">
               <span>Email</span>
               <input value={draft.email} onChange={(event) => updateField('email', event.target.value)} />
-            </label>
-            <label className="profile-field">
-              <span>Phone</span>
-              <input value={draft.phone} onChange={(event) => updateField('phone', event.target.value)} />
             </label>
             <label className="profile-field">
               <span>Company</span>
