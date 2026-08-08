@@ -62,35 +62,36 @@ export function FilterDropdown({
   }, [open]);
 
   return (
-    <div ref={rootRef} className={`filter-dropdown${open ? ' open' : ''}${selected ? ' has-value' : ''}`}>
-      <div className="filter-select-control">
+    <div ref={rootRef} className={`relative min-w-0${open ? ' z-40' : ''}`}>
+      <div className={`flex h-9 w-full items-center rounded-full border bg-white shadow-2xs transition-all duration-150 ${open ? 'border-indigo-500 ring-2 ring-indigo-100' : 'border-slate-200 hover:border-indigo-300 hover:bg-slate-50/50'}`}>
         <button
           type="button"
-          className="filter-select-button"
+          className={`flex min-w-0 flex-1 items-center justify-between gap-2 rounded-full px-3.5 text-left text-xs font-semibold outline-none transition ${selected ? 'text-indigo-600' : 'text-slate-700 hover:text-slate-900'}`}
           onClick={() => setOpen((current) => !current)}
           aria-expanded={open}
         >
-          <span className="filter-select-label">{selected?.buttonLabel ?? selected?.label ?? placeholder}</span>
-          {!canClear ? <ChevronDown size={14} className="filter-select-caret" /> : null}
+          <span className="truncate">{selected?.buttonLabel ?? selected?.label ?? placeholder}</span>
+          {!canClear ? <ChevronDown size={14} className={`shrink-0 transition-transform duration-200 ${open ? 'rotate-180 text-indigo-600' : 'text-slate-400'}`} /> : null}
         </button>
         {canClear ? (
           <button
             type="button"
-            className="filter-select-clear"
+            className="mr-1.5 grid h-5 w-5 shrink-0 place-items-center rounded-full text-indigo-500 transition hover:bg-indigo-100 hover:text-indigo-700"
             aria-label={`Clear ${selected.label}`}
             onClick={clearSelection}
           >
-            <X size={15} aria-hidden="true" />
+            <X size={13} aria-hidden="true" />
           </button>
         ) : null}
       </div>
 
       {open ? (
-        <div className={`filter-dropdown-panel filter-dropdown-panel-${align}`}>
+        <div className={`absolute z-50 mt-2 max-h-80 w-60 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl ring-1 ring-slate-900/5 ${align === 'right' ? 'right-0' : 'left-0'}`}>
           {searchable ? (
-            <label className="filter-dropdown-search">
-              <Search size={14} className="filter-dropdown-search-icon" />
+            <label className="mb-1.5 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-slate-400 focus-within:border-indigo-300 focus-within:bg-white">
+              <Search size={14} className="shrink-0" />
               <input
+                className="min-w-0 flex-1 bg-transparent text-xs text-slate-700 outline-none placeholder:text-slate-400"
                 type="text"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
@@ -99,17 +100,17 @@ export function FilterDropdown({
             </label>
           ) : null}
 
-          <div className="filter-dropdown-list">
+          <div className="max-h-60 overflow-y-auto pr-0.5">
             {showPlaceholderOption ? (
               <button
                 type="button"
-                className={`filter-dropdown-item${value == null ? ' selected' : ''}`}
+                className={`flex w-full items-center rounded-xl px-3 py-2 text-left text-xs font-medium transition hover:bg-indigo-50 hover:text-indigo-700 ${value == null ? 'bg-indigo-50 font-semibold text-indigo-700' : 'text-slate-600'}`}
                 onClick={() => {
                   onChange(null);
                   setOpen(false);
                 }}
               >
-                <span className="filter-dropdown-item-label">{placeholder}</span>
+                <span>{placeholder}</span>
               </button>
             ) : null}
 
@@ -117,14 +118,14 @@ export function FilterDropdown({
               <button
                 key={option.value}
                 type="button"
-                className={`filter-dropdown-item${String(option.value) === String(value) ? ' selected' : ''}`}
+                className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left text-xs font-medium transition hover:bg-indigo-50 hover:text-indigo-700 ${String(option.value) === String(value) ? 'bg-indigo-50 font-semibold text-indigo-700' : 'text-slate-600'}`}
                 onClick={() => {
                   onChange(option.value);
                   setOpen(false);
                 }}
               >
-                <span className="filter-dropdown-item-label">{option.label}</span>
-                {option.meta ? <span className="filter-dropdown-item-meta">{option.meta}</span> : null}
+                <span className="truncate">{option.label}</span>
+                {option.meta ? <span className="shrink-0 text-[11px] text-slate-400">{option.meta}</span> : null}
               </button>
             ))}
           </div>

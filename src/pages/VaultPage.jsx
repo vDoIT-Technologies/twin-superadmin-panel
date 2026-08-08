@@ -111,28 +111,28 @@ export function VaultPage() {
 
   if (isLoading) {
     return (
-      <section className="page-section vault-page">
-        <header className="vault-header">
-          <div className="vault-header-copy">
-            <h1>Vault</h1>
-            <p>Decentralised user file storage — Filebase / IPFS pinning across encrypted drives</p>
+      <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+        <header>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">Vault</h1>
+            <p className="mt-1 text-sm text-slate-400 sm:text-base">Decentralised user file storage — Filebase / IPFS pinning across encrypted drives</p>
           </div>
         </header>
-        <div className="empty-state">Loading vault data...</div>
+        <div className="rounded-2xl border border-slate-200 bg-white py-16 text-center text-sm text-slate-400 shadow-panel">Loading vault data...</div>
       </section>
     );
   }
 
   return (
-    <section className="page-section vault-page">
-      <header className="vault-header">
-        <div className="vault-header-copy">
-          <h1>Vault</h1>
-          <p>Decentralised user file storage — Filebase / IPFS pinning across encrypted drives</p>
+    <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+      <header>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">Vault</h1>
+          <p className="mt-1 text-sm text-slate-400 sm:text-base">Decentralised user file storage — Filebase / IPFS pinning across encrypted drives</p>
         </div>
       </header>
 
-      <div className="vault-metric-grid vault-metric-grid-two-column">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
           { label: 'Stored on IPFS', value: formatBytes(storageUsed), icon: Database, tone: 'indigo' },
           { label: 'Total Bots', value: formatNumber(kpis?.bots || 0), icon: FileUp, tone: 'sky' },
@@ -143,25 +143,25 @@ export function VaultPage() {
         ].map((metric) => {
           const Icon = metric.icon;
           return (
-            <article key={metric.label} className="table-card vault-metric-card">
-              <div className="vault-metric-top">
-                <span className={`vault-metric-icon vault-metric-icon-${metric.tone}`}>
+            <article key={metric.label} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
+              <div>
+                <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${metric.tone === 'sky' ? 'bg-sky-50 text-sky-500' : metric.tone === 'violet' ? 'bg-violet-50 text-violet-500' : metric.tone === 'rose' ? 'bg-rose-50 text-rose-500' : 'bg-indigo-50 text-indigo-500'}`}>
                   <Icon size={18} />
                 </span>
               </div>
-              <h2>{metric.value}</h2>
-              <p>{metric.label}</p>
+              <h2 className="mt-5 text-2xl font-bold tracking-tight text-slate-800">{metric.value}</h2>
+              <p className="mt-2 text-sm font-medium text-slate-500">{metric.label}</p>
             </article>
           );
         })}
       </div>
 
-      <div className="vault-storage-overview-grid">
+      <div className="grid gap-4 xl:grid-cols-3">
         <VaultQuotaCard percentage={quotaPercent} storageUsed={storageUsed} storageLimit={storageLimit} />
         <StorageByClientCard clients={scopedStorageClients} />
       </div>
 
-      <div className="vault-bottom-grid">
+      <div>
         <TopUsersTable
           users={sortedUsers}
           sortConfig={sortConfig}
