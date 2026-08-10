@@ -285,94 +285,94 @@ export function FinancialPage() {
   }, [pointsEconomySeries, vendorTimeData]);
 
   return (
-    <section className="page-section cost-page">
-      <header className="cost-header">
-        <div className="cost-header-copy">
-          <h1>Cost &amp; Billing</h1>
-          <p>Vendor cost breakdown, budgets, unit economics and the points economy</p>
+    <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">Cost &amp; Billing</h1>
+          <p className="mt-1 text-sm text-slate-400 sm:text-base">Vendor cost breakdown, budgets, unit economics and the points economy</p>
         </div>
-        <div className="cost-scope">
-          <span className="cost-scope-label">Scope</span>
-          <span className="cost-scope-value">{scopeLabel}</span>
+        <div className="text-left sm:text-right">
+          <span className="block text-xs font-bold uppercase tracking-widest text-slate-400">Scope</span>
+          <span className="mt-1 block text-sm font-semibold text-slate-500">{scopeLabel}</span>
         </div>
       </header>
 
-      <div className="cost-metric-grid">
-        <article className="table-card cost-metric-card">
-          <div className="cost-metric-top">
-            <span className="cost-metric-icon cost-metric-icon-indigo">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
+          <div className="flex items-start justify-between gap-3">
+            <span className="grid h-9 w-9 place-items-center rounded-xl bg-indigo-50 text-indigo-600">
               <Wallet2 size={18} />
             </span>
-            {costDelta != null ? <span className="cost-metric-delta">^ {Math.abs(costDelta).toFixed(1)}%</span> : null}
+            {costDelta != null ? <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-600">↑ {Math.abs(costDelta).toFixed(1)}%</span> : null}
           </div>
-          <h2>{formatCurrencyFull(summary.totalCost)}</h2>
-          <p>Total COGS</p>
+          <h2 className="mt-4 text-2xl font-bold tracking-tight text-slate-800">{formatCurrencyFull(summary.totalCost)}</h2>
+          <p className="mt-1 text-sm text-slate-400">Total COGS</p>
         </article>
 
-        <article className="table-card cost-metric-card">
-          <div className="cost-metric-top">
-            <span className="cost-metric-icon cost-metric-icon-amber">
+        <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
+          <div className="flex items-start justify-between gap-3">
+            <span className="grid h-9 w-9 place-items-center rounded-xl bg-amber-50 text-amber-600">
               <CalendarClock size={18} />
             </span>
           </div>
-          <h2>{formatCurrencyFull(summary.projectedCost)}</h2>
-          <p>
-            Projected month-end <span>· run-rate</span>
+          <h2 className="mt-4 text-2xl font-bold tracking-tight text-slate-800">{formatCurrencyFull(summary.projectedCost)}</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            Projected month-end <span className="text-slate-400">· run-rate</span>
           </p>
         </article>
 
-        <article className="table-card cost-metric-card">
-          <div className="cost-metric-top">
-            <span className="cost-metric-icon cost-metric-icon-emerald">
+        <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
+          <div className="flex items-start justify-between gap-3">
+            <span className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-50 text-emerald-600">
               <TrendingUp size={18} />
             </span>
           </div>
-          <h2>{formatCurrencyFull(summary.totalRevenue)}</h2>
-          <p>Revenue</p>
+          <h2 className="mt-4 text-2xl font-bold tracking-tight text-slate-800">{formatCurrencyFull(summary.totalRevenue)}</h2>
+          <p className="mt-1 text-sm text-slate-400">Revenue</p>
         </article>
 
-        <article className="table-card cost-metric-card">
-          <div className="cost-metric-top">
-            <span className="cost-metric-icon cost-metric-icon-violet">
+        <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
+          <div className="flex items-start justify-between gap-3">
+            <span className="grid h-9 w-9 place-items-center rounded-xl bg-violet-50 text-violet-600">
               <Percent size={18} />
             </span>
           </div>
-          <h2>{formatCurrencyFull(summary.marginValue)}</h2>
-          <p>
-            Margin <span>· {formatPercent(summary.marginPct, 1)}</span>
+          <h2 className="mt-4 text-2xl font-bold tracking-tight text-slate-800">{formatCurrencyFull(summary.marginValue)}</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            Margin <span className="text-slate-400">· {formatPercent(summary.marginPct, 1)}</span>
           </p>
         </article>
       </div>
 
-      <div className="cost-chart-grid">
-        <section className="table-card cost-chart-card cost-vendor-card">
-          <div className="cost-card-head">
-            <h2>Cost by vendor over time</h2>
-            <span>stacked, per day</span>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-base font-semibold text-slate-800">Cost by vendor over time</h2>
+            <span className="text-xs text-slate-400">stacked, per day</span>
           </div>
-          <div className="chart-wrapper cost-vendor-wrapper">
+          <div className="relative mt-4 h-72">
             <canvas ref={vendorChartRef} />
           </div>
         </section>
 
-        <section className="table-card cost-chart-card cost-waterfall-card">
-          <div className="cost-card-head">
-            <h2>Margin waterfall</h2>
-            <span>revenue → COGS</span>
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-base font-semibold text-slate-800">Margin waterfall</h2>
+            <span className="text-xs text-slate-400">revenue → COGS</span>
           </div>
-          <div className="cost-waterfall">
-            <div className="cost-waterfall-yaxis">
+          <div className="mt-4 flex h-72 items-stretch gap-4">
+            <div className="flex flex-col justify-between text-xs text-slate-400 font-mono">
               {waterfall.ticks.map((value) => (
                 <span key={value}>{formatAxisCurrency(value)}</span>
               ))}
             </div>
-            <div className="cost-waterfall-plot">
-              <div className="cost-waterfall-grid">
+            <div className="relative flex-1">
+              <div className="absolute inset-0 flex flex-col justify-between border-b border-slate-100">
                 {[0, 1, 2, 3].map((line) => (
-                  <span key={line} className="cost-waterfall-grid-line" />
+                  <span key={line} className="w-full border-b border-slate-100" />
                 ))}
               </div>
-              <div className="cost-waterfall-bars">
+              <div className="relative flex h-full items-end justify-around">
                 {waterfall.steps.map((step) => {
                   const start = step.type === 'total' ? 0 : step.start;
                   const end = step.type === 'total' ? step.value : step.end;
@@ -380,10 +380,10 @@ export function FinancialPage() {
                   const height = (Math.abs(end - start) / waterfall.yMax) * 100;
 
                   return (
-                    <div key={step.id} className="cost-waterfall-bar-group">
-                      <div className="cost-waterfall-bar-lane">
+                    <div key={step.id} className="flex h-full flex-col items-center justify-end">
+                      <div className="relative w-12 flex-1">
                         <span
-                          className={`cost-waterfall-bar${step.type === 'total' ? ' total' : ''}`}
+                          className="absolute w-full rounded-md shadow-xs transition-all"
                           style={{
                             backgroundColor: step.color,
                             bottom: `${bottom}%`,
@@ -391,7 +391,7 @@ export function FinancialPage() {
                           }}
                         />
                       </div>
-                      <span className="cost-waterfall-label">{step.label}</span>
+                      <span className="mt-2 text-xs font-semibold text-slate-500">{step.label}</span>
                     </div>
                   );
                 })}
@@ -401,48 +401,48 @@ export function FinancialPage() {
         </section>
       </div>
 
-      <div className="cost-lower-grid">
-        <section className="table-card cost-detail-card">
-          <div className="cost-card-head">
-            <h2>Budget vs actual</h2>
-            <span>monthly run-rate per service</span>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-base font-semibold text-slate-800">Budget vs actual</h2>
+            <span className="text-xs text-slate-400">monthly run-rate per service</span>
           </div>
-          <div className="cost-budget-list">
+          <div className="mt-4 space-y-3">
             {budgetRows.map((row) => (
-              <div key={row.id} className="cost-budget-row">
-                <div className="cost-budget-copy">
-                  <strong>{row.name}</strong>
-                  <span className="cost-budget-values">
-                    <b>{formatCurrencyFull(row.actual)}</b> / {formatCurrencyFull(row.budget)}
+              <div key={row.id} className="space-y-1.5 rounded-xl border border-slate-100 bg-slate-50/50 p-3">
+                <div className="flex items-center justify-between text-xs">
+                  <strong className="font-semibold text-slate-700">{row.name}</strong>
+                  <span className="text-slate-400">
+                    <b className="font-bold text-slate-700">{formatCurrencyFull(row.actual)}</b> / {formatCurrencyFull(row.budget)}
                   </span>
                 </div>
-                <div className="cost-budget-progress">
-                  <div className="cost-budget-track">
-                    <span className="cost-budget-fill" style={{ width: `${Math.min(row.variancePct, 100)}%` }} />
+                <div className="flex items-center gap-3">
+                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200">
+                    <span className="block h-full rounded-full bg-indigo-600" style={{ width: `${Math.min(row.variancePct, 100)}%` }} />
                   </div>
-                  <b>{Math.round(row.variancePct)}%</b>
+                  <b className="w-10 text-right text-xs font-bold text-slate-600">{Math.round(row.variancePct)}%</b>
                 </div>
               </div>
             ))}
           </div>
         </section>
 
-        <section className="table-card cost-detail-card">
-          <div className="cost-card-head">
-            <h2>Unit economics</h2>
-            <span>blended across selected scope</span>
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-base font-semibold text-slate-800">Unit economics</h2>
+            <span className="text-xs text-slate-400">blended across selected scope</span>
           </div>
-          <div className="cost-unit-grid">
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
             {unitEconomics.map((item) => {
               const Icon = item.icon;
               return (
-              <div key={item.label} className="cost-unit-item">
-                <span className="cost-unit-icon">
+              <div key={item.label} className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/50 p-3">
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-indigo-50 text-indigo-600">
                   <Icon size={16} />
                 </span>
-                <div className="cost-unit-copy">
-                  <strong>{item.value}</strong>
-                  <span>{item.label}</span>
+                <div className="min-w-0">
+                  <strong className="block truncate text-sm font-bold text-slate-800">{item.value}</strong>
+                  <span className="block truncate text-xs text-slate-400">{item.label}</span>
                 </div>
               </div>
               );
@@ -451,62 +451,62 @@ export function FinancialPage() {
         </section>
       </div>
 
-      <div className="cost-economy-grid">
-        <section className="table-card cost-detail-card">
-          <div className="cost-card-head">
-            <h2>Points economy</h2>
-            <span>purchased vs spent</span>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-base font-semibold text-slate-800">Points economy</h2>
+            <span className="text-xs text-slate-400">purchased vs spent</span>
           </div>
-          <div className="chart-wrapper cost-points-wrapper">
+          <div className="relative mt-4 h-72">
             <canvas ref={pointsChartRef} />
           </div>
         </section>
 
-        <section className="table-card cost-detail-card cost-summary-card">
-          <div className="cost-card-head">
-            <h2>Economy summary</h2>
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-base font-semibold text-slate-800">Economy summary</h2>
           </div>
-          <div className="cost-summary-list">
+          <div className="mt-4 divide-y divide-slate-100">
             {economySummaryRows.map((row) => (
-              <div key={row.label} className="cost-summary-row">
-                <span>{row.label}</span>
-                <strong className={`cost-summary-value cost-summary-value-${row.tone}`}>{row.value}</strong>
+              <div key={row.label} className="flex items-center justify-between py-3 text-xs">
+                <span className="font-medium text-slate-500">{row.label}</span>
+                <strong className={`font-bold ${row.tone === 'emerald' ? 'text-emerald-600' : row.tone === 'indigo' ? 'text-indigo-600' : 'text-slate-800'}`}>{row.value}</strong>
               </div>
             ))}
           </div>
         </section>
       </div>
 
-      <section className="table-card cost-breakdown-card">
-        <div className="cost-card-head">
-          <h2>Vendor cost breakdown</h2>
-          <button type="button" className="cost-export-button" onClick={exportVendorCsv}>
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
+        <div className="flex items-center justify-between gap-3 pb-4">
+          <h2 className="text-base font-semibold text-slate-800">Vendor cost breakdown</h2>
+          <button type="button" className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-white px-3 py-1.5 text-xs font-semibold text-indigo-600 transition hover:bg-indigo-50" onClick={exportVendorCsv}>
             <Download size={14} />
             Export CSV
           </button>
         </div>
-        <div className="cost-breakdown-table-wrap">
-          <table className="cost-breakdown-table">
-            <thead>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[600px] border-collapse text-sm">
+            <thead className="bg-slate-50">
               <tr>
-                <th>Vendor</th>
-                <th>Category</th>
-                <th>Cost</th>
-                <th>% of COGS</th>
+                <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-400">Vendor</th>
+                <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-400">Category</th>
+                <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-400">Cost</th>
+                <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-400">% of COGS</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-slate-100">
               {vendorBreakdownRows.map((vendor) => (
-                <tr key={vendor.id}>
-                  <td>
-                    <div className="cost-breakdown-vendor">
-                      <span className="cost-breakdown-dot" style={{ backgroundColor: vendor.color }} />
-                      <strong>{vendor.name}</strong>
+                <tr key={vendor.id} className="transition hover:bg-slate-50">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2.5">
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: vendor.color }} />
+                      <strong className="font-semibold text-slate-800">{vendor.name}</strong>
                     </div>
                   </td>
-                  <td>{vendor.category}</td>
-                  <td className="cell-primary">{formatCurrencyFull(vendor.cost)}</td>
-                  <td>{vendor.share.toFixed(1)}%</td>
+                  <td className="px-4 py-3 text-slate-500">{vendor.category}</td>
+                  <td className="px-4 py-3 font-semibold text-slate-800">{formatCurrencyFull(vendor.cost)}</td>
+                  <td className="px-4 py-3 text-slate-500">{vendor.share.toFixed(1)}%</td>
                 </tr>
               ))}
             </tbody>

@@ -43,34 +43,49 @@ function getVaultId(userId) {
   return `vx_${(hash >>> 0).toString(16).padStart(8, '0')}`;
 }
 
+const toneStyles = {
+  indigo: 'bg-indigo-50 text-indigo-600',
+  emerald: 'bg-emerald-50 text-emerald-600',
+  violet: 'bg-violet-50 text-violet-600',
+  rose: 'bg-rose-50 text-rose-600',
+  amber: 'bg-amber-50 text-amber-600',
+  sky: 'bg-sky-50 text-sky-600',
+};
+
+const avatarTone = {
+  client: 'bg-blue-100 text-blue-600',
+  twin: 'bg-purple-100 text-purple-600',
+  user: 'bg-indigo-100 text-indigo-600',
+};
+
 function MetricCard({ icon: Icon, label, value, meta, tone = 'indigo' }) {
   return (
-    <article className="entity-metric-card table-card">
-      <div className="entity-metric-top">
-        <span className={`entity-metric-icon entity-metric-icon-${tone}`}>
+    <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
+      <div className="flex items-center justify-between">
+        <span className={`inline-flex h-9 w-9 items-center justify-center rounded-xl ${toneStyles[tone] || toneStyles.indigo}`}>
           <Icon size={16} />
         </span>
       </div>
-      <h3>{value}</h3>
-      <p>{label}</p>
-      {meta ? <span className="entity-metric-meta">{meta}</span> : null}
+      <h3 className="mt-4 text-2xl font-bold tracking-tight text-slate-900">{value}</h3>
+      <p className="mt-1 text-xs font-semibold text-slate-500">{label}</p>
+      {meta ? <span className="mt-1 block text-xs text-slate-400">{meta}</span> : null}
     </article>
   );
 }
 
 function DetailHeader({ avatarClassName, initials, title, subtitle, onBack }) {
   return (
-    <header className="entity-detail-header">
-      <div className="entity-detail-header-main">
-        <button type="button" className="entity-back-button" onClick={onBack}>
+    <header className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-panel sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-w-0 items-center gap-4">
+        <button type="button" className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900" onClick={onBack}>
           <ArrowLeft size={15} />
           Back
         </button>
-        <div className="entity-detail-identity">
-          <span className={`entity-detail-avatar ${avatarClassName}`}>{initials}</span>
-          <div className="entity-detail-identity-copy">
-            <h1>{title}</h1>
-            <div className="entity-detail-subtitle">{subtitle}</div>
+        <div className="flex min-w-0 items-center gap-3.5">
+          <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl text-base font-bold shadow-sm ${avatarTone[avatarClassName] || avatarClassName}`}>{initials}</span>
+          <div className="min-w-0">
+            <h1 className="truncate text-xl font-bold tracking-tight text-slate-900">{title}</h1>
+            <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">{subtitle}</div>
           </div>
         </div>
       </div>
@@ -80,33 +95,35 @@ function DetailHeader({ avatarClassName, initials, title, subtitle, onBack }) {
 
 function CardSection({ title, subtitle, children, flush = false }) {
   return (
-    <section className={`table-card entity-detail-card${flush ? ' flush' : ''}`}>
-      <div className="entity-detail-card-head">
+    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-panel">
+      <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
         <div>
-          <h2>{title}</h2>
-          {subtitle ? <span>{subtitle}</span> : null}
+          <h2 className="text-base font-semibold text-slate-800">{title}</h2>
+          {subtitle ? <span className="mt-0.5 block text-xs text-slate-400">{subtitle}</span> : null}
         </div>
       </div>
-      {children}
+      <div className={flush ? '' : 'p-5'}>{children}</div>
     </section>
   );
 }
 
 function EntityListRow({ avatarClassName, initials, title, subtitle, meta, onClick }) {
   return (
-    <button type="button" className="entity-link-row" onClick={onClick}>
-      <span className={`entity-link-avatar ${avatarClassName}`}>{initials}</span>
-      <span className="entity-link-copy">
-        <strong>{title}</strong>
-        <span>{subtitle}</span>
-      </span>
-      {meta ? <span className="entity-link-meta">{meta}</span> : null}
+    <button type="button" className="flex w-full items-center justify-between gap-3 border-b border-slate-100 px-5 py-3.5 text-left transition hover:bg-slate-50 last:border-b-0" onClick={onClick}>
+      <div className="flex min-w-0 items-center gap-3">
+        <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl text-xs font-bold ${avatarTone[avatarClassName] || avatarClassName}`}>{initials}</span>
+        <span className="min-w-0">
+          <strong className="block truncate text-sm font-semibold text-slate-800">{title}</strong>
+          <span className="block truncate text-xs text-slate-400">{subtitle}</span>
+        </span>
+      </div>
+      {meta ? <span className="shrink-0 text-xs font-medium text-slate-400">{meta}</span> : null}
     </button>
   );
 }
 
 function EmptyDetailState({ message }) {
-  return <div className="entity-empty-state">{message}</div>;
+  return <div className="py-12 text-center text-sm text-slate-400">{message}</div>;
 }
 
 function DetailPagination({ currentPage, itemCount, onPageChange }) {
@@ -117,13 +134,14 @@ function DetailPagination({ currentPage, itemCount, onPageChange }) {
   if (itemCount === 0) return null;
 
   return (
-    <div className="clients-demo-footer entity-detail-pagination-footer">
+    <div className="flex items-center justify-between border-t border-slate-100 px-5 py-3.5 text-sm text-slate-400">
       <span>{pageStart}-{pageEnd} of {itemCount}</span>
-      <div className="clients-demo-pagination">
+      <div className="flex items-center gap-2 font-medium text-slate-600">
         <button
           type="button"
           disabled={currentPage === 1}
           aria-label="Previous page"
+          className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 transition hover:bg-slate-50 disabled:opacity-40"
           onClick={() => onPageChange(Math.max(1, currentPage - 1))}
         >
           <ChevronLeft size={14} />
@@ -133,6 +151,7 @@ function DetailPagination({ currentPage, itemCount, onPageChange }) {
           type="button"
           disabled={currentPage === totalPages}
           aria-label="Next page"
+          className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 transition hover:bg-slate-50 disabled:opacity-40"
           onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
         >
           <ChevronRight size={14} />
@@ -162,7 +181,6 @@ export function ClientDetailPage() {
   const initialTab = clientTabs.includes(requestedTab) ? requestedTab : 'overview';
   const [activeTab, setActiveTab] = useState(initialTab);
 
-  // Lazy-loaded tab data (cached in state — don't re-fetch on tab switch back).
   const [tabData, setTabData] = useState({ twins: null, users: null, vault: null });
   const [tabLoading, setTabLoading] = useState('');
   const [tabPages, setTabPages] = useState({ twins: 1, users: 1, vault: 1 });
@@ -175,7 +193,6 @@ export function ClientDetailPage() {
       try {
         const response = await dashboardService.getEntityClientById(clientId);
         if (!isActive) return;
-        // response may be wrapped in { data: ... } by SuccessResponse
         const payload = response?.data || response;
         setClientData(payload);
       } catch (error) {
@@ -198,56 +215,56 @@ export function ClientDetailPage() {
 
   const selectTab = (tab) => {
     setActiveTab(tab);
-
-    if (tab === 'overview') {
-      setSearchParams({}, { replace: true });
-      return;
-    }
-
-    setSearchParams({ tab }, { replace: true });
+    setSearchParams({ tab });
   };
 
-  // Lazy-load tab data on tab click.
   useEffect(() => {
-    if (!clientData || activeTab === 'overview') return;
-    if (tabData[activeTab] !== null) return; // already loaded
+    if (!clientId || !activeTab) return undefined;
+    if (['overview', 'services', 'cost', 'timeline'].includes(activeTab)) return undefined;
+
+    if (tabData[activeTab] !== null) return undefined;
 
     let isActive = true;
     setTabLoading(activeTab);
 
-    async function loadTab() {
-      try {
-        let data;
-        if (activeTab === 'twins') data = await dashboardService.getEntityClientTwins(clientId);
-        else if (activeTab === 'users') data = await dashboardService.getEntityClientUsers(clientId);
-        else if (activeTab === 'vault') data = await dashboardService.getEntityClientVault(clientId);
-        if (!isActive) return;
-        const payload = data?.data || data;
-        setTabData((prev) => ({ ...prev, [activeTab]: payload }));
-      } catch (error) {
-        console.error(`Tab ${activeTab} load failed:`, error);
-        if (isActive) setTabData((prev) => ({ ...prev, [activeTab]: { error: true } }));
-      } finally {
-        if (isActive) setTabLoading('');
-      }
-    }
+    const fetchers = {
+      twins: () => dashboardService.getEntityClientTwins(clientId),
+      users: () => dashboardService.getEntityClientUsers(clientId),
+      vault: () => dashboardService.getEntityClientVault(clientId),
+    };
 
-    loadTab();
+    const fetcher = fetchers[activeTab];
+    if (!fetcher) return undefined;
+
+    fetcher()
+      .then((response) => {
+        if (!isActive) return;
+        const payload = response?.data || response;
+        setTabData((prev) => ({ ...prev, [activeTab]: payload }));
+      })
+      .catch((error) => {
+        console.error(`GET client ${activeTab} tab failed:`, error);
+        if (isActive) setTabData((prev) => ({ ...prev, [activeTab]: [] }));
+      })
+      .finally(() => {
+        if (isActive) setTabLoading('');
+      });
+
     return () => { isActive = false; };
-  }, [activeTab, clientData, clientId, tabData]);
+  }, [activeTab, clientId, tabData]);
 
   if (isLoading) {
     return (
-      <section className="page-section entity-detail-page">
-        <div className="empty-state">Loading client...</div>
+      <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+        <div className="rounded-2xl border border-slate-200 bg-white py-16 text-center text-sm text-slate-400 shadow-panel">Loading client...</div>
       </section>
     );
   }
 
   if (!clientData) {
     return (
-      <section className="page-section entity-detail-page">
-        <div className="empty-state">Client not found.</div>
+      <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+        <div className="rounded-2xl border border-slate-200 bg-white py-16 text-center text-sm text-slate-400 shadow-panel">Client not found.</div>
       </section>
     );
   }
@@ -289,7 +306,7 @@ export function ClientDetailPage() {
   const vaultFiles = vault.reduce((sum, item) => sum + Number(item.filesCount || 0), 0);
 
   return (
-    <section className="page-section entity-detail-page">
+    <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       <DetailHeader
         avatarClassName="client"
         initials={getInitials(clientName)}
@@ -298,7 +315,7 @@ export function ClientDetailPage() {
         onBack={() => navigate(location.state?.from || '/clients')}
       />
 
-      <div className="entity-detail-metric-grid entity-detail-metric-grid-five">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <MetricCard icon={Wallet} label="COGS" value={formatCurrency(kpis?.cost || 0)} tone="indigo" />
         <MetricCard icon={TrendingUp} label="Revenue" value={formatCurrency(kpis?.revenue || 0)} tone="emerald" />
         <MetricCard icon={Percent} label="Margin" value={`${kpis?.margin || 0}%`} tone="violet" />
@@ -306,12 +323,12 @@ export function ClientDetailPage() {
         <MetricCard icon={Users} label="Users" value={String(kpis?.usersCount || 0)} tone="amber" />
       </div>
 
-      <div className="entity-tabs">
+      <div className="flex flex-wrap gap-1.5 rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm">
         {tabs.map((tab) => (
           <button
             key={tab}
             type="button"
-            className={`entity-tab${activeTab === tab ? ' active' : ''}`}
+            className={`rounded-lg px-3.5 py-2 text-xs font-semibold capitalize transition ${activeTab === tab ? 'bg-indigo-50 text-indigo-600 shadow-sm ring-1 ring-indigo-100' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'}`}
             onClick={() => selectTab(tab)}
           >
             {tab}
@@ -320,25 +337,25 @@ export function ClientDetailPage() {
       </div>
 
       {activeTab === 'overview' ? (
-        <div className="entity-detail-grid entity-detail-grid-even">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <CardSection title="Client info" flush>
-            <div className="entity-stats-list">
-              <div className="entity-stat-row"><span>Name</span><strong>{clientName || '-'}</strong></div>
-              <div className="entity-stat-row"><span>Organization</span><strong>{profile?.organizationName || '-'}</strong></div>
-              <div className="entity-stat-row"><span>Email</span><strong>{profile?.email || '-'}</strong></div>
-              <div className="entity-stat-row"><span>Plan</span><strong>{plan || '-'}</strong></div>
-              <div className="entity-stat-row"><span>Environment</span><strong>{profile?.env || '-'}</strong></div>
-              <div className="entity-stat-row"><span>Created</span><strong>{profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString() : '-'}</strong></div>
+            <div className="divide-y divide-slate-100">
+              <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Name</span><strong className="font-semibold text-slate-700">{clientName || '-'}</strong></div>
+              <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Organization</span><strong className="font-semibold text-slate-700">{profile?.organizationName || '-'}</strong></div>
+              <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Email</span><strong className="font-semibold text-slate-700">{profile?.email || '-'}</strong></div>
+              <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Plan</span><strong className="font-semibold text-slate-700">{plan || '-'}</strong></div>
+              <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Environment</span><strong className="font-semibold text-slate-700">{profile?.env || '-'}</strong></div>
+              <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Created</span><strong className="font-semibold text-slate-700">{profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString() : '-'}</strong></div>
             </div>
           </CardSection>
           <CardSection title="Usage summary" flush>
-            <div className="entity-stats-list">
-              <div className="entity-stat-row"><span>Total tokens</span><strong>{formatNumber(usage?.tokens || 0)}</strong></div>
-              <div className="entity-stat-row"><span>Prompt tokens</span><strong>{formatNumber(usage?.promptTokens || 0)}</strong></div>
-              <div className="entity-stat-row"><span>Completion tokens</span><strong>{formatNumber(usage?.completionTokens || 0)}</strong></div>
-              <div className="entity-stat-row"><span>Audio seconds</span><strong>{formatNumber(usage?.audioSeconds || 0)}</strong></div>
-              <div className="entity-stat-row"><span>API calls</span><strong>{formatNumber(usage?.apiCalls || 0)}</strong></div>
-              <div className="entity-stat-row"><span>Usage cost</span><strong>{formatCurrency(usage?.cost || 0)}</strong></div>
+            <div className="divide-y divide-slate-100">
+              <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Total tokens</span><strong className="font-semibold text-slate-700">{formatNumber(usage?.tokens || 0)}</strong></div>
+              <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Prompt tokens</span><strong className="font-semibold text-slate-700">{formatNumber(usage?.promptTokens || 0)}</strong></div>
+              <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Completion tokens</span><strong className="font-semibold text-slate-700">{formatNumber(usage?.completionTokens || 0)}</strong></div>
+              <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Audio seconds</span><strong className="font-semibold text-slate-700">{formatNumber(usage?.audioSeconds || 0)}</strong></div>
+              <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">API calls</span><strong className="font-semibold text-slate-700">{formatNumber(usage?.apiCalls || 0)}</strong></div>
+              <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Usage cost</span><strong className="font-semibold text-slate-700">{formatCurrency(usage?.cost || 0)}</strong></div>
             </div>
           </CardSection>
         </div>
@@ -351,30 +368,30 @@ export function ClientDetailPage() {
       {activeTab === 'twins' && tabLoading !== 'twins' ? (
         <CardSection title={`${twins?.length || 0} twins`} flush>
           {twins?.length ? (
-            <div className="entity-table-list">
-              <div className="entity-table-row entity-table-header">
-                <span className="entity-table-name">Twin</span>
-                <span>Est. Cost</span>
-                <span>Share</span>
+            <div className="w-full text-xs">
+              <div className="flex items-center justify-between bg-slate-50 px-5 py-3 font-bold uppercase tracking-wider text-slate-400">
+                <span className="flex-1">Twin</span>
+                <span className="w-28 text-right">Est. Cost</span>
+                <span className="w-20 text-right">Share</span>
               </div>
               {paginatedTwins.map((twin) => (
                 <div
                   key={twin._id}
-                  className="entity-table-row entity-row-clickable"
+                  className="flex cursor-pointer items-center justify-between border-b border-slate-100 px-5 py-3.5 transition hover:bg-slate-50"
                   onClick={() => navigate(`/twins/${twin._id}`)}
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => e.key === 'Enter' && navigate(`/twins/${twin._id}`)}
                 >
-                  <span className="entity-table-name">
-                    <span className="entity-link-avatar twin">{getInitials(twin.name || '')}</span>
+                  <span className="flex flex-1 items-center gap-3">
+                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-purple-100 text-xs font-bold text-purple-600">{getInitials(twin.name || '')}</span>
                     <span>
-                      <strong>{twin.name || 'Unnamed'}</strong>
-                      {twin.role ? <span className="entity-table-sub">{twin.role}</span> : null}
+                      <strong className="block text-sm font-semibold text-slate-800">{twin.name || 'Unnamed'}</strong>
+                      {twin.role ? <span className="block text-xs text-slate-400">{twin.role}</span> : null}
                     </span>
                   </span>
-                  <span>{formatCurrency(twin.estCost || 0)}</span>
-                  <span>{twin.share || 0}%</span>
+                  <span className="w-28 text-right font-medium text-slate-600">{formatCurrency(twin.estCost || 0)}</span>
+                  <span className="w-20 text-right font-medium text-slate-600">{twin.share || 0}%</span>
                 </div>
               ))}
               <DetailPagination
@@ -396,34 +413,34 @@ export function ClientDetailPage() {
       {activeTab === 'users' && tabLoading !== 'users' ? (
         <CardSection title={`${users?.length || 0} users`} flush>
           {users?.length ? (
-            <div className="entity-table-list">
-              <div className="entity-table-row entity-table-header">
-                <span className="entity-table-name">User</span>
-                <span>Env</span>
-                <span>Points</span>
-                <span>Twins used</span>
-                <span>Last active</span>
+            <div className="w-full text-xs">
+              <div className="flex items-center justify-between bg-slate-50 px-5 py-3 font-bold uppercase tracking-wider text-slate-400">
+                <span className="flex-1">User</span>
+                <span className="w-20">Env</span>
+                <span className="w-24 text-right">Points</span>
+                <span className="w-24 text-right">Twins used</span>
+                <span className="w-24 text-right">Last active</span>
               </div>
               {paginatedUsers.map((user) => (
                 <div
                   key={user._id}
-                  className="entity-table-row entity-row-clickable"
+                  className="flex cursor-pointer items-center justify-between border-b border-slate-100 px-5 py-3.5 transition hover:bg-slate-50"
                   onClick={() => navigate(`/users/${user._id}`)}
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => e.key === 'Enter' && navigate(`/users/${user._id}`)}
                 >
-                  <span className="entity-table-name">
-                    <span className="entity-link-avatar user">{getInitials(user.name || '')}</span>
+                  <span className="flex flex-1 items-center gap-3">
+                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-indigo-100 text-xs font-bold text-indigo-600">{getInitials(user.name || '')}</span>
                     <span>
-                      <strong>{user.name || 'Unnamed'}</strong>
-                      <span className="entity-table-sub">{user.email || ''}</span>
+                      <strong className="block text-sm font-semibold text-slate-800">{user.name || 'Unnamed'}</strong>
+                      <span className="block text-xs text-slate-400">{user.email || ''}</span>
                     </span>
                   </span>
-                  <span>{envBadge(user.env)}</span>
-                  <span>{formatNumber(parseDecimal(user.points))}</span>
-                  <span>{user.twinsUsed || 0}</span>
-                  <span>{formatDateShort(user.lastActive)}</span>
+                  <span className="w-20">{envBadge(user.env)}</span>
+                  <span className="w-24 text-right font-medium text-slate-600">{formatNumber(parseDecimal(user.points))}</span>
+                  <span className="w-24 text-right font-medium text-slate-600">{user.twinsUsed || 0}</span>
+                  <span className="w-24 text-right font-medium text-slate-400">{formatDateShort(user.lastActive)}</span>
                 </div>
               ))}
               <DetailPagination
@@ -450,7 +467,7 @@ export function ClientDetailPage() {
 
       {activeTab === 'vault' && tabLoading !== 'vault' ? (
         <>
-          <div className="entity-detail-metric-grid entity-detail-metric-grid-six">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-6">
             <MetricCard icon={Activity} label="Stored on IPFS" value={formatBytes(vaultStorage)} tone="indigo" />
             <MetricCard icon={BookOpen} label="Files pinned" value={formatNumber(vaultFiles)} tone="sky" />
             <MetricCard icon={Users} label="Active drives · users" value={String(vault?.filter((v) => Number(v.storageUsed || 0) > 0).length || 0)} tone="rose" />
@@ -464,17 +481,17 @@ export function ClientDetailPage() {
       {activeTab === 'vault' && tabLoading !== 'vault' ? (
         <CardSection title="Vault drives" subtitle={`${vault.length} records returned by the client vault API`} flush>
           {vault.length ? (
-            <div className="entity-table-list">
-              <div className="entity-table-row entity-table-header">
-                <span className="entity-table-name">User / drive</span><span>Storage</span><span>Limit</span><span>Files</span><span>Last active</span>
+            <div className="w-full text-xs">
+              <div className="flex items-center justify-between bg-slate-50 px-5 py-3 font-bold uppercase tracking-wider text-slate-400">
+                <span className="flex-1">User / drive</span><span className="w-28 text-right">Storage</span><span className="w-28 text-right">Limit</span><span className="w-24 text-right">Files</span><span className="w-28 text-right">Last active</span>
               </div>
               {paginatedVault.map((drive, index) => (
-                <div key={drive._id || drive.userId || index} className="entity-table-row">
-                  <span className="entity-table-name"><strong>{drive.name || drive.userName || drive.email || drive.vaultId || 'Vault drive'}</strong></span>
-                  <span>{formatBytes(drive.storageUsed || 0)}</span>
-                  <span>{formatBytes(drive.storageLimit || 0)}</span>
-                  <span>{formatNumber(drive.filesCount || 0)}</span>
-                  <span>{formatDateShort(drive.lastActive || drive.updatedAt)}</span>
+                <div key={drive._id || drive.userId || index} className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 transition hover:bg-slate-50">
+                  <span className="flex-1 font-semibold text-slate-800">{drive.name || drive.userName || drive.email || drive.vaultId || 'Vault drive'}</span>
+                  <span className="w-28 text-right font-semibold text-slate-700">{formatBytes(drive.storageUsed || 0)}</span>
+                  <span className="w-28 text-right text-slate-500">{formatBytes(drive.storageLimit || 0)}</span>
+                  <span className="w-24 text-right text-slate-500">{formatNumber(drive.filesCount || 0)}</span>
+                  <span className="w-28 text-right text-slate-400">{formatDateShort(drive.lastActive || drive.updatedAt)}</span>
                 </div>
               ))}
               <DetailPagination
@@ -529,13 +546,13 @@ export function TwinDetailPage() {
     return () => { active = false; };
   }, [twinId]);
 
-  if (isLoading) return <section className="page-section entity-detail-page"><div className="empty-state">Loading twin...</div></section>;
-  if (!twinData) return <section className="page-section entity-detail-page"><div className="empty-state">Twin not found.</div></section>;
+  if (isLoading) return <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8"><div className="rounded-2xl border border-slate-200 bg-white py-16 text-center text-sm text-slate-400 shadow-panel">Loading twin...</div></section>;
+  if (!twinData) return <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8"><div className="rounded-2xl border border-slate-200 bg-white py-16 text-center text-sm text-slate-400 shadow-panel">Twin not found.</div></section>;
 
   const { profile, kpis, usage } = twinData;
 
   return (
-    <section className="page-section entity-detail-page">
+    <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       <DetailHeader
         avatarClassName="twin"
         initials={getInitials(profile?.name || '')}
@@ -544,29 +561,29 @@ export function TwinDetailPage() {
         onBack={() => navigate('/twins')}
       />
 
-      <div className="entity-detail-metric-grid entity-detail-metric-grid-four">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard icon={MessagesSquare} label="Messages" value={formatNumber(kpis?.messages || 0)} tone="indigo" />
         <MetricCard icon={Wallet} label="Cost" value={formatCurrency(kpis?.cost || 0)} tone="rose" />
         <MetricCard icon={TrendingUp} label="Revenue" value={formatCurrency(kpis?.revenue || 0)} tone="emerald" />
         <MetricCard icon={BookOpen} label="Knowledge Sources" value={formatNumber(kpis?.knowledgeSources || 0)} tone="amber" />
       </div>
 
-      <div className="entity-detail-grid entity-detail-grid-even">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <CardSection title="Twin Info" flush>
-          <div className="entity-stats-list">
-            <div className="entity-stat-row"><span>Name</span><strong>{profile?.name || '-'}</strong></div>
-            <div className="entity-stat-row"><span>Role</span><strong>{profile?.role || '-'}</strong></div>
-            <div className="entity-stat-row"><span>Client</span><strong>{profile?.clientName || '-'}</strong></div>
-            <div className="entity-stat-row"><span>Created</span><strong>{profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString() : '-'}</strong></div>
+          <div className="divide-y divide-slate-100">
+            <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Name</span><strong className="font-semibold text-slate-700">{profile?.name || '-'}</strong></div>
+            <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Role</span><strong className="font-semibold text-slate-700">{profile?.role || '-'}</strong></div>
+            <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Client</span><strong className="font-semibold text-slate-700">{profile?.clientName || '-'}</strong></div>
+            <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Created</span><strong className="font-semibold text-slate-700">{profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString() : '-'}</strong></div>
           </div>
         </CardSection>
         <CardSection title="Usage Summary" flush>
-          <div className="entity-stats-list">
-            <div className="entity-stat-row"><span>Total Tokens</span><strong>{formatNumber(usage?.tokens || 0)}</strong></div>
-            <div className="entity-stat-row"><span>Prompt Tokens</span><strong>{formatNumber(usage?.promptTokens || 0)}</strong></div>
-            <div className="entity-stat-row"><span>Completion Tokens</span><strong>{formatNumber(usage?.completionTokens || 0)}</strong></div>
-            <div className="entity-stat-row"><span>API Calls</span><strong>{formatNumber(usage?.apiCalls || 0)}</strong></div>
-            <div className="entity-stat-row"><span>Audio Seconds</span><strong>{formatNumber(usage?.audioSeconds || 0)}</strong></div>
+          <div className="divide-y divide-slate-100">
+            <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Total Tokens</span><strong className="font-semibold text-slate-700">{formatNumber(usage?.tokens || 0)}</strong></div>
+            <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Prompt Tokens</span><strong className="font-semibold text-slate-700">{formatNumber(usage?.promptTokens || 0)}</strong></div>
+            <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Completion Tokens</span><strong className="font-semibold text-slate-700">{formatNumber(usage?.completionTokens || 0)}</strong></div>
+            <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">API Calls</span><strong className="font-semibold text-slate-700">{formatNumber(usage?.apiCalls || 0)}</strong></div>
+            <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Audio Seconds</span><strong className="font-semibold text-slate-700">{formatNumber(usage?.audioSeconds || 0)}</strong></div>
           </div>
         </CardSection>
       </div>
@@ -601,13 +618,13 @@ export function UserDetailPage() {
     return () => { active = false; };
   }, [userId]);
 
-  if (isLoading) return <section className="page-section entity-detail-page"><div className="empty-state">Loading user...</div></section>;
-  if (!userData) return <section className="page-section entity-detail-page"><div className="empty-state">User not found.</div></section>;
+  if (isLoading) return <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8"><div className="rounded-2xl border border-slate-200 bg-white py-16 text-center text-sm text-slate-400 shadow-panel">Loading user...</div></section>;
+  if (!userData) return <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8"><div className="rounded-2xl border border-slate-200 bg-white py-16 text-center text-sm text-slate-400 shadow-panel">User not found.</div></section>;
 
   const { profile, kpis, modalityMix, twins, sessionHistory } = userData;
 
   return (
-    <section className="page-section entity-detail-page">
+    <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       <DetailHeader
         avatarClassName="user"
         initials={getInitials(profile?.name || '')}
@@ -622,35 +639,35 @@ export function UserDetailPage() {
         onBack={() => navigate('/users')}
       />
 
-      <div className="entity-detail-metric-grid entity-detail-metric-grid-four">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard icon={MessagesSquare} label="Messages" value={formatNumber(kpis?.messages || 0)} tone="indigo" />
         <MetricCard icon={Activity} label="Sessions" value={formatNumber(kpis?.sessions || 0)} tone="sky" />
         <MetricCard icon={Coins} label="Points Balance" value={formatNumber(kpis?.pointsBalance || 0)} tone="amber" />
         <MetricCard icon={Wallet} label="Spend Value" value={formatCurrency(kpis?.spendValue || 0)} tone="emerald" />
       </div>
 
-      <div className="entity-detail-grid entity-detail-grid-sidebar">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <CardSection title="Modality Mix" subtitle={`${formatNumber(kpis?.messages || 0)} messages`} flush>
-          <div className="entity-stats-list">
-            <div className="entity-stat-row"><span>Text</span><strong>{formatNumber(modalityMix?.text || 0)}</strong></div>
-            <div className="entity-stat-row"><span>Audio</span><strong>{formatNumber(modalityMix?.audio || 0)}</strong></div>
-            <div className="entity-stat-row"><span>Video</span><strong>{formatNumber(modalityMix?.video || 0)}</strong></div>
+          <div className="divide-y divide-slate-100">
+            <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Text</span><strong className="font-semibold text-slate-700">{formatNumber(modalityMix?.text || 0)}</strong></div>
+            <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Audio</span><strong className="font-semibold text-slate-700">{formatNumber(modalityMix?.audio || 0)}</strong></div>
+            <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Video</span><strong className="font-semibold text-slate-700">{formatNumber(modalityMix?.video || 0)}</strong></div>
           </div>
         </CardSection>
         <CardSection title="User Info" flush>
-          <div className="entity-stats-list">
-            <div className="entity-stat-row"><span>Email</span><strong>{profile?.email || '-'}</strong></div>
-            <div className="entity-stat-row"><span>Client</span><strong>{profile?.clientName || '-'}</strong></div>
-            <div className="entity-stat-row"><span>Environment</span><strong>{profile?.env || '-'}</strong></div>
-            <div className="entity-stat-row"><span>Created</span><strong>{profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString() : '-'}</strong></div>
+          <div className="divide-y divide-slate-100">
+            <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Email</span><strong className="font-semibold text-slate-700">{profile?.email || '-'}</strong></div>
+            <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Client</span><strong className="font-semibold text-slate-700">{profile?.clientName || '-'}</strong></div>
+            <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Environment</span><strong className="font-semibold text-slate-700">{profile?.env || '-'}</strong></div>
+            <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Created</span><strong className="font-semibold text-slate-700">{profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString() : '-'}</strong></div>
           </div>
         </CardSection>
       </div>
 
-      <div className="entity-detail-grid entity-detail-grid-even">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <CardSection title="Twins Used" subtitle={`${twins?.length || 0} linked twins`} flush>
           {twins?.length ? (
-            <div className="entity-list">
+            <div>
               {twins.map((twin) => (
                 <EntityListRow
                   key={twin._id}
@@ -669,11 +686,11 @@ export function UserDetailPage() {
 
         <CardSection title="Session History" flush>
           {sessionHistory?.length ? (
-            <div className="entity-stats-list">
+            <div className="divide-y divide-slate-100">
               {sessionHistory.map((session, i) => (
-                <div key={session.sessionId || i} className="entity-stat-row">
-                  <span>{session.twinName || 'Unknown'}</span>
-                  <strong>{session.messages || 0} msgs · {session.duration || '-'}</strong>
+                <div key={session.sessionId || i} className="flex items-center justify-between px-5 py-3 text-xs">
+                  <span className="text-slate-400">{session.twinName || 'Unknown'}</span>
+                  <strong className="font-semibold text-slate-700">{session.messages || 0} msgs · {session.duration || '-'}</strong>
                 </div>
               ))}
             </div>
