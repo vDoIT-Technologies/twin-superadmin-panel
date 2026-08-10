@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, Download, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { FilterContext } from '../app/FilterContext';
 import { superadminDemoData } from '../demo-data/superadminDemoData';
-import { dashboardService, getUsersDropdown } from '../services';
+import { dashboardService, dropdownApiAvailable, getUsersDropdown } from '../services';
 import { envBadge, formatCurrencyFull, formatNumber } from '../utils/dashboardUtils';
 
 function formatScopeLabel(filters) {
@@ -67,6 +67,20 @@ function formatOptionalCurrency(value) {
 }
 
 function getUsersPayload(response) {
+  if (Array.isArray(response)) {
+    return {
+      users: response,
+      pagination: null,
+    };
+  }
+
+  if (Array.isArray(response?.users)) {
+    return {
+      users: response.users,
+      pagination: response?.pagination ?? null,
+    };
+  }
+
   if (Array.isArray(response?.data)) {
     return {
       users: response.data,
@@ -123,18 +137,17 @@ export function UsersPage() {
       const dropdownUsers = await getUsersDropdown({
         env: selectedEnv,
         clientId: filters.client || undefined,
+        twinId: filters.twin || undefined,
+        userId: filters.user || undefined,
       });
-      const scopedUsers = dropdownUsers
-        .filter((user) => !filters.client || getId(user.clientId ?? user.client) === String(filters.client))
-        .filter((user) => !filters.user || getId(user.id ?? user._id) === String(filters.user));
-      const total = scopedUsers.length;
+      const total = dropdownUsers.length;
       const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
       const currentPage = Math.min(page, totalPages);
       const start = (currentPage - 1) * PAGE_SIZE;
 
       if (!isActive) return;
 
-      setApiUsers(scopedUsers.slice(start, start + PAGE_SIZE));
+      setApiUsers(dropdownUsers.slice(start, start + PAGE_SIZE));
       setPagination({
         total,
         page: currentPage,
@@ -151,6 +164,7 @@ export function UsersPage() {
           page,
           limit: PAGE_SIZE,
           clientId: filters.client,
+          twinId: filters.twin,
           userId: filters.user,
           env: filters.envs.length === 1 ? filters.envs[0] : undefined,
           range: filters.range,
@@ -161,24 +175,25 @@ export function UsersPage() {
         }
 
         const payload = getUsersPayload(data);
-
-        if (payload.users.length) {
-          setApiUsers(payload.users);
-          setPagination({
-            total: Number(payload.pagination?.total) || payload.users.length,
-            page: Number(payload.pagination?.page) || page,
-            limit: Number(payload.pagination?.limit) || PAGE_SIZE,
-            totalPages: Number(payload.pagination?.totalPages) || 1,
-          });
-        } else {
-          await loadDropdownFallback();
-        }
+        setApiUsers(payload.users);
+        setPagination({
+          total: Number(payload.pagination?.total) || payload.users.length,
+          page: Number(payload.pagination?.page) || page,
+          limit: Number(payload.pagination?.limit) || PAGE_SIZE,
+          totalPages: Number(payload.pagination?.totalPages) || 1,
+        });
       } catch (error) {
         if (!isActive) {
           return;
         }
 
         console.error('GET /api/v1/entities/users failed:', error);
+        if (!dropdownApiAvailable()) {
+          setApiUsers([]);
+          setPagination((prev) => ({ ...prev, total: 0, totalPages: 1 }));
+          return;
+        }
+
         try {
           await loadDropdownFallback();
         } catch (fallbackError) {
@@ -198,11 +213,11 @@ export function UsersPage() {
     return () => {
       isActive = false;
     };
-  }, [filters.client, filters.envs, filters.range, filters.user, page]);
+  }, [filters.client, filters.envs, filters.range, filters.twin, filters.user, page]);
 
   useEffect(() => {
     setPage(1);
-  }, [filters.client, filters.envs, filters.range, filters.user]);
+  }, [filters.client, filters.envs, filters.range, filters.twin, filters.user]);
 
   const scopeLabel = useMemo(() => formatScopeLabel(filters), [filters]);
 
@@ -245,23 +260,22 @@ export function UsersPage() {
           lastActiveLabel,
         };
       })
-      .filter((user) => (!filters.client ? true : user.clientId === String(filters.client)))
-      .filter((user) => (!filters.user ? true : user.id === String(filters.user)))
       .filter((user) => (user.env ? filters.envs.includes(user.env) : true));
-  }, [apiUsers, filters.client, filters.envs, filters.user]);
+  }, [apiUsers, filters.envs]);
 
   const filteredRows = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const nextRows = !q
-      ? userRows
-      : userRows.filter(
+
+    if (!q) {
+      return userRows;
+    }
+
+    return userRows.filter(
       (user) =>
         user.name.toLowerCase().includes(q) ||
         user.client.toLowerCase().includes(q) ||
         getEnvLabel(user.env).toLowerCase().includes(q),
     );
-
-    return nextRows;
   }, [query, userRows]);
 
   const sortedRows = useMemo(() => {
@@ -435,7 +449,7 @@ export function UsersPage() {
                         <strong>{user.name}</strong>
                       </div>
                     </td>
-                    <td>{user.client}</td>
+                    <td>{user.client || '---'}</td>
                     <td>{superadminDemoData.ENV_META[user.env] ? envBadge(user.env) : getEnvLabel(user.env)}</td>
                     <td>{formatOptionalNumber(user.messages)}</td>
                     <td>{formatOptionalNumber(user.sessions)}</td>

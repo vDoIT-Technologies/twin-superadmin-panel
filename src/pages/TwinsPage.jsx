@@ -78,32 +78,25 @@ export function TwinsPage() {
     setPage(1);
   }, [filters.client, filters.envs, filters.twin]);
 
-  const twinRows = useMemo(() => apiTwins.map((t, i) => ({
-    id: getId(t._id ?? t.id) || `twin-${i}`,
-    clientId: getId(t.clientId ?? t.client?._id ?? t.client?.id),
-    name: t.name || '',
-    role: t.role || '',
-    client: t.clientName || '',
-    messages: t.messages || 0,
-    videoMins: t.videoMins || 0,
-    tokens: t.tokens || 0,
-    sources: t.sources || 0,
-    cost: t.cost || 0,
-  })), [apiTwins]);
+  const twinRows = useMemo(() => apiTwins.map((t, i) => {
+    const clientId = getId(t.clientId ?? t.client?._id ?? t.client?.id);
+    const clientName = t.clientName ?? t.client?.name ?? '';
 
-  const filteredRows = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const clientScopedRows = filters.client
-      ? twinRows.filter((twin) => twin.clientId === String(filters.client))
-      : twinRows;
-    const scopedRows = filters.twin
-      ? clientScopedRows.filter((twin) => twin.id === String(filters.twin))
-      : clientScopedRows;
-    if (!q) return scopedRows;
-    return scopedRows.filter((t) =>
-      t.name.toLowerCase().includes(q) || t.role.toLowerCase().includes(q) || t.client.toLowerCase().includes(q),
-    );
-  }, [filters.client, filters.twin, query, twinRows]);
+    return {
+      id: getId(t._id ?? t.id) || `twin-${i}`,
+      clientId,
+      name: t.name || '',
+      role: t.role || '',
+      client: clientName || '---', //clientId ||
+      clientName,
+      messages: t.messages || 0,
+      videoMins: t.videoMins || 0,
+      tokens: t.tokens || 0,
+      sources: t.sources || 0,
+      cost: t.cost || 0,
+    };
+  }), [apiTwins]);
+ 
 
   const sortedRows = useMemo(() => {
     const getVal = (t) => {
@@ -118,12 +111,12 @@ export function TwinsPage() {
         default: return t.name;
       }
     };
-    return [...filteredRows].sort((a, b) => {
+    return [...twinRows].sort((a, b) => {
       const av = getVal(a), bv = getVal(b);
       if (typeof av === 'number' && typeof bv === 'number') return sortConfig.direction === 'asc' ? av - bv : bv - av;
       return sortConfig.direction === 'asc' ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
     });
-  }, [filteredRows, sortConfig]);
+  }, [twinRows, sortConfig]);
 
   const totalPages = Math.max(1, pagination.totalPages);
   const currentPage = Math.min(page, totalPages);
@@ -196,7 +189,14 @@ export function TwinsPage() {
                       <div><strong>{twin.name}</strong><span>{twin.role}</span></div>
                     </div>
                   </td>
-                  <td>{twin.client}</td>
+                  <td>
+                    <div className="clients-demo-client">
+                      <div>
+                        <strong>{twin.client || '-'}</strong>
+                        {/* {twin.clientId ? <span>{twin.clientId}</span> : null} */}
+                      </div>
+                    </div>
+                  </td>
                   <td>{formatNumber(twin.messages)}</td>
                   <td>{formatNumber(twin.videoMins)}</td>
                   <td>{formatNumber(twin.tokens)}</td>

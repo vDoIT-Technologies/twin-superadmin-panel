@@ -148,6 +148,7 @@ export function AppLayout() {
     getUsersDropdown({
       env: selectedEnv,
       clientId: filters.client,
+      twinId: filters.twin,
     })
       .then((data) => {
         if (active) setUsers(data);
@@ -160,7 +161,7 @@ export function AppLayout() {
     return () => {
       active = false;
     };
-  }, [filters.client, isAuthenticated, selectedEnv]);
+  }, [filters.client, filters.twin, isAuthenticated, selectedEnv]);
 
   const vendorOptions = useMemo(
     () =>
@@ -224,6 +225,11 @@ export function AppLayout() {
   const updateScopeFilter = (key, value) => {
     if (key === "client") {
       updateFilters({ client: value, twin: null, user: null });
+      return;
+    }
+
+    if (key === "twin") {
+      updateFilters({ twin: value, user: null });
       return;
     }
 
