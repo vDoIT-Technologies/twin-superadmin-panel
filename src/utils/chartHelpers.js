@@ -108,7 +108,7 @@ export function stackedBar(canvas, labels, datasets, opts = {}) {
           ? {
               display: true,
               position: 'bottom',
-              labels: { usePointStyle: true, boxWidth: 7, boxHeight: 7, padding: 12, font: { size: 11 } },
+              labels: { usePointStyle: true, boxWidth: 6, boxHeight: 6, padding: 8, font: { size: 10 } },
             }
           : { display: false },
       },
@@ -145,7 +145,7 @@ export function groupedBar(canvas, labels, datasets, opts = {}) {
         legend: {
           display: true,
           position: 'bottom',
-          labels: { usePointStyle: true, boxWidth: 7, boxHeight: 7, padding: 12, font: { size: 11 } },
+          labels: { usePointStyle: true, boxWidth: 6, boxHeight: 6, padding: 8, font: { size: 10 } },
         },
       },
       scales: {

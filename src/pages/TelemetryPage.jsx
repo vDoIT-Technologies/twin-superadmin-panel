@@ -18,9 +18,9 @@ function formatScopeLabel(filters) {
 
 function levelBadge(level) {
   const label = level.toUpperCase();
-  if (level === 'warn') return <span className="telemetry-level telemetry-level-warn">{label}</span>;
-  if (level === 'error') return <span className="telemetry-level telemetry-level-error">{label}</span>;
-  return <span className="telemetry-level telemetry-level-info">{label}</span>;
+  if (level === 'warn') return <span className="inline-flex rounded-full bg-amber-50 px-2 py-1 text-[11px] font-bold tracking-wide text-amber-700">{label}</span>;
+  if (level === 'error') return <span className="inline-flex rounded-full bg-rose-50 px-2 py-1 text-[11px] font-bold tracking-wide text-rose-700">{label}</span>;
+  return <span className="inline-flex rounded-full bg-sky-50 px-2 py-1 text-[11px] font-bold tracking-wide text-sky-700">{label}</span>;
 }
 
 export function TelemetryPage() {
@@ -162,32 +162,33 @@ export function TelemetryPage() {
   };
 
   return (
-    <section className="page-section telemetry-demo-page">
-      <header className="telemetry-demo-header">
-        <div className="telemetry-demo-header-copy">
-          <h1>Telemetry / Logs</h1>
-          <p>Read-only event explorer — route hits, chat, video, ingestion, payments</p>
+    <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+      <header className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Telemetry / Logs</h1>
+          <p className="mt-1 text-sm text-slate-500">Read-only event explorer — route hits, chat, video, ingestion, payments</p>
         </div>
-        <div className="telemetry-demo-scope">
-          <span className="telemetry-demo-scope-label">Scope</span>
-          <span className="telemetry-demo-scope-value">{scopeLabel}</span>
+        <div className="text-left lg:text-right">
+          <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Scope</span>
+          <span className="mt-1 block text-sm font-semibold text-slate-600">{scopeLabel}</span>
         </div>
       </header>
 
-      <section className="table-card telemetry-demo-card">
-        <div className="telemetry-demo-toolbar">
-          <label className="telemetry-demo-search">
-            <Search size={15} className="telemetry-demo-search-icon" />
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-panel">
+        <div className="flex flex-col gap-3 border-b border-slate-100 p-4 lg:flex-row lg:items-center lg:justify-between">
+          <label className="flex h-11 w-full max-w-md items-center gap-2 rounded-xl bg-slate-50 px-3 text-slate-400 lg:w-[22rem]">
+            <Search size={16} />
             <input
               type="text"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search events, twins, users..."
+              className="min-w-0 flex-1 bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400"
             />
           </label>
 
-          <div className="telemetry-demo-toolbar-actions">
-            <select value={level} onChange={(event) => setLevel(event.target.value)} className="telemetry-demo-select">
+          <div className="flex flex-wrap items-center gap-2">
+            <select value={level} onChange={(event) => setLevel(event.target.value)} className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100">
               {levels.map((item) => (
                 <option key={item} value={item}>
                   {item}
@@ -195,7 +196,7 @@ export function TelemetryPage() {
               ))}
             </select>
 
-            <select value={service} onChange={(event) => setService(event.target.value)} className="telemetry-demo-select">
+            <select value={service} onChange={(event) => setService(event.target.value)} className="h-10 max-w-[12rem] rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100">
               <option value="all">all services</option>
               {superadminDemoData.SERVICES.map((svc) => (
                 <option key={svc.id} value={svc.id}>
@@ -204,7 +205,7 @@ export function TelemetryPage() {
               ))}
             </select>
 
-            <select value={env} onChange={(event) => setEnv(event.target.value)} className="telemetry-demo-select">
+            <select value={env} onChange={(event) => setEnv(event.target.value)} className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100">
               <option value="all">all envs</option>
               {superadminDemoData.ENVS.map((item) => (
                 <option key={item} value={item}>
@@ -213,16 +214,16 @@ export function TelemetryPage() {
               ))}
             </select>
 
-            <button type="button" className="telemetry-demo-export" onClick={exportCsv}>
+            <button type="button" className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-600 transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700" onClick={exportCsv}>
               <Download size={14} />
               Export CSV
             </button>
           </div>
         </div>
 
-        <div className="telemetry-demo-table-wrap">
-          <table className="telemetry-demo-table">
-            <thead>
+        <div className="overflow-x-auto">
+          <table className="min-w-[1040px] w-full border-collapse text-left text-sm">
+            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
               <tr>
                 {[
                   ['ts', 'Timestamp'],
@@ -237,9 +238,9 @@ export function TelemetryPage() {
                   ['cost', 'Cost'],
                 ].map(([key, label]) => (
                   <th key={key}>
-                    <button type="button" className="table-sort-button" onClick={() => toggleSort(key)}>
+                    <button type="button" className="inline-flex items-center gap-1.5 py-3 text-left font-semibold transition hover:text-slate-700" onClick={() => toggleSort(key)}>
                       <span>{label}</span>
-                      <span className={`table-sort-indicator${sortConfig.key === key ? ' active' : ''}`}>
+                      <span className={`text-xs text-slate-300 ${sortConfig.key === key ? 'text-indigo-600' : ''}`}>
                         {sortConfig.key === key ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}
                       </span>
                     </button>
@@ -249,21 +250,21 @@ export function TelemetryPage() {
             </thead>
             <tbody>
               {sortedRows.slice(0, 120).map((row) => (
-                <tr key={row.id}>
-                  <td className="telemetry-demo-ts">{row.ts}</td>
-                  <td>{levelBadge(row.level)}</td>
-                  <td>{envBadge(row.env)}</td>
-                  <td className="telemetry-demo-service">{row.service}</td>
-                  <td className="telemetry-demo-event">{row.event}</td>
-                  <td>{row.client}</td>
-                  <td>{row.twin}</td>
-                  <td>{row.user}</td>
-                  <td>
-                    <span className="telemetry-demo-units">
-                      <strong>{formatNumber(row.units)}</strong> <span>{row.unitLabel}</span>
+                <tr key={row.id} className="border-t border-slate-100 transition hover:bg-slate-50/70">
+                  <td className="whitespace-nowrap px-4 py-3.5 text-slate-500">{row.ts}</td>
+                  <td className="px-4 py-3.5">{levelBadge(row.level)}</td>
+                  <td className="px-4 py-3.5">{envBadge(row.env)}</td>
+                  <td className="px-4 py-3.5 font-medium text-slate-700">{row.service}</td>
+                  <td className="max-w-[18rem] truncate px-4 py-3.5 text-slate-700" title={row.event}>{row.event}</td>
+                  <td className="max-w-[12rem] truncate px-4 py-3.5 text-slate-600" title={row.client}>{row.client}</td>
+                  <td className="max-w-[12rem] truncate px-4 py-3.5 text-slate-600" title={row.twin}>{row.twin}</td>
+                  <td className="max-w-[12rem] truncate px-4 py-3.5 text-slate-600" title={row.user}>{row.user}</td>
+                  <td className="whitespace-nowrap px-4 py-3.5">
+                    <span className="text-slate-500">
+                      <strong className="font-semibold text-slate-800">{formatNumber(row.units)}</strong> <span>{row.unitLabel}</span>
                     </span>
                   </td>
-                  <td className="cell-primary">${row.cost.toFixed(4)}</td>
+                  <td className="whitespace-nowrap px-4 py-3.5 font-semibold text-slate-800">${row.cost.toFixed(4)}</td>
                 </tr>
               ))}
             </tbody>

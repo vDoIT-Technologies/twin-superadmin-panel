@@ -48,55 +48,57 @@ export function DataTable({
   };
 
   return (
-    <div className="table-card">
-      <table>
-        <thead>
-          <tr>
-            {columns.map((column) => {
-              const isActive = sortConfig.key === column.key;
-              return (
-                <th key={column.key}>
-                  <button type="button" className="table-sort-button" onClick={() => toggleSort(column.key)}>
-                    <span>{column.label}</span>
-                    <span className={`table-sort-indicator${isActive ? ' active' : ''}`}>
-                      {isActive ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}
-                    </span>
-                  </button>
-                </th>
-              );
-            })}
-          </tr>
-        </thead>
-        <tbody>
-          {sortedRows.length === 0 ? (
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-panel">
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-slate-100 text-left">
+          <thead className="bg-slate-50/80">
             <tr>
-              <td colSpan={columns.length} className="table-empty">
-                {emptyMessage}
-              </td>
+              {columns.map((column) => {
+                const isActive = sortConfig.key === column.key;
+                return (
+                  <th key={column.key} className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-400 first:pl-5">
+                    <button type="button" className="inline-flex items-center gap-1.5 whitespace-nowrap transition hover:text-indigo-600" onClick={() => toggleSort(column.key)}>
+                      <span>{column.label}</span>
+                      <span className={isActive ? 'font-bold text-indigo-500' : 'text-slate-300'}>
+                        {isActive ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}
+                      </span>
+                    </button>
+                  </th>
+                );
+              })}
             </tr>
-          ) : (
-            sortedRows.map((row) => (
-              <tr
-                key={row[rowKey]}
-                className={onRowClick ? 'row-link' : ''}
-                onClick={onRowClick ? () => onRowClick(row[rowKey]) : undefined}
-              >
-                {columns.map((column) => {
-                  const value = column.render ? column.render(row) : row[column.key];
-                  const isStatus = column.key === statusKey;
-                  const isPrimary = column.key === 'name';
-
-                  return (
-                    <td key={column.key} className={isPrimary ? 'cell-primary' : ''}>
-                      {isStatus ? <span className={`pill ${getStatusTone(String(value))}`}>{value}</span> : value}
-                    </td>
-                  );
-                })}
+          </thead>
+          <tbody>
+            {sortedRows.length === 0 ? (
+              <tr>
+                <td colSpan={columns.length} className="px-5 py-12 text-center text-sm text-slate-400">
+                  {emptyMessage}
+                </td>
               </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+            ) : (
+              sortedRows.map((row) => (
+                <tr
+                  key={row[rowKey]}
+                  className={`border-t border-slate-100 text-sm text-slate-600 transition ${onRowClick ? 'cursor-pointer hover:bg-slate-50' : ''}`}
+                  onClick={onRowClick ? () => onRowClick(row[rowKey]) : undefined}
+                >
+                  {columns.map((column) => {
+                    const value = column.render ? column.render(row) : row[column.key];
+                    const isStatus = column.key === statusKey;
+                    const isPrimary = column.key === 'name';
+
+                    return (
+                      <td key={column.key} className={`${isPrimary ? 'font-medium text-slate-800' : ''} px-4 py-4 first:pl-5`}>
+                        {isStatus ? <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusTone(String(value))}`}>{value}</span> : value}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

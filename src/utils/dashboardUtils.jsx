@@ -69,10 +69,10 @@ export function envBadge(env) {
   const meta = superadminDemoData.ENV_META[env];
   return (
     <span
-      className="env-badge"
+      className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold"
       style={{ backgroundColor: `${meta.color}15`, color: meta.color }}
     >
-      <span className="env-badge-dot" style={{ backgroundColor: meta.color }} />
+      <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: meta.color }} />
       {meta.label}
     </span>
   );
@@ -86,7 +86,7 @@ const healthColor = {
 
 export function healthDot(status) {
   const tone = healthColor[status] || 'bg-slate-300';
-  return <span className={`health-dot ${tone}`} />;
+  return <span className={`h-2 w-2 rounded-full ${tone}`} />;
 }
 
 export function getPageTitle(pathname) {
