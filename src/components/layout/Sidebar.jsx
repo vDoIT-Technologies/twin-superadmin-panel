@@ -1,41 +1,13 @@
 import { NavLink } from 'react-router-dom';
-import { Activity, Bot, Boxes, Building2, Database, LayoutDashboard, ScrollText, Users, Wallet } from 'lucide-react';
 import { useAuth } from '../../app/AuthContext';
-
-const NAV_GROUPS = [
-  { label: 'Monitor', items: [
-    { to: '/', label: 'Overview', end: true, icon: LayoutDashboard },
-    { to: '/services', label: 'Services', icon: Boxes },
-    { to: '/vault', label: 'Vault', icon: Database },
-  ] },
-  { label: 'Entities', items: [
-    { to: '/clients', label: 'Clients', icon: Building2 },
-    { to: '/twins', label: 'Twins', icon: Bot },
-    { to: '/users', label: 'Users', icon: Users },
-  ] },
-  { label: 'Financials', items: [
-    { to: '/financial', label: 'Cost & Billing', icon: Wallet },
-    { to: '/usage', label: 'Usage Analytics', icon: Activity },
-  ] },
-  { label: 'System', items: [
-    { to: '/telemetry', label: 'Telemetry / Logs', icon: ScrollText },
-  ] },
-];
-
-function BrandMark() {
-  return (
-    <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-indigo-600 to-blue-600 text-white shadow-md shadow-indigo-500/20" aria-label="Twin Protocol logo">
-      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M12 2 4 6v6c0 5 3.5 8 8 10 4.5-2 8-5 8-10V6z" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M9.5 12.5 11 14l3.5-4" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    </div>
-  );
-}
+import { BrandMark, NAV_GROUPS_BY_ROLE } from './Nav';
+import { normalizeRoleName } from '../../utils/dashboardUtils';
 
 export function Sidebar({ collapsed, mobileOpen, onNavigate, initials, profileName, profileEmail }) {
   const { profile } = useAuth();
-  const brandTitle = profile?.role?.name === 'twin' ? 'Twin Protocol' : profile?.role?.name === 'vault' ? 'Vault Protocol' : 'Twin Protocol';
+  const roleName = normalizeRoleName(profile?.role);
+  const navGroups = NAV_GROUPS_BY_ROLE[roleName] ?? NAV_GROUPS_BY_ROLE.default;
+  const brandTitle = roleName === 'vault' ? 'Vault' : 'Twin Protocol';
 
   return (
     <aside className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-slate-200 bg-white px-3 py-4 shadow-panel transition-[width,transform] duration-200 lg:sticky lg:z-10 lg:h-screen lg:translate-x-0 lg:shadow-none ${collapsed ? ' lg:w-20' : ''}${mobileOpen ? ' translate-x-0 shadow-2xl' : ' -translate-x-full'}`}>
@@ -47,7 +19,7 @@ export function Sidebar({ collapsed, mobileOpen, onNavigate, initials, profileNa
         </div>
       </div>
       <nav className="mt-5 flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto">
-        {NAV_GROUPS.map((group) => (
+        {navGroups?.map((group) => (
           <div key={group.label}>
             <p className={`mb-2 px-2 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400 ${collapsed ? 'lg:hidden' : ''}`}>{group.label}</p>
             <div className="space-y-1">
