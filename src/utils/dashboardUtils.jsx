@@ -112,3 +112,8 @@ export function getEnvOptions() {
     color: superadminDemoData.ENV_META[env].color,
   }));
 }
+
+export function normalizeRoleName(role) {
+  const rawRole = typeof role === 'string' ? role : role?.name ?? role?.label ?? '';
+  return rawRole.trim().toLowerCase();
+}
