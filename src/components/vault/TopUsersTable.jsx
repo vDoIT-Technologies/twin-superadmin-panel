@@ -37,9 +37,9 @@ export function TopUsersTable({ users, sortConfig, onSort, onExport }) {
         <h2 className="text-base font-semibold text-slate-800">Top users by storage</h2>
         <button type="button" className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-white px-3 py-2 text-sm font-semibold text-indigo-600 transition hover:bg-indigo-50" onClick={onExport}><Download size={14} />Export CSV</button>
       </div>
-      <div className="overflow-x-auto">
+      <div className="max-h-[65vh] overflow-auto">
         <table className="w-full min-w-[720px] border-collapse text-sm">
-          <thead className="bg-slate-50"><tr>{COLUMNS.map(([key, label]) => (
+          <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_0_0_rgba(226,232,240,1)]"><tr>{COLUMNS.map(([key, label]) => (
             <th key={key} className="px-5 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-400"><button type="button" className="inline-flex items-center gap-1 hover:text-slate-700" onClick={() => onSort(key)}>
               <span>{label}</span><span className={sortConfig.key === key ? 'text-indigo-500' : ''}>{sortConfig.key === key ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}</span>
             </button></th>

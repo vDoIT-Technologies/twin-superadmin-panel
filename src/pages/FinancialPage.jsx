@@ -495,9 +495,9 @@ export function FinancialPage() {
             Export CSV
           </button>
         </div>
-        <div className="overflow-x-auto">
+        <div className="max-h-[65vh] overflow-auto">
           <table className="w-full min-w-[600px] border-collapse text-sm">
-            <thead className="bg-slate-50">
+            <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_0_0_rgba(226,232,240,1)]">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-400">Vendor</th>
                 <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-400">Category</th>

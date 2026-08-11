@@ -259,9 +259,9 @@ export function ClientsPage() {
           </button>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="max-h-[65vh] overflow-auto">
           <table className={`w-full border-collapse text-sm ${isVault ? 'min-w-[980px]' : 'min-w-[1100px]'}`}>
-            <thead className="bg-slate-50">
+            <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_0_0_rgba(226,232,240,1)]">
               <tr>
                 {[
                   ["client", "Client"],

@@ -4,7 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { dashboardService } from '../services';
 import { FilterContext } from '../app/FilterContext';
 import { TruncatedText } from '../components/common/TruncatedText';
-import { formatNumber } from '../utils/dashboardUtils';
+import { envBadge, formatNumber } from '../utils/dashboardUtils';
+import { superadminDemoData } from '../demo-data/superadminDemoData';
 
 function getTwinInitials(name) {
   if (!name) return '?';
@@ -82,12 +83,14 @@ export function TwinsPage() {
   const twinRows = useMemo(() => apiTwins.map((t, i) => {
     const clientId = getId(t.clientId ?? t.client?._id ?? t.client?.id);
     const clientName = t.clientName ?? t.client?.name ?? '';
+    const environment = t.__env ?? t.env ?? t.environment ?? '';
 
     return {
       id: getId(t._id ?? t.id) || `twin-${i}`,
       clientId,
       name: t.name || '',
       role: t.role || '',
+      env: typeof environment === 'string' ? environment.toLowerCase() : environment?.id ?? environment?.name ?? '',
       client: clientName || '---', //clientId ||
       clientName,
       messages: t.messages || 0,
@@ -103,6 +106,7 @@ export function TwinsPage() {
     const getVal = (t) => {
       switch (sortConfig.key) {
         case 'twin': return t.name;
+        case 'env': return t.env;
         case 'client': return t.client;
         case 'messages': return t.messages;
         case 'videoMins': return t.videoMins;
@@ -127,13 +131,13 @@ export function TwinsPage() {
   const toggleSort = (key) => {
     setSortConfig((prev) => prev.key === key
       ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' }
-      : { key, direction: key === 'twin' || key === 'client' ? 'asc' : 'desc' });
+      : { key, direction: key === 'twin' || key === 'env' || key === 'client' ? 'asc' : 'desc' });
   };
 
   const exportCsv = () => {
-    const header = ['Twin', 'Client', 'Messages', 'Video Min', 'Tokens', 'Sources', 'Cost'];
+    const header = ['Twin', 'Env', 'Client', 'Messages', 'Video Min', 'Tokens', 'Sources', 'Cost'];
     const lines = sortedRows.map((t) =>
-      [t.name, t.client, formatNumber(t.messages), formatNumber(t.videoMins), formatNumber(t.tokens), t.sources, `$${formatNumber(t.cost)}`]
+      [t.name, t.env, t.client, formatNumber(t.messages), formatNumber(t.videoMins), formatNumber(t.tokens), t.sources, `$${formatNumber(t.cost)}`]
         .map((v) => `"${String(v).replaceAll('"', '""')}"`).join(','));
     const blob = new Blob([[header.join(','), ...lines].join('\n')], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -161,11 +165,11 @@ export function TwinsPage() {
           </button>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px] border-collapse text-sm">
-            <thead className="bg-slate-50">
+        <div className="max-h-[65vh] overflow-auto">
+          <table className="w-full min-w-[1000px] border-collapse text-sm">
+            <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_0_0_rgba(226,232,240,1)]">
               <tr>
-                {[['twin','Twin'],['client','Client'],['messages','Messages'],['videoMins','Video min'],['tokens','Tokens'],['sources','Sources'],['cost','Cost']].map(([key,label]) => (
+                {[['twin','Twin'],['env','Env'],['client','Client'],['messages','Messages'],['videoMins','Video min'],['tokens','Tokens'],['sources','Sources'],['cost','Cost']].map(([key,label]) => (
                   <th key={key} className="px-4 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
                     <button type="button" className="inline-flex items-center gap-1 transition hover:text-slate-700" onClick={() => toggleSort(key)}>
                       <span>{label}</span>
@@ -179,9 +183,9 @@ export function TwinsPage() {
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={7} className="px-5 py-12 text-center text-sm text-slate-400"><span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-indigo-100 border-t-indigo-600 align-[-2px]" aria-hidden="true" />Loading twins...</td></tr>
+                <tr><td colSpan={8} className="px-5 py-12 text-center text-sm text-slate-400"><span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-indigo-100 border-t-indigo-600 align-[-2px]" aria-hidden="true" />Loading twins...</td></tr>
               ) : sortedRows.length === 0 ? (
-                <tr><td colSpan={7} className="px-5 py-12 text-center text-sm text-slate-400">No twins found</td></tr>
+                <tr><td colSpan={8} className="px-5 py-12 text-center text-sm text-slate-400">No twins found</td></tr>
               ) : sortedRows.map((twin) => (
                 <tr key={twin.id} className="cursor-pointer border-t border-slate-100 transition hover:bg-slate-50" onClick={() => navigate(`/twins/${twin.id}`)}>
                   <td className="px-4 py-3.5">
@@ -190,6 +194,7 @@ export function TwinsPage() {
                       <div className="min-w-0"><strong className="block font-semibold text-slate-700"><TruncatedText value={twin.name} /></strong><span className="mt-0.5 block text-xs text-slate-400"><TruncatedText value={twin.role} /></span></div>
                     </div>
                   </td>
+                  <td className="px-4 py-3.5 text-slate-500">{superadminDemoData.ENV_META[twin.env] ? envBadge(twin.env) : <TruncatedText value={twin.env || '---'} />}</td>
                   <td className="px-4 py-3.5 text-slate-500"><TruncatedText value={twin.client || '---'} /></td>
                   <td className="px-4 py-3.5 text-slate-500">{formatNumber(twin.messages)}</td>
                   <td className="px-4 py-3.5 text-slate-500">{formatNumber(twin.videoMins)}</td>

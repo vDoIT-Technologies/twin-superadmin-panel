@@ -245,9 +245,9 @@ export function TelemetryPage() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="max-h-[65vh] overflow-auto">
           <table className="min-w-[1040px] w-full border-collapse text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
+            <thead className="sticky top-0 z-10 bg-slate-50 text-xs uppercase tracking-wide text-slate-400 shadow-[0_1px_0_0_rgba(226,232,240,1)]">
               <tr>
                 {[
                   ['ts', 'Timestamp'],
