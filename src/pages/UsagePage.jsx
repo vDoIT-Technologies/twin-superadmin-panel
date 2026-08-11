@@ -7,6 +7,8 @@ import { areaChart, stackedBar } from '../utils/chartHelpers';
 import { deltaPercent, formatNumber } from '../utils/dashboardUtils.jsx';
 import { DataTable } from '../components/common/DataTable.jsx';
 import { loadTokenUsage } from '../services/usageService';
+import { useAuth } from '../app/AuthContext';
+import { isServiceForProduct } from '../utils/productAccess';
 
 const formatUSD = (value) =>
   `$${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -39,6 +41,7 @@ function formatAxisBillions(value) {
 }
 
 export function UsagePage() {
+  const { adminProduct } = useAuth();
   const { filters } = useContext(FilterContext);
   const modalityRef = useRef(null);
   const tokensRef = useRef(null);
@@ -50,13 +53,16 @@ export function UsagePage() {
   const scopedFilters = useMemo(
     () => ({
       ...filters,
-      service: null,
+      service: adminProduct === 'vault' ? 'vault' : null,
       vendor: null,
     }),
-    [filters],
+    [adminProduct, filters],
   );
 
-  const rows = useMemo(() => selectFacts(scopedFilters), [scopedFilters]);
+  const rows = useMemo(
+    () => selectFacts(scopedFilters).filter((row) => isServiceForProduct(adminProduct, row.service)),
+    [adminProduct, scopedFilters],
+  );
   const scopeLabel = useMemo(() => formatScopeLabel(filters), [filters]);
   const labels = useMemo(() => timeSeries(rows, 'messages', scopedFilters).labels, [rows, scopedFilters]);
 
@@ -258,8 +264,8 @@ export function UsagePage() {
     <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">Usage Analytics</h1>
-          <p className="mt-1 text-sm text-slate-400 sm:text-base">Deep time-series across modalities, tokens, media, storage and traffic</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">{adminProduct === 'vault' ? 'Vault Usage Analytics' : 'Usage Analytics'}</h1>
+          <p className="mt-1 text-sm text-slate-400 sm:text-base">{adminProduct === 'vault' ? 'Vault-only storage, API traffic, user activity, and service consumption' : 'Deep time-series across modalities, tokens, media, storage and traffic'}</p>
         </div>
         <div className="text-left sm:text-right">
           <span className="block text-xs font-bold uppercase tracking-widest text-slate-400">Scope</span>
@@ -270,7 +276,7 @@ export function UsagePage() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {metricCards.map((card) => {
           const Icon = card.icon;
-          const delta = card.key === 'storageGB' ? null : deltaPercent(scopedFilters, card.key);
+          const delta = card.key === 'storageGB' ? null : deltaPercent(scopedFilters, card.key, null, adminProduct);
           const cardValue = card.key === 'tokens' ? tokensValue : summary[card.key];
 
           return (

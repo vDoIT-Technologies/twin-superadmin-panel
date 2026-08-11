@@ -43,7 +43,16 @@ export function FilterToolbar({
   serviceOptions,
   vendorOptions,
   showOverviewControls,
+  adminProduct,
+  visibleScopes = ['granularity', 'client', 'twin', 'user', 'service', 'vendor'],
 }) {
+  const isVault = adminProduct === 'vault';
+  const isVisible = (scope) => visibleScopes.includes(scope);
+  const visibleCount = visibleScopes.filter((scope) => scope !== 'twin' || !isVault).length;
+  const desktopGridClass = {
+    1: 'xl:grid-cols-1', 2: 'xl:grid-cols-2', 3: 'xl:grid-cols-3',
+    4: 'xl:grid-cols-4', 5: 'xl:grid-cols-5', 6: 'xl:grid-cols-6',
+  }[visibleCount] || 'xl:grid-cols-6';
   return (
     <>
       <div className="border-b border-slate-200 bg-white px-4 py-3 sm:px-6 lg:px-8">
@@ -71,8 +80,8 @@ export function FilterToolbar({
             </div>
           </div>
 
-          <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            <div className="min-w-0">
+          <div className={`grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 ${desktopGridClass}`}>
+            {isVisible('granularity') ? <div className="min-w-0">
               <FilterDropdown
                 value={filters.gran}
                 onChange={(value) => updateFilters({ gran: value ?? 'day' })}
@@ -81,12 +90,12 @@ export function FilterToolbar({
                 searchable={false}
                 showPlaceholderOption={false}
               />
-            </div>
-            <ScopeDropdown filterKey="client" filters={filters} updateScopeFilter={updateScopeFilter} options={clientOptions} placeholder="All clients" searchPlaceholder="Search client..." />
-            <ScopeDropdown filterKey="twin" filters={filters} updateScopeFilter={updateScopeFilter} options={twinOptions} placeholder="All twins" searchPlaceholder="Search twin..." align="right" />
-            <ScopeDropdown filterKey="user" filters={filters} updateScopeFilter={updateScopeFilter} options={userOptions} placeholder="All users" searchPlaceholder="Search user..." />
-            <ScopeDropdown filterKey="service" filters={filters} updateScopeFilter={updateScopeFilter} options={serviceOptions} placeholder="All services" searchPlaceholder="Search service..." align="right" />
-            <ScopeDropdown filterKey="vendor" filters={filters} updateScopeFilter={updateScopeFilter} options={vendorOptions} placeholder="All vendors" searchPlaceholder="Search vendor..." align="right" />
+            </div> : null}
+            {isVisible('client') ? <ScopeDropdown filterKey="client" filters={filters} updateScopeFilter={updateScopeFilter} options={clientOptions} placeholder="All clients" searchPlaceholder="Search client..." /> : null}
+            {!isVault && isVisible('twin') ? <ScopeDropdown filterKey="twin" filters={filters} updateScopeFilter={updateScopeFilter} options={twinOptions} placeholder="All twins" searchPlaceholder="Search twin..." align="right" /> : null}
+            {isVisible('user') ? <ScopeDropdown filterKey="user" filters={filters} updateScopeFilter={updateScopeFilter} options={userOptions} placeholder="All users" searchPlaceholder="Search user..." /> : null}
+            {isVisible('service') ? <ScopeDropdown filterKey="service" filters={filters} updateScopeFilter={updateScopeFilter} options={serviceOptions} placeholder="All services" searchPlaceholder="Search service..." align="right" /> : null}
+            {isVisible('vendor') ? <ScopeDropdown filterKey="vendor" filters={filters} updateScopeFilter={updateScopeFilter} options={vendorOptions} placeholder="All vendors" searchPlaceholder="Search vendor..." align="right" /> : null}
           </div>
         </div>
       </div>

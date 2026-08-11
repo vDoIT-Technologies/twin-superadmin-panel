@@ -31,7 +31,7 @@ export const NAV_GROUPS_BY_ROLE = {
     ] },
   ],
   vault: [
-    { label: 'Vault', items: [
+    { label: 'Monitor', items: [
       { to: '/', label: 'Overview', end: true, icon: LayoutDashboard },
       { to: '/services', label: 'Services', icon: Boxes },
       { to: '/vault', label: 'Vault', icon: Database },
@@ -40,11 +40,12 @@ export const NAV_GROUPS_BY_ROLE = {
       { to: '/clients', label: 'Clients', icon: Building2 },
       { to: '/users', label: 'Users', icon: Users },
     ] },
-    { label: 'Billing', items: [
-      { to: '/financial', label: 'Cost & Billing', icon: Wallet },
+    { label: 'Financials', items: [
+      { to: '/financial', label: 'Vault Billing', icon: Wallet },
+      { to: '/usage', label: 'Vault Usage Analytics', icon: Activity },
     ] },
     { label: 'System', items: [
-      { to: '/telemetry', label: 'Telemetry / Logs', icon: ScrollText },
+      { to: '/telemetry', label: 'Health & Logs', icon: ScrollText },
     ] },
   ],
   default: [

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { dashboardService } from '../services';
+import { useAuth } from '../app/AuthContext';
 import { envBadge, formatCurrency, formatNumber } from '../utils/dashboardUtils';
 
 const DETAIL_PAGE_SIZE = 10;
@@ -170,6 +171,7 @@ function parseDecimal(value) {
 }
 
 export function ClientDetailPage() {
+  const { adminProduct } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { clientId } = useParams();
@@ -177,7 +179,9 @@ export function ClientDetailPage() {
   const [clientData, setClientData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const requestedTab = searchParams.get('tab');
-  const clientTabs = ['overview', 'twins', 'users', 'services', 'vault', 'cost', 'timeline'];
+  const clientTabs = adminProduct === 'vault'
+    ? ['overview', 'users', 'services', 'vault', 'timeline']
+    : ['overview', 'twins', 'users', 'services', 'cost', 'timeline'];
   const initialTab = clientTabs.includes(requestedTab) ? requestedTab : 'overview';
   const [activeTab, setActiveTab] = useState(initialTab);
 
@@ -315,13 +319,22 @@ export function ClientDetailPage() {
         onBack={() => navigate(location.state?.from || '/clients')}
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <MetricCard icon={Wallet} label="COGS" value={formatCurrency(kpis?.cost || 0)} tone="indigo" />
-        <MetricCard icon={TrendingUp} label="Revenue" value={formatCurrency(kpis?.revenue || 0)} tone="emerald" />
-        <MetricCard icon={Percent} label="Margin" value={`${kpis?.margin || 0}%`} tone="violet" />
-        <MetricCard icon={Bot} label="Twins" value={String(kpis?.twinsCount || 0)} tone="rose" />
-        <MetricCard icon={Users} label="Users" value={String(kpis?.usersCount || 0)} tone="amber" />
-      </div>
+      {adminProduct === 'vault' ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <MetricCard icon={Users} label="Vault users" value={String(kpis?.usersCount || kpis?.activeDrives || 0)} tone="indigo" />
+          <MetricCard icon={Activity} label="Active drives" value={String(kpis?.activeDrives || 0)} tone="emerald" />
+          <MetricCard icon={BookOpen} label="Files stored" value={formatNumber(kpis?.totalFiles || 0)} tone="sky" />
+          <MetricCard icon={TrendingUp} label="Storage used" value={formatBytes(kpis?.storedOnIpfsBytes || 0)} tone="violet" />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          <MetricCard icon={Wallet} label="COGS" value={formatCurrency(kpis?.cost || 0)} tone="indigo" />
+          <MetricCard icon={TrendingUp} label="Revenue" value={formatCurrency(kpis?.revenue || 0)} tone="emerald" />
+          <MetricCard icon={Percent} label="Margin" value={`${kpis?.margin || 0}%`} tone="violet" />
+          <MetricCard icon={Bot} label="Twins" value={String(kpis?.twinsCount || 0)} tone="rose" />
+          <MetricCard icon={Users} label="Users" value={String(kpis?.usersCount || 0)} tone="amber" />
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-1.5 rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm">
         {tabs.map((tab) => (
@@ -348,14 +361,24 @@ export function ClientDetailPage() {
               <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Created</span><strong className="font-semibold text-slate-700">{profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString() : '-'}</strong></div>
             </div>
           </CardSection>
-          <CardSection title="Usage summary" flush>
+          <CardSection title={adminProduct === 'vault' ? 'Vault summary' : 'Usage summary'} flush>
             <div className="divide-y divide-slate-100">
-              <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Total tokens</span><strong className="font-semibold text-slate-700">{formatNumber(usage?.tokens || 0)}</strong></div>
-              <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Prompt tokens</span><strong className="font-semibold text-slate-700">{formatNumber(usage?.promptTokens || 0)}</strong></div>
-              <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Completion tokens</span><strong className="font-semibold text-slate-700">{formatNumber(usage?.completionTokens || 0)}</strong></div>
-              <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Audio seconds</span><strong className="font-semibold text-slate-700">{formatNumber(usage?.audioSeconds || 0)}</strong></div>
-              <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">API calls</span><strong className="font-semibold text-slate-700">{formatNumber(usage?.apiCalls || 0)}</strong></div>
-              <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Usage cost</span><strong className="font-semibold text-slate-700">{formatCurrency(usage?.cost || 0)}</strong></div>
+              {adminProduct === 'vault' ? (
+                <>
+                  <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Active drives</span><strong className="font-semibold text-slate-700">{formatNumber(kpis?.activeDrives || 0)}</strong></div>
+                  <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Files stored</span><strong className="font-semibold text-slate-700">{formatNumber(kpis?.totalFiles || 0)}</strong></div>
+                  <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Storage used</span><strong className="font-semibold text-slate-700">{formatBytes(kpis?.storedOnIpfsBytes || 0)}</strong></div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Total tokens</span><strong className="font-semibold text-slate-700">{formatNumber(usage?.tokens || 0)}</strong></div>
+                  <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Prompt tokens</span><strong className="font-semibold text-slate-700">{formatNumber(usage?.promptTokens || 0)}</strong></div>
+                  <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Completion tokens</span><strong className="font-semibold text-slate-700">{formatNumber(usage?.completionTokens || 0)}</strong></div>
+                  <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Audio seconds</span><strong className="font-semibold text-slate-700">{formatNumber(usage?.audioSeconds || 0)}</strong></div>
+                  <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">API calls</span><strong className="font-semibold text-slate-700">{formatNumber(usage?.apiCalls || 0)}</strong></div>
+                  <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Usage cost</span><strong className="font-semibold text-slate-700">{formatCurrency(usage?.cost || 0)}</strong></div>
+                </>
+              )}
             </div>
           </CardSection>
         </div>
@@ -418,7 +441,7 @@ export function ClientDetailPage() {
                 <span className="flex-1">User</span>
                 <span className="w-20">Env</span>
                 <span className="w-24 text-right">Points</span>
-                <span className="w-24 text-right">Twins used</span>
+                {adminProduct !== 'vault' ? <span className="w-24 text-right">Twins used</span> : null}
                 <span className="w-24 text-right">Last active</span>
               </div>
               {paginatedUsers.map((user) => (
@@ -439,7 +462,7 @@ export function ClientDetailPage() {
                   </span>
                   <span className="w-20">{envBadge(user.env)}</span>
                   <span className="w-24 text-right font-medium text-slate-600">{formatNumber(parseDecimal(user.points))}</span>
-                  <span className="w-24 text-right font-medium text-slate-600">{user.twinsUsed || 0}</span>
+                  {adminProduct !== 'vault' ? <span className="w-24 text-right font-medium text-slate-600">{user.twinsUsed || 0}</span> : null}
                   <span className="w-24 text-right font-medium text-slate-400">{formatDateShort(user.lastActive)}</span>
                 </div>
               ))}
@@ -592,6 +615,7 @@ export function TwinDetailPage() {
 }
 
 export function UserDetailPage() {
+  const { adminProduct } = useAuth();
   const navigate = useNavigate();
   const { userId } = useParams();
   const [userData, setUserData] = useState(null);
@@ -664,8 +688,8 @@ export function UserDetailPage() {
         </CardSection>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <CardSection title="Twins Used" subtitle={`${twins?.length || 0} linked twins`} flush>
+      <div className={`grid grid-cols-1 gap-4 ${adminProduct === 'vault' ? '' : 'lg:grid-cols-2'}`}>
+        {adminProduct !== 'vault' ? <CardSection title="Twins Used" subtitle={`${twins?.length || 0} linked twins`} flush>
           {twins?.length ? (
             <div>
               {twins.map((twin) => (
@@ -682,14 +706,14 @@ export function UserDetailPage() {
           ) : (
             <EmptyDetailState message="No twins used." />
           )}
-        </CardSection>
+        </CardSection> : null}
 
         <CardSection title="Session History" flush>
           {sessionHistory?.length ? (
             <div className="divide-y divide-slate-100">
               {sessionHistory.map((session, i) => (
                 <div key={session.sessionId || i} className="flex items-center justify-between px-5 py-3 text-xs">
-                  <span className="text-slate-400">{session.twinName || 'Unknown'}</span>
+                  <span className="text-slate-400">{adminProduct === 'vault' ? `Session ${i + 1}` : session.twinName || 'Unknown'}</span>
                   <strong className="font-semibold text-slate-700">{session.messages || 0} msgs · {session.duration || '-'}</strong>
                 </div>
               ))}

@@ -14,6 +14,9 @@ import { superadminDemoData } from '../demo-data/superadminDemoData';
 import { groupBy, selectFacts, timeSeries } from '../demo-data/superadminSelectors';
 import { areaChart, stackedBar } from '../utils/chartHelpers';
 import { deltaPercent, formatCurrencyFull, formatPercent } from '../utils/dashboardUtils.jsx';
+import { useAuth } from '../app/AuthContext';
+import { isServiceForProduct, isVendorForProduct } from '../utils/productAccess';
+import { TruncatedText } from '../components/common/TruncatedText';
 
 const vendorOrder = ['openai', 'elevenlabs', 'did', 'heygen', 'apify', 'filebase', 's3ses', 'blockchain', 'stripe'];
 const waterfallVendorOrder = ['openai', 'did', 's3ses', 'apify', 'elevenlabs', 'filebase', 'heygen', 'stripe', 'blockchain'];
@@ -37,6 +40,7 @@ function ceilToStep(value, step) {
 }
 
 export function FinancialPage() {
+  const { adminProduct } = useAuth();
   const { filters } = useContext(FilterContext);
   const vendorChartRef = useRef(null);
   const pointsChartRef = useRef(null);
@@ -44,15 +48,18 @@ export function FinancialPage() {
   const scopedFilters = useMemo(
     () => ({
       ...filters,
-      service: null,
+      service: adminProduct === 'vault' ? 'vault' : null,
       vendor: null,
       twin: null,
       user: null,
     }),
-    [filters],
+    [adminProduct, filters],
   );
 
-  const rows = useMemo(() => selectFacts(scopedFilters), [scopedFilters]);
+  const rows = useMemo(
+    () => selectFacts(scopedFilters).filter((row) => isServiceForProduct(adminProduct, row.service)),
+    [adminProduct, scopedFilters],
+  );
   const scopeLabel = useMemo(() => formatScopeLabel(filters), [filters]);
 
   const summary = useMemo(() => {
@@ -78,11 +85,12 @@ export function FinancialPage() {
     };
   }, [rows]);
 
-  const costDelta = useMemo(() => deltaPercent(scopedFilters, 'cost'), [scopedFilters]);
+  const costDelta = useMemo(() => deltaPercent(scopedFilters, 'cost', null, adminProduct), [adminProduct, scopedFilters]);
 
   const vendorTimeData = useMemo(() => {
     const labels = timeSeries(rows, 'cost', scopedFilters).labels;
     const datasets = vendorOrder
+      .filter((vendorId) => isVendorForProduct(adminProduct, vendorId))
       .map((vendorId) => {
         const vendor = superadminDemoData.byId.vendor(vendorId);
         const values = timeSeries(rows, 'cost', scopedFilters, vendorId).values;
@@ -99,11 +107,11 @@ export function FinancialPage() {
       .filter(Boolean);
 
     return { labels, datasets };
-  }, [rows, scopedFilters]);
+  }, [adminProduct, rows, scopedFilters]);
 
   const budgetRows = useMemo(
     () =>
-      superadminDemoData.SERVICES.map((service) => {
+      superadminDemoData.SERVICES.filter((service) => isServiceForProduct(adminProduct, service.id)).map((service) => {
         const serviceRows = rows.filter((row) => row.service === service.id);
         const actual = serviceRows.reduce((sum, row) => sum + row.cost, 0);
         const budget = superadminDemoData.BUDGETS[service.id] ?? 0;
@@ -117,7 +125,7 @@ export function FinancialPage() {
           variancePct,
         };
       }),
-    [rows],
+    [adminProduct, rows],
   );
 
   const pointsEconomySeries = useMemo(() => {
@@ -155,6 +163,7 @@ export function FinancialPage() {
   const vendorBreakdownRows = useMemo(
     () =>
       vendorOrder
+        .filter((vendorId) => isVendorForProduct(adminProduct, vendorId))
         .map((vendorId) => {
           const vendor = superadminDemoData.byId.vendor(vendorId);
           const cost = rows.reduce((sum, row) => sum + (row.vendorCost[vendorId] || 0), 0);
@@ -171,7 +180,7 @@ export function FinancialPage() {
         })
         .filter(Boolean)
         .sort((left, right) => right.cost - left.cost),
-    [rows, summary.totalCost],
+    [adminProduct, rows, summary.totalCost],
   );
 
   const exportVendorCsv = () => {
@@ -214,6 +223,7 @@ export function FinancialPage() {
 
   const waterfall = useMemo(() => {
     const vendorCosts = waterfallVendorOrder
+      .filter((vendorId) => isVendorForProduct(adminProduct, vendorId))
       .map((vendorId) => {
         const vendor = superadminDemoData.byId.vendor(vendorId);
         const value = rows.reduce((sum, row) => sum + (row.vendorCost[vendorId] || 0), 0);
@@ -249,7 +259,7 @@ export function FinancialPage() {
     const yMax = ceilToStep(Math.max(summary.totalRevenue, summary.marginValue, 1), 500000);
     const ticks = Array.from({ length: 4 }, (_, index) => yMax - index * (yMax / 3));
     return { steps, yMax, ticks };
-  }, [rows, summary.marginValue, summary.totalRevenue]);
+  }, [adminProduct, rows, summary.marginValue, summary.totalRevenue]);
 
   useEffect(() => {
     const charts = [];
@@ -288,8 +298,8 @@ export function FinancialPage() {
     <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">Cost &amp; Billing</h1>
-          <p className="mt-1 text-sm text-slate-400 sm:text-base">Vendor cost breakdown, budgets, unit economics and the points economy</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">{adminProduct === 'vault' ? 'Vault Billing' : 'Cost & Billing'}</h1>
+          <p className="mt-1 text-sm text-slate-400 sm:text-base">{adminProduct === 'vault' ? 'Vault-only storage vendor costs, budgets, revenue, and unit economics' : 'Vendor cost breakdown, budgets, unit economics and the points economy'}</p>
         </div>
         <div className="text-left sm:text-right">
           <span className="block text-xs font-bold uppercase tracking-widest text-slate-400">Scope</span>
@@ -501,10 +511,10 @@ export function FinancialPage() {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2.5">
                       <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: vendor.color }} />
-                      <strong className="font-semibold text-slate-800">{vendor.name}</strong>
+                      <strong className="font-semibold text-slate-800"><TruncatedText value={vendor.name} /></strong>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-slate-500">{vendor.category}</td>
+                  <td className="px-4 py-3 text-slate-500"><TruncatedText value={vendor.category} /></td>
                   <td className="px-4 py-3 font-semibold text-slate-800">{formatCurrencyFull(vendor.cost)}</td>
                   <td className="px-4 py-3 text-slate-500">{vendor.share.toFixed(1)}%</td>
                 </tr>

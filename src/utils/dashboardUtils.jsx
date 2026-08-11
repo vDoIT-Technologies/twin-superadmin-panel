@@ -1,4 +1,5 @@
 import { superadminDemoData } from '../demo-data/superadminDemoData';
+import { isServiceForProduct } from './productAccess';
 import { selectFacts, sumMetric, RANGE_DAYS } from '../demo-data/superadminSelectors';
 
 const compactFormatter = new Intl.NumberFormat('en-US', {
@@ -55,9 +56,9 @@ export function selectPreviousFacts(filters) {
   );
 }
 
-export function deltaPercent(filters, key, vendorId = null) {
-  const currentRows = selectFacts(filters);
-  const previousRows = selectPreviousFacts(filters);
+export function deltaPercent(filters, key, vendorId = null, product = null) {
+  const currentRows = selectFacts(filters).filter((row) => !product || isServiceForProduct(product, row.service));
+  const previousRows = selectPreviousFacts(filters).filter((row) => !product || isServiceForProduct(product, row.service));
   const currentValue = sumMetric(currentRows, key, filters, vendorId);
   const previousValue = sumMetric(previousRows, key, filters, vendorId);
 

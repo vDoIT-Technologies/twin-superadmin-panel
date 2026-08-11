@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import { envBadge, formatNumber } from '../../utils/dashboardUtils';
 import { formatBytes, formatLastActive, getUserInitials } from '../../utils/vaultFormatters';
+import { TruncatedText } from '../common/TruncatedText';
 
 const COLUMNS = [
   ['user', 'User'], ['client', 'Client'], ['env', 'Env'],
@@ -47,8 +48,8 @@ export function TopUsersTable({ users, sortConfig, onSort, onExport }) {
             <tr><td colSpan={6} className="px-5 py-12 text-center text-sm text-slate-400">No storage users found</td></tr>
           ) : paginatedUsers.map((user, index) => (
             <tr className="border-t border-slate-100 transition hover:bg-slate-50" key={user.id || `${user.email}-${user.client}-${pageStart + index}`}>
-              <td className="px-5 py-4"><div className="flex items-center gap-3"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky-500 text-xs font-bold text-white">{getUserInitials(user.name)}</span><strong className="max-w-48 truncate text-slate-700">{user.name}</strong></div></td>
-              <td className="px-5 py-4 text-slate-500">{user.client}</td><td className="px-5 py-4">{envBadge(user.env)}</td>
+              <td className="px-5 py-4"><div className="flex items-center gap-3"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky-500 text-xs font-bold text-white">{getUserInitials(user.name)}</span><strong className="text-slate-700"><TruncatedText value={user.name} /></strong></div></td>
+              <td className="px-5 py-4 text-slate-500"><TruncatedText value={user.client} /></td><td className="px-5 py-4">{envBadge(user.env)}</td>
               <td className="px-5 py-4 font-semibold text-slate-700">{formatBytes(user.storageBytes)}</td>
               <td className="px-5 py-4 text-slate-500">{formatNumber(user.files)}</td><td className="px-5 py-4 text-slate-500">{formatLastActive(user.lastActive)}</td>
             </tr>

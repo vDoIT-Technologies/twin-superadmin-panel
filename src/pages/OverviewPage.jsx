@@ -15,6 +15,8 @@ import { FilterContext } from '../app/FilterContext';
 import { superadminDemoData } from '../demo-data/superadminDemoData';
 import { RANGE_DAYS, groupBy, selectFacts, sumMetric, timeSeries, twinShare } from '../demo-data/superadminSelectors';
 import { areaChart, donut, stackedBar } from '../utils/chartHelpers';
+import { useAuth } from '../app/AuthContext';
+import { isServiceForProduct, isVendorForProduct } from '../utils/productAccess';
 
 function formatOverviewCurrency(value) {
   const absolute = Math.abs(value);
@@ -56,9 +58,13 @@ const metricConfig = [
 ];
 
 export function OverviewPage() {
+  const { adminProduct } = useAuth();
   const { filters } = useContext(FilterContext);
   const navigate = useNavigate();
-  const rows = useMemo(() => selectFacts(filters), [filters]);
+  const rows = useMemo(
+    () => selectFacts(filters).filter((row) => isServiceForProduct(adminProduct, row.service)),
+    [adminProduct, filters],
+  );
   const trendChartRef = useRef(null);
   const modalityChartRef = useRef(null);
   const vendorChartRef = useRef(null);
@@ -116,7 +122,8 @@ export function OverviewPage() {
         row.day >= previousMinDay &&
         row.day < currentMinDay &&
         (!filters.client || row.clientId === filters.client) &&
-        (!filters.service || row.service === filters.service),
+        (!filters.service || row.service === filters.service) &&
+        isServiceForProduct(adminProduct, row.service),
     );
 
     return ['cost', 'revenue', 'messages'].reduce((acc, key) => {
@@ -131,7 +138,7 @@ export function OverviewPage() {
 
       return acc;
     }, {});
-  }, [filters, rows]);
+  }, [adminProduct, filters, rows]);
 
   const overviewMetrics = useMemo(
     () => [
@@ -140,9 +147,9 @@ export function OverviewPage() {
       { key: 'margin', value: `${summary.marginPct.toFixed(1)}%`, meta: formatOverviewCurrency(summary.marginValue) },
       { key: 'messages', value: formatOverviewMetric(summary.totalMessages), meta: null, badge: metricBadgeMap.messages },
       { key: 'users', value: String(summary.activeUsers), meta: null },
-      { key: 'twins', value: String(summary.activeTwins), meta: null },
+      ...(adminProduct === 'vault' ? [] : [{ key: 'twins', value: String(summary.activeTwins), meta: null }]),
     ],
-    [metricBadgeMap, summary],
+    [adminProduct, metricBadgeMap, summary],
   );
 
   const topClients = useMemo(
@@ -183,7 +190,7 @@ export function OverviewPage() {
   const environmentCards = useMemo(
     () =>
       superadminDemoData.ENVS.map((env) => {
-        const envRows = selectFacts(filters, { envs: [env] });
+        const envRows = selectFacts(filters, { envs: [env] }).filter((row) => isServiceForProduct(adminProduct, row.service));
         const cost = sumMetric(envRows, 'cost', filters);
         const revenue = sumMetric(envRows, 'revenue', filters);
         const messages = sumMetric(envRows, 'messages', filters);
@@ -197,12 +204,13 @@ export function OverviewPage() {
           messages: formatOverviewMetric(messages),
         };
       }),
-    [filters, rows],
+    [adminProduct, filters, rows],
   );
 
   const vendorChartConfig = useMemo(() => {
     const labels = timeSeries(rows, 'cost', filters).labels;
     const datasets = superadminDemoData.VENDORS.filter((vendor) =>
+      isVendorForProduct(adminProduct, vendor.id) &&
       rows.some((row) => (row.vendorCost[vendor.id] || 0) > 0),
     ).map((vendor) => ({
       label: vendor.name,
@@ -214,12 +222,12 @@ export function OverviewPage() {
       labels,
       datasets,
     };
-  }, [filters, rows]);
+  }, [adminProduct, filters, rows]);
 
   const compareRows = useMemo(() => {
     if (!filters.compare) return [];
     return filters.envs.map((env) => {
-      const envRows = selectFacts(filters, { envs: [env] });
+      const envRows = selectFacts(filters, { envs: [env] }).filter((row) => isServiceForProduct(adminProduct, row.service));
       return {
         env,
         label: superadminDemoData.ENV_META[env].label,
@@ -229,7 +237,15 @@ export function OverviewPage() {
         messages: formatOverviewMetric(sumMetric(envRows, 'messages', filters)),
       };
     });
-  }, [filters]);
+  }, [adminProduct, filters]);
+
+  const productAlerts = useMemo(
+    () => superadminDemoData.ALERTS.filter((alert) => {
+      const isVaultAlert = /vault|filebase|ipfs/i.test(`${alert.text} ${alert.meta || ''}`);
+      return adminProduct === 'vault' ? isVaultAlert : !isVaultAlert;
+    }),
+    [adminProduct],
+  );
 
   const trendConfig = useMemo(() => {
     if (filters.lens === 'usage') {
@@ -345,7 +361,7 @@ export function OverviewPage() {
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">Executive Overview</h1>
-          <p className="mt-1 text-sm text-slate-400 sm:text-base">Cross-service usage, cost, and margin across the Twin Protocol platform</p>
+          <p className="mt-1 text-sm text-slate-400 sm:text-base">{adminProduct === 'vault' ? 'Vault-only usage, cost, margin, clients, and service health' : 'Cross-service usage, cost, and margin across the Twin Protocol platform'}</p>
         </div>
         <div className="text-left sm:text-right">
           <span className="block text-xs font-bold uppercase tracking-widest text-slate-400">Scope</span>
@@ -354,7 +370,7 @@ export function OverviewPage() {
       </header>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {superadminDemoData.ALERTS.map((alert) => {
+        {productAlerts.map((alert) => {
           const Icon = alertIconMap[alert.sev] ?? CircleAlert;
           return (
             <article key={alert.text} className={`flex min-h-28 gap-3 rounded-2xl border p-4 shadow-panel ${alert.sev === 'danger' ? 'border-rose-200 bg-rose-50' : alert.sev === 'success' ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}>
@@ -368,7 +384,7 @@ export function OverviewPage() {
         })}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 ${adminProduct === 'vault' ? 'xl:grid-cols-5' : 'xl:grid-cols-6'}`}>
         {overviewMetrics.map((metric) => {
           const config = metricConfig.find((item) => item.key === metric.key);
           const Icon = config.icon;
@@ -508,7 +524,7 @@ export function OverviewPage() {
         </section>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className={`grid gap-4 ${adminProduct === 'vault' ? '' : 'lg:grid-cols-2'}`}>
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-base font-semibold text-slate-800">Top 5 Clients by cost</h2>
@@ -517,13 +533,13 @@ export function OverviewPage() {
           {renderRankList(topClients, 'client')}
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
+        {adminProduct !== 'vault' ? <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-base font-semibold text-slate-800">Top 5 Twins by cost</h2>
             <div className="text-xs font-medium text-slate-400">click to drill</div>
           </div>
           {renderRankList(topTwins, 'twin')}
-        </section>
+        </section> : null}
       </div>
 
       {filters.compare ? (

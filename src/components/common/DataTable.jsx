@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { getStatusTone } from '../../utils/status';
+import { TruncatedText } from './TruncatedText';
 
 export function DataTable({
   columns,
@@ -89,7 +90,11 @@ export function DataTable({
 
                     return (
                       <td key={column.key} className={`${isPrimary ? 'font-medium text-slate-800' : ''} px-4 py-4 first:pl-5`}>
-                        {isStatus ? <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusTone(String(value))}`}>{value}</span> : value}
+                        {isStatus
+                          ? <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusTone(String(value))}`}>{value}</span>
+                          : typeof value === 'string'
+                            ? <TruncatedText value={value} />
+                            : value}
                       </td>
                     );
                   })}

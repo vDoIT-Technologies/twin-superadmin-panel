@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Download, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { dashboardService } from '../services';
 import { FilterContext } from '../app/FilterContext';
+import { TruncatedText } from '../components/common/TruncatedText';
 import { formatNumber } from '../utils/dashboardUtils';
 
 function getTwinInitials(name) {
@@ -186,14 +187,14 @@ export function TwinsPage() {
                   <td className="px-4 py-3.5">
                     <div className="flex items-center gap-3">
                       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-violet-100 text-xs font-bold text-violet-600">{getTwinInitials(twin.name)}</span>
-                      <div className="min-w-0"><strong className="block truncate font-semibold text-slate-700">{twin.name}</strong><span className="mt-0.5 block truncate text-xs text-slate-400">{twin.role}</span></div>
+                      <div className="min-w-0"><strong className="block font-semibold text-slate-700"><TruncatedText value={twin.name} /></strong><span className="mt-0.5 block text-xs text-slate-400"><TruncatedText value={twin.role} /></span></div>
                     </div>
                   </td>
-                  <td className="px-4 py-3.5 text-slate-500">{twin.client || '---'}</td>
+                  <td className="px-4 py-3.5 text-slate-500"><TruncatedText value={twin.client || '---'} /></td>
                   <td className="px-4 py-3.5 text-slate-500">{formatNumber(twin.messages)}</td>
                   <td className="px-4 py-3.5 text-slate-500">{formatNumber(twin.videoMins)}</td>
                   <td className="px-4 py-3.5 text-slate-500">{formatNumber(twin.tokens)}</td>
-                  <td className="px-4 py-3.5 text-slate-500">{twin.sources}</td>
+                  <td className="px-4 py-3.5 text-slate-500"><TruncatedText value={twin.sources} /></td>
                   <td className="px-4 py-3.5 font-semibold text-slate-700">${formatNumber(twin.cost)}</td>
                 </tr>
               ))}
