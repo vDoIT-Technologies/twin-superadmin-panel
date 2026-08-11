@@ -47,6 +47,7 @@ export function ClientsPage() {
           page,
           limit: PAGE_SIZE,
           clientId: filters.client,
+          twinId: filters.twin,
           env: filters.envs.length === 1 ? filters.envs[0] : undefined,
           range: filters.range,
         });
@@ -75,11 +76,11 @@ export function ClientsPage() {
     return () => {
       isActive = false;
     };
-  }, [filters.client, filters.envs, filters.range, page]);
+  }, [filters.client, filters.envs, filters.range, filters.twin, page]);
 
   useEffect(() => {
     setPage(1);
-  }, [filters.client, filters.envs, filters.range]);
+  }, [filters.client, filters.envs, filters.range, filters.twin]);
 
   const clientRows = useMemo(() => {
     return apiClients.map((client, index) => {
