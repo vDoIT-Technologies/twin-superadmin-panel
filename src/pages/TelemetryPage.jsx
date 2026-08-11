@@ -1,11 +1,15 @@
-import { useContext, useMemo, useState } from 'react';
-import { Download, Search } from 'lucide-react';
+import { useContext, useEffect, useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, Download, Search } from 'lucide-react';
 import { FilterContext } from '../app/FilterContext';
 import { superadminDemoData } from '../demo-data/superadminDemoData';
 import { RANGE_DAYS } from '../demo-data/superadminSelectors';
 import { envBadge, formatNumber } from '../utils/dashboardUtils.jsx';
+import { useAuth } from '../app/AuthContext';
+import { isServiceForProduct } from '../utils/productAccess';
+import { TruncatedText } from '../components/common/TruncatedText';
 
 const levels = ['all', 'info', 'warn', 'error'];
+const PAGE_SIZE = 10;
 
 function formatScopeLabel(filters) {
   if (filters.envs.length === superadminDemoData.ENVS.length) {
@@ -18,18 +22,20 @@ function formatScopeLabel(filters) {
 
 function levelBadge(level) {
   const label = level.toUpperCase();
-  if (level === 'warn') return <span className="telemetry-level telemetry-level-warn">{label}</span>;
-  if (level === 'error') return <span className="telemetry-level telemetry-level-error">{label}</span>;
-  return <span className="telemetry-level telemetry-level-info">{label}</span>;
+  if (level === 'warn') return <span className="inline-flex rounded-full bg-amber-50 px-2 py-1 text-[11px] font-bold tracking-wide text-amber-700">{label}</span>;
+  if (level === 'error') return <span className="inline-flex rounded-full bg-rose-50 px-2 py-1 text-[11px] font-bold tracking-wide text-rose-700">{label}</span>;
+  return <span className="inline-flex rounded-full bg-sky-50 px-2 py-1 text-[11px] font-bold tracking-wide text-sky-700">{label}</span>;
 }
 
 export function TelemetryPage() {
+  const { adminProduct } = useAuth();
   const { filters } = useContext(FilterContext);
   const [query, setQuery] = useState('');
   const [level, setLevel] = useState('all');
   const [service, setService] = useState('all');
   const [env, setEnv] = useState('all');
   const [sortConfig, setSortConfig] = useState({ key: 'ts', direction: 'desc' });
+  const [currentPage, setCurrentPage] = useState(1);
 
   const scopeLabel = useMemo(() => formatScopeLabel(filters), [filters]);
 
@@ -40,6 +46,7 @@ export function TelemetryPage() {
     return superadminDemoData.EVENTS.filter((event) => {
       const matchesGlobal =
         filters.envs.includes(event.env) &&
+        isServiceForProduct(adminProduct, event.service) &&
         (!filters.client || event.clientId === filters.client) &&
         (!filters.service || event.service === filters.service) &&
         (!filters.twin || event.twinId === filters.twin) &&
@@ -57,11 +64,11 @@ export function TelemetryPage() {
       return (
         event.event.toLowerCase().includes(q) ||
         (superadminDemoData.byId.client(event.clientId)?.name ?? '').toLowerCase().includes(q) ||
-        (superadminDemoData.byId.twin(event.twinId)?.name ?? '').toLowerCase().includes(q) ||
+        (adminProduct !== 'vault' && (superadminDemoData.byId.twin(event.twinId)?.name ?? '').toLowerCase().includes(q)) ||
         (superadminDemoData.byId.user(event.userId)?.name ?? '').toLowerCase().includes(q)
       );
     });
-  }, [env, filters, level, query, service]);
+  }, [adminProduct, env, filters, level, query, service]);
 
   const rows = useMemo(
     () =>
@@ -125,6 +132,23 @@ export function TelemetryPage() {
     });
   }, [rows, sortConfig]);
 
+  const totalPages = Math.max(1, Math.ceil(sortedRows.length / PAGE_SIZE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const pageStart = sortedRows.length ? (safeCurrentPage - 1) * PAGE_SIZE + 1 : 0;
+  const pageEnd = Math.min(safeCurrentPage * PAGE_SIZE, sortedRows.length);
+  const paginatedRows = useMemo(
+    () => sortedRows.slice((safeCurrentPage - 1) * PAGE_SIZE, safeCurrentPage * PAGE_SIZE),
+    [safeCurrentPage, sortedRows],
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [adminProduct, env, filters.client, filters.envs, filters.range, filters.service, filters.twin, filters.user, level, query, service, sortConfig.direction, sortConfig.key]);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages));
+  }, [totalPages]);
+
   const toggleSort = (key) => {
     setSortConfig((prev) =>
       prev.key === key
@@ -134,7 +158,7 @@ export function TelemetryPage() {
   };
 
   const exportCsv = () => {
-    const header = ['Timestamp', 'Level', 'Env', 'Service', 'Event', 'Client', 'Twin', 'User', 'Units', 'Cost'];
+    const header = ['Timestamp', 'Level', 'Env', 'Service', 'Event', 'Client', ...(adminProduct === 'vault' ? [] : ['Twin']), 'User', 'Units', 'Cost'];
     const lines = sortedRows.map((row) =>
       [
         row.ts,
@@ -143,7 +167,7 @@ export function TelemetryPage() {
         row.service,
         row.event,
         row.client,
-        row.twin,
+        ...(adminProduct === 'vault' ? [] : [row.twin]),
         row.user,
         `${formatNumber(row.units)} ${row.unitLabel}`,
         `$${row.cost.toFixed(4)}`,
@@ -162,32 +186,33 @@ export function TelemetryPage() {
   };
 
   return (
-    <section className="page-section telemetry-demo-page">
-      <header className="telemetry-demo-header">
-        <div className="telemetry-demo-header-copy">
-          <h1>Telemetry / Logs</h1>
-          <p>Read-only event explorer — route hits, chat, video, ingestion, payments</p>
+    <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+      <header className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{adminProduct === 'vault' ? 'Health & Logs' : 'Telemetry / Logs'}</h1>
+          <p className="mt-1 text-sm text-slate-500">{adminProduct === 'vault' ? 'Read-only Vault events for storage, files, users, and service health' : 'Read-only event explorer — route hits, chat, video, ingestion, payments'}</p>
         </div>
-        <div className="telemetry-demo-scope">
-          <span className="telemetry-demo-scope-label">Scope</span>
-          <span className="telemetry-demo-scope-value">{scopeLabel}</span>
+        <div className="text-left lg:text-right">
+          <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Scope</span>
+          <span className="mt-1 block text-sm font-semibold text-slate-600">{scopeLabel}</span>
         </div>
       </header>
 
-      <section className="table-card telemetry-demo-card">
-        <div className="telemetry-demo-toolbar">
-          <label className="telemetry-demo-search">
-            <Search size={15} className="telemetry-demo-search-icon" />
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-panel">
+        <div className="flex flex-col gap-3 border-b border-slate-100 p-4 lg:flex-row lg:items-center lg:justify-between">
+          <label className="flex h-11 w-full max-w-md items-center gap-2 rounded-xl bg-slate-50 px-3 text-slate-400 lg:w-[22rem]">
+            <Search size={16} />
             <input
               type="text"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search events, twins, users..."
+              placeholder={adminProduct === 'vault' ? 'Search events, clients, users...' : 'Search events, twins, users...'}
+              className="min-w-0 flex-1 bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400"
             />
           </label>
 
-          <div className="telemetry-demo-toolbar-actions">
-            <select value={level} onChange={(event) => setLevel(event.target.value)} className="telemetry-demo-select">
+          <div className="flex flex-wrap items-center gap-2">
+            <select value={level} onChange={(event) => setLevel(event.target.value)} className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100">
               {levels.map((item) => (
                 <option key={item} value={item}>
                   {item}
@@ -195,16 +220,16 @@ export function TelemetryPage() {
               ))}
             </select>
 
-            <select value={service} onChange={(event) => setService(event.target.value)} className="telemetry-demo-select">
+            <select value={service} onChange={(event) => setService(event.target.value)} className="h-10 max-w-[12rem] rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100">
               <option value="all">all services</option>
-              {superadminDemoData.SERVICES.map((svc) => (
+              {superadminDemoData.SERVICES.filter((svc) => isServiceForProduct(adminProduct, svc.id)).map((svc) => (
                 <option key={svc.id} value={svc.id}>
                   {svc.name}
                 </option>
               ))}
             </select>
 
-            <select value={env} onChange={(event) => setEnv(event.target.value)} className="telemetry-demo-select">
+            <select value={env} onChange={(event) => setEnv(event.target.value)} className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100">
               <option value="all">all envs</option>
               {superadminDemoData.ENVS.map((item) => (
                 <option key={item} value={item}>
@@ -213,16 +238,16 @@ export function TelemetryPage() {
               ))}
             </select>
 
-            <button type="button" className="telemetry-demo-export" onClick={exportCsv}>
+            <button type="button" className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-600 transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700" onClick={exportCsv}>
               <Download size={14} />
               Export CSV
             </button>
           </div>
         </div>
 
-        <div className="telemetry-demo-table-wrap">
-          <table className="telemetry-demo-table">
-            <thead>
+        <div className="max-h-[65vh] overflow-auto">
+          <table className="min-w-[1040px] w-full border-collapse text-left text-sm">
+            <thead className="sticky top-0 z-10 bg-slate-50 text-xs uppercase tracking-wide text-slate-400 shadow-[0_1px_0_0_rgba(226,232,240,1)]">
               <tr>
                 {[
                   ['ts', 'Timestamp'],
@@ -231,15 +256,15 @@ export function TelemetryPage() {
                   ['service', 'Service'],
                   ['event', 'Event'],
                   ['client', 'Client'],
-                  ['twin', 'Twin'],
+                  ...(adminProduct === 'vault' ? [] : [['twin', 'Twin']]),
                   ['user', 'User'],
                   ['units', 'Units'],
                   ['cost', 'Cost'],
                 ].map(([key, label]) => (
                   <th key={key}>
-                    <button type="button" className="table-sort-button" onClick={() => toggleSort(key)}>
+                    <button type="button" className="inline-flex items-center gap-1.5 py-3 text-left font-semibold transition hover:text-slate-700" onClick={() => toggleSort(key)}>
                       <span>{label}</span>
-                      <span className={`table-sort-indicator${sortConfig.key === key ? ' active' : ''}`}>
+                      <span className={`text-xs text-slate-300 ${sortConfig.key === key ? 'text-indigo-600' : ''}`}>
                         {sortConfig.key === key ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}
                       </span>
                     </button>
@@ -248,26 +273,40 @@ export function TelemetryPage() {
               </tr>
             </thead>
             <tbody>
-              {sortedRows.slice(0, 120).map((row) => (
-                <tr key={row.id}>
-                  <td className="telemetry-demo-ts">{row.ts}</td>
-                  <td>{levelBadge(row.level)}</td>
-                  <td>{envBadge(row.env)}</td>
-                  <td className="telemetry-demo-service">{row.service}</td>
-                  <td className="telemetry-demo-event">{row.event}</td>
-                  <td>{row.client}</td>
-                  <td>{row.twin}</td>
-                  <td>{row.user}</td>
-                  <td>
-                    <span className="telemetry-demo-units">
-                      <strong>{formatNumber(row.units)}</strong> <span>{row.unitLabel}</span>
+              {paginatedRows.length ? paginatedRows.map((row) => (
+                <tr key={row.id} className="border-t border-slate-100 transition hover:bg-slate-50/70">
+                  <td className="whitespace-nowrap px-4 py-3.5 text-slate-500">{row.ts}</td>
+                  <td className="px-4 py-3.5">{levelBadge(row.level)}</td>
+                  <td className="px-4 py-3.5">{envBadge(row.env)}</td>
+                  <td className="px-4 py-3.5 font-medium text-slate-700"><TruncatedText value={row.service} /></td>
+                  <td className="px-4 py-3.5 text-slate-700"><TruncatedText value={row.event} /></td>
+                  <td className="px-4 py-3.5 text-slate-600"><TruncatedText value={row.client} /></td>
+                  {adminProduct !== 'vault' ? <td className="px-4 py-3.5 text-slate-600"><TruncatedText value={row.twin} /></td> : null}
+                  <td className="px-4 py-3.5 text-slate-600"><TruncatedText value={row.user} /></td>
+                  <td className="whitespace-nowrap px-4 py-3.5">
+                    <span className="text-slate-500">
+                      <strong className="font-semibold text-slate-800">{formatNumber(row.units)}</strong> <span>{row.unitLabel}</span>
                     </span>
                   </td>
-                  <td className="cell-primary">${row.cost.toFixed(4)}</td>
+                  <td className="whitespace-nowrap px-4 py-3.5 font-semibold text-slate-800">${row.cost.toFixed(4)}</td>
                 </tr>
-              ))}
+              )) : (
+                <tr><td colSpan={adminProduct === 'vault' ? 9 : 10} className="px-5 py-12 text-center text-sm text-slate-400">No log events match the selected filters.</td></tr>
+              )}
             </tbody>
           </table>
+        </div>
+        <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-5 py-4 text-sm text-slate-400">
+          <span>{pageStart}-{pageEnd} of {sortedRows.length}</span>
+          <div className="flex items-center gap-2">
+            <button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40" disabled={safeCurrentPage === 1} aria-label="Previous page" onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}>
+              <ChevronLeft size={14} />
+            </button>
+            <span className="min-w-14 text-center font-semibold text-slate-500">{safeCurrentPage} / {totalPages}</span>
+            <button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40" disabled={safeCurrentPage === totalPages} aria-label="Next page" onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}>
+              <ChevronRight size={14} />
+            </button>
+          </div>
         </div>
       </section>
     </section>

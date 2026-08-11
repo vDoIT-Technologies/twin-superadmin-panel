@@ -15,6 +15,8 @@ import { FilterContext } from '../app/FilterContext';
 import { superadminDemoData } from '../demo-data/superadminDemoData';
 import { RANGE_DAYS, groupBy, selectFacts, sumMetric, timeSeries, twinShare } from '../demo-data/superadminSelectors';
 import { areaChart, donut, stackedBar } from '../utils/chartHelpers';
+import { useAuth } from '../app/AuthContext';
+import { isServiceForProduct, isVendorForProduct } from '../utils/productAccess';
 
 function formatOverviewCurrency(value) {
   const absolute = Math.abs(value);
@@ -56,9 +58,13 @@ const metricConfig = [
 ];
 
 export function OverviewPage() {
+  const { adminProduct } = useAuth();
   const { filters } = useContext(FilterContext);
   const navigate = useNavigate();
-  const rows = useMemo(() => selectFacts(filters), [filters]);
+  const rows = useMemo(
+    () => selectFacts(filters).filter((row) => isServiceForProduct(adminProduct, row.service)),
+    [adminProduct, filters],
+  );
   const trendChartRef = useRef(null);
   const modalityChartRef = useRef(null);
   const vendorChartRef = useRef(null);
@@ -116,7 +122,8 @@ export function OverviewPage() {
         row.day >= previousMinDay &&
         row.day < currentMinDay &&
         (!filters.client || row.clientId === filters.client) &&
-        (!filters.service || row.service === filters.service),
+        (!filters.service || row.service === filters.service) &&
+        isServiceForProduct(adminProduct, row.service),
     );
 
     return ['cost', 'revenue', 'messages'].reduce((acc, key) => {
@@ -131,7 +138,7 @@ export function OverviewPage() {
 
       return acc;
     }, {});
-  }, [filters, rows]);
+  }, [adminProduct, filters, rows]);
 
   const overviewMetrics = useMemo(
     () => [
@@ -140,9 +147,9 @@ export function OverviewPage() {
       { key: 'margin', value: `${summary.marginPct.toFixed(1)}%`, meta: formatOverviewCurrency(summary.marginValue) },
       { key: 'messages', value: formatOverviewMetric(summary.totalMessages), meta: null, badge: metricBadgeMap.messages },
       { key: 'users', value: String(summary.activeUsers), meta: null },
-      { key: 'twins', value: String(summary.activeTwins), meta: null },
+      ...(adminProduct === 'vault' ? [] : [{ key: 'twins', value: String(summary.activeTwins), meta: null }]),
     ],
-    [metricBadgeMap, summary],
+    [adminProduct, metricBadgeMap, summary],
   );
 
   const topClients = useMemo(
@@ -183,7 +190,7 @@ export function OverviewPage() {
   const environmentCards = useMemo(
     () =>
       superadminDemoData.ENVS.map((env) => {
-        const envRows = selectFacts(filters, { envs: [env] });
+        const envRows = selectFacts(filters, { envs: [env] }).filter((row) => isServiceForProduct(adminProduct, row.service));
         const cost = sumMetric(envRows, 'cost', filters);
         const revenue = sumMetric(envRows, 'revenue', filters);
         const messages = sumMetric(envRows, 'messages', filters);
@@ -197,12 +204,13 @@ export function OverviewPage() {
           messages: formatOverviewMetric(messages),
         };
       }),
-    [filters, rows],
+    [adminProduct, filters, rows],
   );
 
   const vendorChartConfig = useMemo(() => {
     const labels = timeSeries(rows, 'cost', filters).labels;
     const datasets = superadminDemoData.VENDORS.filter((vendor) =>
+      isVendorForProduct(adminProduct, vendor.id) &&
       rows.some((row) => (row.vendorCost[vendor.id] || 0) > 0),
     ).map((vendor) => ({
       label: vendor.name,
@@ -214,12 +222,12 @@ export function OverviewPage() {
       labels,
       datasets,
     };
-  }, [filters, rows]);
+  }, [adminProduct, filters, rows]);
 
   const compareRows = useMemo(() => {
     if (!filters.compare) return [];
     return filters.envs.map((env) => {
-      const envRows = selectFacts(filters, { envs: [env] });
+      const envRows = selectFacts(filters, { envs: [env] }).filter((row) => isServiceForProduct(adminProduct, row.service));
       return {
         env,
         label: superadminDemoData.ENV_META[env].label,
@@ -229,7 +237,15 @@ export function OverviewPage() {
         messages: formatOverviewMetric(sumMetric(envRows, 'messages', filters)),
       };
     });
-  }, [filters]);
+  }, [adminProduct, filters]);
+
+  const productAlerts = useMemo(
+    () => superadminDemoData.ALERTS.filter((alert) => {
+      const isVaultAlert = /vault|filebase|ipfs/i.test(`${alert.text} ${alert.meta || ''}`);
+      return adminProduct === 'vault' ? isVaultAlert : !isVaultAlert;
+    }),
+    [adminProduct],
+  );
 
   const trendConfig = useMemo(() => {
     if (filters.lens === 'usage') {
@@ -310,30 +326,30 @@ export function OverviewPage() {
     const max = Math.max(...items.map((item) => item.value), 1);
 
     return (
-      <div className={`overview-rank-list overview-rank-list-${type}`}>
+      <div className="space-y-2">
         {items.map((item, index) => (
           <button
             key={item.id}
             type="button"
-            className={`overview-rank-row overview-rank-row-${type}`}
+            className="group flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-2 text-left transition hover:border-slate-200 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             onClick={() => navigate(type === 'client' ? '/clients' : '/twins')}
           >
-            <span className="overview-rank-index">{index + 1}</span>
-            <div className="overview-rank-avatar">{item.name.slice(0, 2).toUpperCase()}</div>
-            <div className="overview-rank-main">
-              <div className="overview-rank-head">
-                <span className="overview-rank-name">{item.name}</span>
-                <span className="overview-rank-value">{formatOverviewCurrency(item.value)}</span>
+            <span className="w-4 text-xs font-semibold text-slate-400">{index + 1}</span>
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-500 text-xs font-bold text-white">{item.name.slice(0, 2).toUpperCase()}</div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-3">
+                <span className="truncate text-sm font-semibold text-slate-700">{item.name}</span>
+                <span className="shrink-0 text-sm font-bold text-slate-800">{formatOverviewCurrency(item.value)}</span>
               </div>
-              <div className="overview-rank-bar">
-                <span className="overview-rank-bar-fill" style={{ width: `${(item.value / max) * 100}%` }} />
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                <span className="block h-full rounded-full bg-sky-400" style={{ width: `${(item.value / max) * 100}%` }} />
               </div>
-              <div className="overview-rank-meta">
-                <span>{item.meta}</span>
-                <span>{((item.value / Math.max(totalScopedCost, 1)) * 100).toFixed(1)}% of total</span>
+              <div className="mt-1 flex justify-between gap-3 text-xs text-slate-400">
+                <span className="truncate">{item.meta}</span>
+                <span className="shrink-0 font-medium">{((item.value / Math.max(totalScopedCost, 1)) * 100).toFixed(1)}% of total</span>
               </div>
             </div>
-            <span className="overview-rank-arrow">›</span>
+            <span className="text-xl text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-indigo-500">›</span>
           </button>
         ))}
       </div>
@@ -341,160 +357,165 @@ export function OverviewPage() {
   };
 
   return (
-    <section className="page-section">
-      <header className="executive-header">
-        <div className="executive-header-copy">
-          <h1>Executive Overview</h1>
-          <p>Cross-service usage, cost, and margin across the Twin Protocol platform</p>
+    <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">Executive Overview</h1>
+          <p className="mt-1 text-sm text-slate-400 sm:text-base">{adminProduct === 'vault' ? 'Vault-only usage, cost, margin, clients, and service health' : 'Cross-service usage, cost, and margin across the Twin Protocol platform'}</p>
         </div>
-        <div className="executive-scope">
-          <span className="executive-scope-label">Scope</span>
-          <span className="executive-scope-value">{scopeLabel}</span>
+        <div className="text-left sm:text-right">
+          <span className="block text-xs font-bold uppercase tracking-widest text-slate-400">Scope</span>
+          <span className="mt-1 block text-sm font-semibold text-slate-500">{scopeLabel}</span>
         </div>
       </header>
 
-      <div className="alert-strip">
-        {superadminDemoData.ALERTS.map((alert) => {
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {productAlerts.map((alert) => {
           const Icon = alertIconMap[alert.sev] ?? CircleAlert;
           return (
-            <article key={alert.text} className={`alert-card alert-card-${alert.sev}`}>
-              <Icon size={16} className="alert-card-icon" />
-              <div className="alert-card-copy">
-                <h3>{alert.text}</h3>
-                <p>{alert.meta}</p>
+            <article key={alert.text} className={`flex min-h-28 gap-3 rounded-2xl border p-4 shadow-panel ${alert.sev === 'danger' ? 'border-rose-200 bg-rose-50' : alert.sev === 'success' ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}>
+              <Icon size={18} className={alert.sev === 'danger' ? 'shrink-0 text-rose-500' : alert.sev === 'success' ? 'shrink-0 text-emerald-500' : 'shrink-0 text-amber-500'} />
+              <div className="min-w-0">
+                <h3 className="text-sm font-semibold leading-5 text-slate-700">{alert.text}</h3>
+                <p className="mt-2 text-sm text-slate-400">{alert.meta}</p>
               </div>
             </article>
           );
         })}
       </div>
 
-      <div className="overview-kpi-grid">
+      <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 ${adminProduct === 'vault' ? 'xl:grid-cols-5' : 'xl:grid-cols-6'}`}>
         {overviewMetrics.map((metric) => {
           const config = metricConfig.find((item) => item.key === metric.key);
           const Icon = config.icon;
           return (
-            <article key={metric.key} className="overview-kpi-card">
-              <div className="overview-kpi-head">
-                <span className={`overview-kpi-icon overview-kpi-icon-${config.tone}`}>
+            <article key={metric.key} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel transition hover:-translate-y-0.5 hover:shadow-floating">
+              <div className="flex items-start justify-between gap-3">
+                <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${config.tone === 'green' ? 'bg-emerald-50 text-emerald-500' : config.tone === 'orange' ? 'bg-amber-50 text-amber-500' : config.tone === 'red' ? 'bg-rose-50 text-rose-500' : config.tone === 'sky' ? 'bg-sky-50 text-sky-500' : config.tone === 'violet' ? 'bg-violet-50 text-violet-500' : 'bg-indigo-50 text-indigo-500'}`}>
                   <Icon size={18} />
                 </span>
                 {metric.badge ? (
-                  <span className={`overview-kpi-badge overview-kpi-badge-${metric.badge.direction}`}>
+                  <span className={`rounded-full px-2 py-1 text-xs font-bold ${metric.badge.direction === 'up' ? 'bg-emerald-50 text-emerald-500' : 'bg-rose-50 text-rose-500'}`}>
                     <span className={`overview-kpi-badge-arrow overview-kpi-badge-arrow-${metric.badge.direction}`} />
                     {metric.badge.value}
                   </span>
                 ) : null}
               </div>
-              <h2>{metric.value}</h2>
-              <p className="overview-kpi-label">
+              <h2 className="mt-5 text-3xl font-bold tracking-tight text-slate-800">{metric.value}</h2>
+              <p className="mt-2 text-sm font-medium text-slate-500">
                 {config.label}
-                {metric.meta ? <span className="overview-kpi-meta"> · {metric.meta}</span> : null}
+                {metric.meta ? <span className="text-slate-400"> · {metric.meta}</span> : null}
               </p>
             </article>
           );
         })}
       </div>
 
-      <div className="overview-chart-grid">
-        <section className="table-card overview-chart-card overview-chart-card-wide">
-          <div className="overview-chart-header">
-            <h2 className="section-title">{trendConfig.title}</h2>
-            <div className="overview-chart-legend">
+      <div className="grid gap-4 xl:grid-cols-3">
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel xl:col-span-2">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-base font-semibold text-slate-800">{trendConfig.title}</h2>
+            <div className="flex flex-wrap items-center gap-3 text-xs font-medium text-slate-400">
               {trendConfig.datasets.map((dataset) => (
                 <span key={dataset.label}>
-                  <i className="legend-dot" style={{ background: dataset.color }} />
+                  <i className="mr-1.5 inline-block h-2.5 w-2.5 rounded-full" style={{ background: dataset.color }} />
                   {dataset.label}
                 </span>
               ))}
             </div>
           </div>
-          <div className="chart-wrapper overview-chart-wrapper">
+          <div className="relative mt-5 h-72">
             <canvas ref={trendChartRef} />
           </div>
         </section>
 
-        <section className="table-card overview-chart-card overview-chart-card-donut">
-          <div className="overview-chart-header">
-            <h2 className="section-title">Usage by modality</h2>
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
+          <div>
+            <h2 className="text-base font-semibold text-slate-800">Usage by modality</h2>
           </div>
-          <div className="overview-donut-shell">
-            <div className="chart-wrapper overview-donut-wrapper">
+          <div className="mt-5 flex flex-col items-center gap-6 sm:flex-row sm:items-center sm:justify-start lg:gap-8 xl:flex-col xl:items-center">
+            <div className="relative h-44 w-44 shrink-0">
               <canvas ref={modalityChartRef} />
-              <div className="overview-donut-center">
-                <strong>{formatOverviewMetric(summary.totalMessages)}</strong>
-                <span>messages</span>
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+                <strong className="text-xl font-bold tracking-tight text-slate-900">{formatOverviewMetric(summary.totalMessages)}</strong>
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">messages</span>
               </div>
             </div>
-            <div className="overview-donut-legend">
-              <div className="overview-donut-row">
-                <span><i className="legend-dot legend-dot-indigo" />Text</span>
-                <strong>
-                  {formatOverviewMetric(summary.modalityValues[0])}{' '}
-                  <span className="overview-donut-share">
-                    {Math.round((summary.modalityValues[0] / Math.max(summary.totalMessages, 1)) * 100)}%
-                  </span>
-                </strong>
+            <div className="w-full min-w-0 flex-1 space-y-2 text-sm">
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50/80 px-3.5 py-2.5 transition hover:bg-slate-100/80">
+                <span className="flex items-center gap-2 font-medium text-slate-600">
+                  <span className="h-2.5 w-2.5 rounded-full bg-indigo-600" />
+                  Text
+                </span>
+                <div className="text-right">
+                  <strong className="font-bold text-slate-800">{formatOverviewMetric(summary.modalityValues[0])}</strong>
+                  <span className="ml-1.5 text-xs text-slate-400">({Math.round((summary.modalityValues[0] / Math.max(summary.totalMessages, 1)) * 100)}%)</span>
+                </div>
               </div>
-              <div className="overview-donut-row">
-                <span><i className="legend-dot legend-dot-sky" />Audio</span>
-                <strong>
-                  {formatOverviewMetric(summary.modalityValues[1])}{' '}
-                  <span className="overview-donut-share">
-                    {Math.round((summary.modalityValues[1] / Math.max(summary.totalMessages, 1)) * 100)}%
-                  </span>
-                </strong>
+
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50/80 px-3.5 py-2.5 transition hover:bg-slate-100/80">
+                <span className="flex items-center gap-2 font-medium text-slate-600">
+                  <span className="h-2.5 w-2.5 rounded-full bg-sky-500" />
+                  Audio
+                </span>
+                <div className="text-right">
+                  <strong className="font-bold text-slate-800">{formatOverviewMetric(summary.modalityValues[1])}</strong>
+                  <span className="ml-1.5 text-xs text-slate-400">({Math.round((summary.modalityValues[1] / Math.max(summary.totalMessages, 1)) * 100)}%)</span>
+                </div>
               </div>
-              <div className="overview-donut-row">
-                <span><i className="legend-dot legend-dot-violet" />Video</span>
-                <strong>
-                  {formatOverviewMetric(summary.modalityValues[2])}{' '}
-                  <span className="overview-donut-share">
-                    {Math.round((summary.modalityValues[2] / Math.max(summary.totalMessages, 1)) * 100)}%
-                  </span>
-                </strong>
+
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50/80 px-3.5 py-2.5 transition hover:bg-slate-100/80">
+                <span className="flex items-center gap-2 font-medium text-slate-600">
+                  <span className="h-2.5 w-2.5 rounded-full bg-violet-500" />
+                  Video
+                </span>
+                <div className="text-right">
+                  <strong className="font-bold text-slate-800">{formatOverviewMetric(summary.modalityValues[2])}</strong>
+                  <span className="ml-1.5 text-xs text-slate-400">({Math.round((summary.modalityValues[2] / Math.max(summary.totalMessages, 1)) * 100)}%)</span>
+                </div>
               </div>
             </div>
           </div>
         </section>
       </div>
 
-      <div className="overview-lower-grid">
-        <section className="table-card overview-chart-card overview-vendor-card">
-          <div className="overview-chart-header">
-            <h2 className="section-title">Cost by vendor</h2>
-            <div className="overview-card-kicker">stacked, per {filters.gran}</div>
+      <div className="grid gap-4 xl:grid-cols-3">
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel xl:col-span-2">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-base font-semibold text-slate-800">Cost by vendor</h2>
+            <div className="text-xs font-medium text-slate-400">stacked, per {filters.gran}</div>
           </div>
-          <div className="chart-wrapper overview-vendor-wrapper">
+          <div className="relative mt-5 h-72">
             <canvas ref={vendorChartRef} />
           </div>
         </section>
 
-        <section className="table-card overview-env-card">
-          <div className="overview-chart-header">
-            <h2 className="section-title">Environment comparison</h2>
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-base font-semibold text-slate-800">Environment comparison</h2>
           </div>
-          <div className="overview-env-list">
+          <div className="mt-3 divide-y divide-slate-100">
             {environmentCards.map((item) => (
-              <article key={item.env} className={`overview-env-item${item.active ? '' : ' is-muted'}`}>
-                <div className="overview-env-head">
-                  <span className="overview-env-label">
-                    <i className="legend-dot" style={{ background: item.color }} />
+              <article key={item.env} className={`py-4 ${item.active ? '' : 'opacity-50'}`}>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700">
+                    <i className="h-2.5 w-2.5 rounded-full" style={{ background: item.color }} />
                     {item.label}
                   </span>
-                  {!item.active ? <span className="overview-env-muted">filtered out</span> : null}
+                  {!item.active ? <span className="text-xs font-medium text-slate-400">filtered out</span> : null}
                 </div>
-                <div className="overview-env-metrics">
-                  <div>
+                <div className="mt-3 grid grid-cols-3 gap-3">
+                  <div className="flex flex-col">
                     <strong>{item.cost}</strong>
-                    <span>Cost</span>
+                    <span className="mt-1 text-xs text-slate-400">Cost</span>
                   </div>
-                  <div>
+                  <div className="flex flex-col">
                     <strong>{item.revenue}</strong>
-                    <span>Revenue</span>
+                    <span className="mt-1 text-xs text-slate-400">Revenue</span>
                   </div>
-                  <div>
+                  <div className="flex flex-col">
                     <strong>{item.messages}</strong>
-                    <span>Messages</span>
+                    <span className="mt-1 text-xs text-slate-400">Messages</span>
                   </div>
                 </div>
               </article>
@@ -503,47 +524,37 @@ export function OverviewPage() {
         </section>
       </div>
 
-      <div className="overview-rank-grid">
-        <section className="table-card overview-rank-card overview-rank-card-client">
-          <div className="overview-chart-header">
-            <h2 className="section-title">Top 5 Clients by cost</h2>
-            <div className="overview-card-kicker">click to drill</div>
+      <div className={`grid gap-4 ${adminProduct === 'vault' ? '' : 'lg:grid-cols-2'}`}>
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-base font-semibold text-slate-800">Top 5 Clients by cost</h2>
+            <div className="text-xs font-medium text-slate-400">click to drill</div>
           </div>
           {renderRankList(topClients, 'client')}
         </section>
 
-        <section className="table-card overview-rank-card overview-rank-card-twin">
-          <div className="overview-chart-header">
-            <h2 className="section-title">Top 5 Twins by cost</h2>
-            <div className="overview-card-kicker">click to drill</div>
+        {adminProduct !== 'vault' ? <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-base font-semibold text-slate-800">Top 5 Twins by cost</h2>
+            <div className="text-xs font-medium text-slate-400">click to drill</div>
           </div>
           {renderRankList(topTwins, 'twin')}
-        </section>
+        </section> : null}
       </div>
 
       {filters.compare ? (
-        <div className="compare-grid">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {compareRows.map((item) => (
-            <article key={item.env} className={`compare-card compare-card-${item.env}`}>
-              <div className="compare-card-head">
-                <span className="compare-dot" />
-                <h3>{item.label}</h3>
+            <article key={item.env} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
+              <div className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                <h3 className="font-semibold text-slate-800">{item.label}</h3>
               </div>
-              <div className="compare-metric">
-                <span>Cost</span>
-                <strong>{item.cost}</strong>
-              </div>
-              <div className="compare-metric">
-                <span>Revenue</span>
-                <strong>{item.revenue}</strong>
-              </div>
-              <div className="compare-metric">
-                <span>Margin</span>
-                <strong>{item.margin}</strong>
-              </div>
-              <div className="compare-metric">
-                <span>Messages</span>
-                <strong>{item.messages}</strong>
+              <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                <div className="flex flex-col"><span className="text-slate-400">Cost</span><strong className="mt-1 text-slate-700">{item.cost}</strong></div>
+                <div className="flex flex-col"><span className="text-slate-400">Revenue</span><strong className="mt-1 text-slate-700">{item.revenue}</strong></div>
+                <div className="flex flex-col"><span className="text-slate-400">Margin</span><strong className="mt-1 text-slate-700">{item.margin}</strong></div>
+                <div className="flex flex-col"><span className="text-slate-400">Messages</span><strong className="mt-1 text-slate-700">{item.messages}</strong></div>
               </div>
             </article>
           ))}

@@ -1,4 +1,5 @@
 import { superadminDemoData } from '../demo-data/superadminDemoData';
+import { isServiceForProduct } from './productAccess';
 import { selectFacts, sumMetric, RANGE_DAYS } from '../demo-data/superadminSelectors';
 
 const compactFormatter = new Intl.NumberFormat('en-US', {
@@ -55,9 +56,9 @@ export function selectPreviousFacts(filters) {
   );
 }
 
-export function deltaPercent(filters, key, vendorId = null) {
-  const currentRows = selectFacts(filters);
-  const previousRows = selectPreviousFacts(filters);
+export function deltaPercent(filters, key, vendorId = null, product = null) {
+  const currentRows = selectFacts(filters).filter((row) => !product || isServiceForProduct(product, row.service));
+  const previousRows = selectPreviousFacts(filters).filter((row) => !product || isServiceForProduct(product, row.service));
   const currentValue = sumMetric(currentRows, key, filters, vendorId);
   const previousValue = sumMetric(previousRows, key, filters, vendorId);
 
@@ -69,10 +70,10 @@ export function envBadge(env) {
   const meta = superadminDemoData.ENV_META[env];
   return (
     <span
-      className="env-badge"
+      className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold"
       style={{ backgroundColor: `${meta.color}15`, color: meta.color }}
     >
-      <span className="env-badge-dot" style={{ backgroundColor: meta.color }} />
+      <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: meta.color }} />
       {meta.label}
     </span>
   );
@@ -86,7 +87,7 @@ const healthColor = {
 
 export function healthDot(status) {
   const tone = healthColor[status] || 'bg-slate-300';
-  return <span className={`health-dot ${tone}`} />;
+  return <span className={`h-2 w-2 rounded-full ${tone}`} />;
 }
 
 export function getPageTitle(pathname) {
@@ -111,4 +112,9 @@ export function getEnvOptions() {
     label: superadminDemoData.ENV_META[env].label,
     color: superadminDemoData.ENV_META[env].color,
   }));
+}
+
+export function normalizeRoleName(role) {
+  const rawRole = typeof role === 'string' ? role : role?.name ?? role?.label ?? '';
+  return rawRole.trim().toLowerCase();
 }

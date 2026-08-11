@@ -1,63 +1,67 @@
-import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { useContext, useEffect, useMemo, useRef, useState } from "react";
-import { useAuth } from "../app/AuthContext";
-import { FilterContext } from "../app/FilterContext";
-import { FilterToolbar } from "../components/layout/FilterToolbar";
-import { Sidebar } from "../components/layout/Sidebar";
-import { superadminDemoData } from "../demo-data/superadminDemoData";
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useAuth } from '../app/AuthContext';
+import { FilterContext } from '../app/FilterContext';
+import { FilterToolbar } from '../components/layout/FilterToolbar';
+import { Sidebar } from '../components/layout/Sidebar';
+import { superadminDemoData } from '../demo-data/superadminDemoData';
+import { isServiceForProduct, isVendorForProduct } from '../utils/productAccess';
 import {
   dropdownApiAvailable,
   getClientsDropdown,
   getTwinsDropdown,
   getUsersDropdown,
-} from "../services";
+} from '../services';
 import {
   Search,
   Bell,
+  Building2,
+  Bot,
   Columns2,
   CornerDownLeft,
   ChevronDown,
   LogOut,
   UserCircle2,
-} from "lucide-react";
+  Users,
+} from 'lucide-react';
 
 const breadcrumbTitles = {
-  "/": "Overview",
-  "/clients": "Clients",
-  "/twins": "Twins",
-  "/users": "Users",
-  "/services": "Services",
-  "/vault": "Vault",
-  "/financial": "Cost & Billing",
-  "/usage": "Usage Analytics",
-  "/telemetry": "Telemetry / Logs",
-  "/profile": "Profile",
+  '/': 'Overview',
+  '/clients': 'Clients',
+  '/twins': 'Twins',
+  '/users': 'Users',
+  '/services': 'Services',
+  '/vault': 'Vault',
+  '/financial': 'Cost & Billing',
+  '/usage': 'Usage Analytics',
+  '/telemetry': 'Telemetry / Logs',
+  '/profile': 'Profile',
 };
 
 const invalidUserNames = new Set([
-  "",
-  "-",
-  "?",
-  "-?",
-  "n/a",
-  "na",
-  "null",
-  "undefined",
+  '',
+  '-',
+  '?',
+  '-?',
+  'n/a',
+  'na',
+  'null',
+  'undefined',
 ]);
 
 function getUserName(user) {
-  const name = typeof user.name === "string" ? user.name.trim() : "";
-  return invalidUserNames.has(name.toLowerCase()) ? "" : name;
+  const name = typeof user.name === 'string' ? user.name.trim() : '';
+  return invalidUserNames.has(name.toLowerCase()) ? '' : name;
 }
 
 export function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated, logout, profile, user } = useAuth();
+  const { adminProduct, isAuthenticated, logout, profile, user } = useAuth();
   const { filters, setFilters } = useContext(FilterContext);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
@@ -66,32 +70,52 @@ export function AppLayout() {
   const [users, setUsers] = useState([]);
   const searchRef = useRef(null);
   const profileMenuRef = useRef(null);
-  const showFilterBar = location.pathname !== "/profile";
-  const showOverviewControls = location.pathname === "/";
-  const currentTitle =
+  const showFilterBar = location.pathname !== '/profile';
+  const showOverviewControls = location.pathname === '/';
+  const visibleScopes = ['granularity', 'client', 'twin', 'user', 'service', 'vendor'];
+  const baseTitle =
     breadcrumbTitles[location.pathname] ??
-    (location.pathname.startsWith("/clients/")
-      ? "Clients"
-      : location.pathname.startsWith("/twins/")
-        ? "Twins"
-        : location.pathname.startsWith("/users/")
-          ? "Users"
-          : "Overview");
-  const profileName = profile.name || user?.name || "Super Admin";
-  const profileEmail = profile.email || user?.email || "No email";
+    (location.pathname.startsWith('/clients/')
+      ? 'Clients'
+      : location.pathname.startsWith('/twins/')
+        ? 'Twins'
+        : location.pathname.startsWith('/users/')
+          ? 'Users'
+          : 'Overview');
+  const currentTitle = adminProduct === 'vault' && location.pathname === '/financial'
+    ? 'Vault Billing'
+    : adminProduct === 'vault' && location.pathname === '/usage'
+      ? 'Vault Usage Analytics'
+      : baseTitle;
+  const profileName = profile.name || user?.name || 'Super Admin';
+  const profileEmail = profile.email || user?.email || 'No email';
   const initials =
     profileName
       .split(/\s+/)
       .filter(Boolean)
       .slice(0, 2)
       .map((part) => part[0]?.toUpperCase())
-      .join("") || "SA";
+      .join('') || 'SA';
 
   const updateFilters = (partial) => {
     setFilters((prev) => ({ ...prev, ...partial }));
   };
 
   const selectedEnv = filters.envs.length === 1 ? filters.envs[0] : undefined;
+
+  useEffect(() => {
+    const invalidService = filters.service && !isServiceForProduct(adminProduct, filters.service);
+    const invalidVendor = filters.vendor && !isVendorForProduct(adminProduct, filters.vendor);
+    const invalidTwin = adminProduct === 'vault' && filters.twin;
+
+    if (invalidService || invalidVendor || invalidTwin) {
+      updateFilters({
+        ...(invalidService ? { service: null } : {}),
+        ...(invalidVendor ? { vendor: null } : {}),
+        ...(invalidTwin ? { twin: null } : {}),
+      });
+    }
+  }, [adminProduct, filters.service, filters.twin, filters.vendor]);
 
   useEffect(() => {
     if (!isAuthenticated || !dropdownApiAvailable()) {
@@ -105,7 +129,7 @@ export function AppLayout() {
         if (active) setClients(data);
       })
       .catch((error) => {
-        console.error("[AppLayout] Failed to load clients:", error);
+        console.error('[AppLayout] Failed to load clients:', error);
         if (active) setClients([]);
       });
 
@@ -129,7 +153,7 @@ export function AppLayout() {
         if (active) setTwins(data);
       })
       .catch((error) => {
-        console.error("[AppLayout] Failed to load twins:", error);
+        console.error('[AppLayout] Failed to load twins:', error);
         if (active) setTwins([]);
       });
 
@@ -148,37 +172,36 @@ export function AppLayout() {
     getUsersDropdown({
       env: selectedEnv,
       clientId: filters.client,
+      twinId: filters.twin,
     })
       .then((data) => {
         if (active) setUsers(data);
       })
       .catch((error) => {
-        console.error("[AppLayout] Failed to load users:", error);
+        console.error('[AppLayout] Failed to load users:', error);
         if (active) setUsers([]);
       });
 
     return () => {
       active = false;
     };
-  }, [filters.client, isAuthenticated, selectedEnv]);
+  }, [filters.client, filters.twin, isAuthenticated, selectedEnv]);
 
   const vendorOptions = useMemo(
     () =>
       superadminDemoData.VENDORS.filter(
         (vendor) =>
-          !filters.service ||
-          superadminDemoData.byId
-            .service(filters.service)
-            ?.vendors.includes(vendor.id),
+          isVendorForProduct(adminProduct, vendor.id) &&
+          (!filters.service || superadminDemoData.byId.service(filters.service)?.vendors.includes(vendor.id)),
       ),
-    [filters.service],
+    [adminProduct, filters.service],
   );
   const clientDropdownOptions = useMemo(
     () =>
       clients.map((client) => ({
         value: client.id ?? client._id ?? client.value,
         label: client.name ?? client.label,
-        meta: client.plan ?? "",
+        meta: client.plan ?? '',
       })),
     [clients],
   );
@@ -187,7 +210,7 @@ export function AppLayout() {
       twins.map((twin) => ({
         value: twin.id ?? twin._id ?? twin.value,
         label: twin.name ?? twin.label,
-        meta: twin.clientName ?? twin.client?.name ?? "",
+        meta: twin.clientName ?? twin.client?.name ?? '',
       })),
     [twins],
   );
@@ -198,19 +221,19 @@ export function AppLayout() {
 
         return {
           value: user.id ?? user._id ?? user.value,
-          label: name || user.email || user.label || "Unknown user",
+          label: name || user.email || user.label || 'Unknown user',
         };
       }),
     [users],
   );
   const serviceDropdownOptions = useMemo(
     () =>
-      superadminDemoData.SERVICES.map((service) => ({
+      superadminDemoData.SERVICES.filter((service) => isServiceForProduct(adminProduct, service.id)).map((service) => ({
         value: service.id,
         label: service.name,
         meta: service.stack,
       })),
-    [],
+    [adminProduct],
   );
   const vendorDropdownOptions = useMemo(
     () =>
@@ -219,11 +242,16 @@ export function AppLayout() {
         label: vendor.name,
         meta: vendor.cat,
       })),
-    [vendorOptions],
+    [adminProduct, vendorOptions],
   );
   const updateScopeFilter = (key, value) => {
-    if (key === "client") {
+    if (key === 'client') {
       updateFilters({ client: value, twin: null, user: null });
+      return;
+    }
+
+    if (key === "twin") {
+      updateFilters({ twin: value, user: null });
       return;
     }
 
@@ -245,7 +273,7 @@ export function AppLayout() {
       .slice(0, 4)
       .map((client) => ({
         key: `client-${client.id}`,
-        type: "client",
+        type: 'client',
         id: client.id,
         name: client.name,
         sub: client.plan,
@@ -253,19 +281,19 @@ export function AppLayout() {
         path: `/clients/${client.id}`,
       }));
 
-    const twins = superadminDemoData.TWINS.filter((twin) =>
+    const twins = adminProduct === 'twin' ? superadminDemoData.TWINS.filter((twin) =>
       twin.name.toLowerCase().includes(q),
     )
       .slice(0, 4)
       .map((twin) => ({
         key: `twin-${twin.id}`,
-        type: "twin",
+        type: 'twin',
         id: twin.id,
         name: twin.name,
-        sub: superadminDemoData.byId.client(twin.clientId)?.name ?? "",
+        sub: superadminDemoData.byId.client(twin.clientId)?.name ?? '',
         icon: <Bot size={14} />,
         path: `/twins/${twin.id}`,
-      }));
+      })) : [];
 
     const users = superadminDemoData.USERS.filter((user) =>
       user.name.toLowerCase().includes(q),
@@ -273,16 +301,16 @@ export function AppLayout() {
       .slice(0, 4)
       .map((user) => ({
         key: `user-${user.id}`,
-        type: "user",
+        type: 'user',
         id: user.id,
         name: user.name,
-        sub: superadminDemoData.byId.client(user.clientId)?.name ?? "",
+        sub: superadminDemoData.byId.client(user.clientId)?.name ?? '',
         icon: <Users size={14} />,
         path: `/users/${user.id}`,
       }));
 
     return [...clients, ...twins, ...users];
-  }, [searchQuery]);
+  }, [adminProduct, searchQuery]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -295,12 +323,12 @@ export function AppLayout() {
       }
     };
 
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   useEffect(() => {
-    setSearchQuery("");
+    setSearchQuery('');
     setSearchOpen(false);
     setIsMobileSearchOpen(false);
     setProfileMenuOpen(false);
@@ -311,11 +339,11 @@ export function AppLayout() {
     if (!isMobileSidebarOpen) return undefined;
 
     const handleEscape = (event) => {
-      if (event.key === "Escape") setIsMobileSidebarOpen(false);
+      if (event.key === 'Escape') setIsMobileSidebarOpen(false);
     };
 
-    document.addEventListener("keydown", handleEscape);
-    return () => document.removeEventListener("keydown", handleEscape);
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
   }, [isMobileSidebarOpen]);
 
   const openSearch = () => {
@@ -325,7 +353,7 @@ export function AppLayout() {
   };
 
   const selectSearchHit = (hit) => {
-    setSearchQuery("");
+    setSearchQuery('');
     setSearchOpen(false);
     navigate(hit.path);
   };
@@ -338,11 +366,11 @@ export function AppLayout() {
   const handleLogout = async () => {
     setProfileMenuOpen(false);
     await logout();
-    navigate("/login", { replace: true });
+    navigate('/login', { replace: true });
   };
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell flex min-h-screen bg-slate-50 text-slate-800 ${adminProduct === 'vault' ? 'product-vault' : 'product-twin'}`} data-product={adminProduct}>
       <Sidebar
         collapsed={isSidebarCollapsed}
         mobileOpen={isMobileSidebarOpen}
@@ -353,33 +381,31 @@ export function AppLayout() {
       />
       <button
         type="button"
-        className={`sidebar-backdrop${isMobileSidebarOpen ? " visible" : ""}`}
+        className={`fixed inset-0 z-30 bg-slate-900/40 backdrop-blur-sm transition-opacity duration-200 lg:hidden ${isMobileSidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
         aria-label="Close navigation"
         aria-hidden={!isMobileSidebarOpen}
         tabIndex={isMobileSidebarOpen ? 0 : -1}
         onClick={() => setIsMobileSidebarOpen(false)}
       />
 
-      <div className="workspace">
-        <div className="workspace-chrome">
-          <header className="topbar">
-            <div
-              className={`topbar-title-group${isMobileSearchOpen ? " mobile-search-active" : ""}`}
-            >
+      <div className="min-w-0 flex-1">
+        <div className="sticky top-0 z-30 bg-white/95 backdrop-blur">
+          <header className="flex h-16 items-center justify-between gap-3 border-b border-slate-200 px-4 sm:px-6 lg:px-8">
+            <div className={`flex min-w-0 items-center gap-3 ${isMobileSearchOpen ? 'hidden sm:flex' : ''}`}>
               <button
-                className="icon-button topbar-toggle"
+                className="inline-grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-indigo-200 hover:text-indigo-600"
                 type="button"
                 aria-label={
                   isMobileSidebarOpen
-                    ? "Close navigation"
+                    ? 'Close navigation'
                     : isSidebarCollapsed
-                      ? "Expand sidebar"
-                      : "Open navigation"
+                      ? 'Expand sidebar'
+                      : 'Open navigation'
                 }
                 aria-expanded={isMobileSidebarOpen}
                 aria-pressed={isSidebarCollapsed}
                 onClick={() => {
-                  if (window.matchMedia("(max-width: 1024px)").matches) {
+                  if (window.matchMedia('(max-width: 1024px)').matches) {
                     setIsMobileSidebarOpen((value) => !value);
                     return;
                   }
@@ -388,40 +414,40 @@ export function AppLayout() {
               >
                 <Columns2 size={16} />
               </button>
-              <div className="breadcrumb">
-                <span className="breadcrumb-current">{currentTitle}</span>
+              <div className="min-w-0">
+                <span className="block truncate text-lg font-semibold text-slate-800">{currentTitle}</span>
               </div>
+              <span className={`hidden rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] sm:inline-flex ${adminProduct === 'vault' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-indigo-200 bg-indigo-50 text-indigo-700'}`}>
+                {adminProduct === 'vault' ? 'Vault Admin' : 'Twin Admin'}
+              </span>
             </div>
 
-            <div
-              className={`topbar-actions${isMobileSearchOpen ? " mobile-search-active" : ""}`}
-            >
-              <div
-                className={`search-shell${isMobileSearchOpen ? " mobile-search-open" : ""}`}
-                ref={searchRef}
-              >
-                <button
-                  type="button"
-                  className="icon-button mobile-search-trigger"
-                  aria-label="Open search"
-                  aria-expanded={isMobileSearchOpen}
-                  onClick={() => {
-                    setIsMobileSearchOpen(true);
+            <div className={`flex min-w-0 items-center justify-end gap-2 ${isMobileSearchOpen ? 'w-full flex-1' : ''}`}>
+              <div className={`relative min-w-0 ${isMobileSearchOpen ? 'flex-1' : 'w-48 sm:w-64'}`} ref={searchRef}>
+                {!isMobileSearchOpen ? (
+                  <button
+                    type="button"
+                    className="inline-grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-indigo-200 hover:text-indigo-600 sm:hidden"
+                    aria-label="Open search"
+                    aria-expanded={isMobileSearchOpen}
+                    onClick={() => {
+                      setIsMobileSearchOpen(true);
+                      window.requestAnimationFrame(() => {
+                        searchRef.current?.querySelector('input')?.focus();
+                      });
+                    }}
+                  >
+                    <Search size={16} />
+                  </button>
+                ) : null}
 
-                    window.requestAnimationFrame(() => {
-                      searchRef.current?.querySelector("input")?.focus();
-                    });
-                  }}
-                >
-                  <Search size={16} />
-                </button>
-
-                <Search className="search-icon" size={16} />
+                <Search className={`absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 ${!isMobileSearchOpen ? 'hidden sm:block' : ''}`} size={16} />
 
                 <input
                   type="text"
+                  className={`h-9 w-full rounded-xl border border-slate-200 bg-slate-50/80 pl-9 pr-8 text-xs font-medium text-slate-700 outline-none transition focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100 ${!isMobileSearchOpen ? 'hidden sm:block' : 'block'}`}
                   value={searchQuery}
-                  placeholder="Search clients, twins, users..."
+                  placeholder={adminProduct === 'vault' ? 'Search Vault clients and users...' : 'Search clients, twins, users...'}
                   onChange={(event) => {
                     const nextQuery = event.target.value;
                     setSearchQuery(nextQuery);
@@ -429,8 +455,8 @@ export function AppLayout() {
                   }}
                   onFocus={openSearch}
                   onKeyDown={(event) => {
-                    if (event.key === "Escape") {
-                      setSearchQuery("");
+                    if (event.key === 'Escape') {
+                      setSearchQuery('');
                       setSearchOpen(false);
                       setIsMobileSearchOpen(false);
                       event.currentTarget.blur();
@@ -438,92 +464,70 @@ export function AppLayout() {
                   }}
                 />
 
-                <button
-                  type="button"
-                  className="mobile-search-close"
-                  aria-label="Close search"
-                  onClick={() => {
-                    setSearchQuery("");
-                    setSearchOpen(false);
-                    setIsMobileSearchOpen(false);
-                  }}
-                >
-                  ×
-                </button>
+                {isMobileSearchOpen ? (
+                  <button
+                    type="button"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-lg text-slate-400 hover:text-slate-600 sm:hidden"
+                    aria-label="Close search"
+                    onClick={() => {
+                      setSearchQuery('');
+                      setSearchOpen(false);
+                      setIsMobileSearchOpen(false);
+                    }}
+                  >
+                    ×
+                  </button>
+                ) : null}
 
                 {searchOpen ? (
-                  <div
-                    className="search-results"
-                    role="listbox"
-                    aria-label="Global search results"
-                  >
+                  <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 max-h-80 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-floating" role="listbox" aria-label="Global search results">
                     {searchHits.length ? (
                       searchHits.map((hit) => (
                         <button
                           key={hit.key}
                           type="button"
-                          className="search-result-button"
+                          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition hover:bg-indigo-50 hover:text-indigo-700"
                           onClick={() => selectSearchHit(hit)}
                         >
-                          <span className="search-result-icon">{hit.icon}</span>
-
-                          <span className="search-result-copy">
-                            <span className="search-result-name">
-                              {hit.name}
-                            </span>
-
-                            <span className="search-result-meta">
-                              {hit.type} · {hit.sub}
-                            </span>
+                          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500">{hit.icon}</span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-xs font-semibold text-slate-800">{hit.name}</span>
+                            <span className="block truncate text-[11px] text-slate-400">{hit.type} · {hit.sub}</span>
                           </span>
-
-                          <CornerDownLeft
-                            size={14}
-                            className="search-result-enter"
-                          />
+                          <CornerDownLeft size={14} className="shrink-0 text-slate-400" />
                         </button>
                       ))
                     ) : (
-                      <div className="search-results-empty">
+                      <div className="px-3 py-4 text-center text-xs text-slate-400">
                         No matches for "{searchQuery.trim()}"
                       </div>
                     )}
                   </div>
                 ) : null}
               </div>
-              <button
-                className="icon-button"
-                type="button"
-                aria-label="Notifications"
-              >
+
+              <button className="inline-grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-transparent text-slate-600 transition hover:bg-slate-100" type="button" aria-label="Notifications">
                 <Bell size={16} />
               </button>
-              <div className="profile-menu-shell" ref={profileMenuRef}>
+
+              <div className="relative" ref={profileMenuRef}>
                 <button
-                  className="profile-menu-trigger"
+                  className="inline-flex h-9 items-center gap-1 rounded-xl px-1 text-slate-600 transition hover:bg-slate-100"
                   type="button"
                   aria-label="Open profile menu"
                   aria-expanded={profileMenuOpen}
                   onClick={() => setProfileMenuOpen((value) => !value)}
                 >
-                  <div className="avatar-badge compact">{initials}</div>
-                  <ChevronDown size={14} className="profile-menu-caret" />
+                  <div className={`grid h-8 w-8 place-items-center rounded-xl bg-gradient-to-br text-xs font-bold text-white shadow-xs ${adminProduct === 'vault' ? 'from-emerald-600 to-teal-500' : 'from-indigo-600 to-indigo-500'}`}>{initials}</div>
+                  <ChevronDown size={14} className="text-slate-400" />
                 </button>
                 {profileMenuOpen ? (
-                  <div className="profile-menu-dropdown">
-                    <button
-                      type="button"
-                      className="profile-menu-item"
-                      onClick={() => handleProfileAction("/profile")}
-                    >
+                  <div className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-44 rounded-xl border border-slate-200 bg-white p-1.5 shadow-floating">
+                    <button type="button" className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-900" onClick={() => handleProfileAction('/profile')}>
                       <UserCircle2 size={15} />
                       <span>Profile</span>
                     </button>
-                    <button
-                      type="button"
-                      className="profile-menu-item danger"
-                      onClick={handleLogout}
-                    >
+                    <button type="button" className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-semibold text-rose-600 transition hover:bg-rose-50 hover:text-rose-700" onClick={handleLogout}>
                       <LogOut size={15} />
                       <span>Logout</span>
                     </button>
@@ -544,11 +548,13 @@ export function AppLayout() {
               serviceOptions={serviceDropdownOptions}
               vendorOptions={vendorDropdownOptions}
               showOverviewControls={showOverviewControls}
+              adminProduct={adminProduct}
+              visibleScopes={visibleScopes}
             />
           ) : null}
         </div>
 
-        <main className="main-content">
+        <main className="min-w-0">
           <Outlet />
         </main>
       </div>

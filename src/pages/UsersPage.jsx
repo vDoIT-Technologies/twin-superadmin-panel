@@ -2,8 +2,10 @@ import { useContext, useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Download, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { FilterContext } from '../app/FilterContext';
+import { useAuth } from '../app/AuthContext';
+import { TruncatedText } from '../components/common/TruncatedText';
 import { superadminDemoData } from '../demo-data/superadminDemoData';
-import { dashboardService, getUsersDropdown } from '../services';
+import { dashboardService, dropdownApiAvailable, getUsersDropdown } from '../services';
 import { envBadge, formatCurrencyFull, formatNumber } from '../utils/dashboardUtils';
 
 function formatScopeLabel(filters) {
@@ -67,6 +69,20 @@ function formatOptionalCurrency(value) {
 }
 
 function getUsersPayload(response) {
+  if (Array.isArray(response)) {
+    return {
+      users: response,
+      pagination: null,
+    };
+  }
+
+  if (Array.isArray(response?.users)) {
+    return {
+      users: response.users,
+      pagination: response?.pagination ?? null,
+    };
+  }
+
   if (Array.isArray(response?.data)) {
     return {
       users: response.data,
@@ -100,6 +116,8 @@ function getId(value) {
 }
 
 export function UsersPage() {
+  const { adminProduct } = useAuth();
+  const isVault = adminProduct === 'vault';
   const PAGE_SIZE = 12;
   const { filters } = useContext(FilterContext);
   const navigate = useNavigate();
@@ -123,18 +141,17 @@ export function UsersPage() {
       const dropdownUsers = await getUsersDropdown({
         env: selectedEnv,
         clientId: filters.client || undefined,
+        twinId: filters.twin || undefined,
+        userId: filters.user || undefined,
       });
-      const scopedUsers = dropdownUsers
-        .filter((user) => !filters.client || getId(user.clientId ?? user.client) === String(filters.client))
-        .filter((user) => !filters.user || getId(user.id ?? user._id) === String(filters.user));
-      const total = scopedUsers.length;
+      const total = dropdownUsers.length;
       const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
       const currentPage = Math.min(page, totalPages);
       const start = (currentPage - 1) * PAGE_SIZE;
 
       if (!isActive) return;
 
-      setApiUsers(scopedUsers.slice(start, start + PAGE_SIZE));
+      setApiUsers(dropdownUsers.slice(start, start + PAGE_SIZE));
       setPagination({
         total,
         page: currentPage,
@@ -151,6 +168,7 @@ export function UsersPage() {
           page,
           limit: PAGE_SIZE,
           clientId: filters.client,
+          twinId: filters.twin,
           userId: filters.user,
           env: filters.envs.length === 1 ? filters.envs[0] : undefined,
           range: filters.range,
@@ -161,24 +179,25 @@ export function UsersPage() {
         }
 
         const payload = getUsersPayload(data);
-
-        if (payload.users.length) {
-          setApiUsers(payload.users);
-          setPagination({
-            total: Number(payload.pagination?.total) || payload.users.length,
-            page: Number(payload.pagination?.page) || page,
-            limit: Number(payload.pagination?.limit) || PAGE_SIZE,
-            totalPages: Number(payload.pagination?.totalPages) || 1,
-          });
-        } else {
-          await loadDropdownFallback();
-        }
+        setApiUsers(payload.users);
+        setPagination({
+          total: Number(payload.pagination?.total) || payload.users.length,
+          page: Number(payload.pagination?.page) || page,
+          limit: Number(payload.pagination?.limit) || PAGE_SIZE,
+          totalPages: Number(payload.pagination?.totalPages) || 1,
+        });
       } catch (error) {
         if (!isActive) {
           return;
         }
 
         console.error('GET /api/v1/entities/users failed:', error);
+        if (!dropdownApiAvailable()) {
+          setApiUsers([]);
+          setPagination((prev) => ({ ...prev, total: 0, totalPages: 1 }));
+          return;
+        }
+
         try {
           await loadDropdownFallback();
         } catch (fallbackError) {
@@ -198,11 +217,11 @@ export function UsersPage() {
     return () => {
       isActive = false;
     };
-  }, [filters.client, filters.envs, filters.range, filters.user, page]);
+  }, [filters.client, filters.envs, filters.range, filters.twin, filters.user, page]);
 
   useEffect(() => {
     setPage(1);
-  }, [filters.client, filters.envs, filters.range, filters.user]);
+  }, [filters.client, filters.envs, filters.range, filters.twin, filters.user]);
 
   const scopeLabel = useMemo(() => formatScopeLabel(filters), [filters]);
 
@@ -245,23 +264,22 @@ export function UsersPage() {
           lastActiveLabel,
         };
       })
-      .filter((user) => (!filters.client ? true : user.clientId === String(filters.client)))
-      .filter((user) => (!filters.user ? true : user.id === String(filters.user)))
       .filter((user) => (user.env ? filters.envs.includes(user.env) : true));
-  }, [apiUsers, filters.client, filters.envs, filters.user]);
+  }, [apiUsers, filters.envs]);
 
   const filteredRows = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const nextRows = !q
-      ? userRows
-      : userRows.filter(
+
+    if (!q) {
+      return userRows;
+    }
+
+    return userRows.filter(
       (user) =>
         user.name.toLowerCase().includes(q) ||
         user.client.toLowerCase().includes(q) ||
         getEnvLabel(user.env).toLowerCase().includes(q),
     );
-
-    return nextRows;
   }, [query, userRows]);
 
   const sortedRows = useMemo(() => {
@@ -323,7 +341,7 @@ export function UsersPage() {
   };
 
   const exportCsv = () => {
-    const header = ['User', 'Client', 'Env', 'Messages', 'Sessions', 'Balance', 'Points Spent', '$ Value', 'Twins', 'Last Active'];
+    const header = ['User', 'Client', 'Env', 'Messages', 'Sessions', 'Balance', 'Points Spent', '$ Value', ...(!isVault ? ['Twins'] : []), 'Last Active'];
     const lines = sortedRows.map((user) =>
       [
         user.name,
@@ -334,7 +352,7 @@ export function UsersPage() {
         formatOptionalNumber(user.balance),
         formatOptionalNumber(user.pointsSpent),
         formatOptionalCurrency(user.value),
-        user.twins ?? '',
+        ...(!isVault ? [user.twins ?? ''] : []),
         user.lastActiveLabel,
       ]
         .map((value) => `"${String(value).replaceAll('"', '""')}"`)
@@ -352,23 +370,24 @@ export function UsersPage() {
   };
 
   return (
-    <section className="page-section users-page">
-      <header className="users-header">
-        <div className="users-header-copy">
-          <h1>Users</h1>
-          <p>End users — sessions, points balance and spend</p>
+    <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Users</h1>
+          <p className="mt-1 text-sm text-slate-400">End users — sessions, points balance and spend</p>
         </div>
-        <div className="users-scope">
-          <span className="users-scope-label">Scope</span>
-          <span className="users-scope-value">{scopeLabel}</span>
+        <div className="text-right">
+          <span className="block text-xs font-bold uppercase tracking-[0.14em] text-slate-400">Scope</span>
+          <span className="mt-1 block text-sm font-semibold text-slate-500">{scopeLabel}</span>
         </div>
       </header>
 
-      <section className="table-card users-demo-card">
-        <div className="users-toolbar">
-          <label className="users-search">
-            <Search size={15} className="users-search-icon" />
-            <input
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-panel">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
+          <label className="flex h-10 w-full max-w-md items-center gap-2 rounded-xl bg-slate-50 px-3 text-slate-400 sm:w-80">
+            <Search size={15} />
+           <input
+              className="min-w-0 flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
               type="text"
               value={query}
               onChange={(event) => {
@@ -379,15 +398,15 @@ export function UsersPage() {
             />
           </label>
 
-          <button type="button" className="users-export-button" onClick={exportCsv}>
+          <button type="button" className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 px-3.5 text-sm font-semibold text-slate-600 transition hover:border-indigo-300 hover:text-indigo-600" onClick={exportCsv}>
             <Download size={14} />
             Export CSV
           </button>
         </div>
 
-        <div className="users-demo-table-wrap">
-          <table className="users-demo-table">
-            <thead>
+        <div className="max-h-[65vh] overflow-auto">
+          <table className={`w-full border-collapse text-sm ${isVault ? 'min-w-[980px]' : 'min-w-[1100px]'}`}>
+            <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_0_0_rgba(226,232,240,1)]">
               <tr>
                 {[
                   ['user', 'User'],
@@ -398,13 +417,13 @@ export function UsersPage() {
                   ['balance', 'Balance'],
                   ['pointsSpent', 'Points spent'],
                   ['value', '$ Value'],
-                  ['twins', 'Twins'],
+                  ...(!isVault ? [['twins', 'Twins']] : []),
                   ['lastActive', 'Last active'],
                 ].map(([key, label]) => (
-                  <th key={key}>
-                    <button type="button" className="table-sort-button" onClick={() => toggleSort(key)}>
+                  <th key={key} className="px-4 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
+                    <button type="button" className="inline-flex items-center gap-1 transition hover:text-slate-700" onClick={() => toggleSort(key)}>
                       <span>{label}</span>
-                      <span className={`table-sort-indicator${sortConfig.key === key ? ' active' : ''}`}>
+                      <span className={`text-xs text-slate-300 ${sortConfig.key === key ? 'text-indigo-600' : ''}`}>
                         {sortConfig.key === key ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}
                       </span>
                     </button>
@@ -415,35 +434,35 @@ export function UsersPage() {
             <tbody>
               {isTableLoading ? (
                 <tr>
-                  <td colSpan={10} className="table-empty users-table-loading-cell">
-                    <span className="users-table-loader" aria-hidden="true" />
+                  <td colSpan={isVault ? 9 : 10} className="px-5 py-12 text-center text-sm text-slate-400">
+                    <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-indigo-100 border-t-indigo-600 align-[-2px]" aria-hidden="true" />
                     Loading users...
                   </td>
                 </tr>
               ) : paginatedRows.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="table-empty">
+                  <td colSpan={isVault ? 9 : 10} className="px-5 py-12 text-center text-sm text-slate-400">
                     No users found
                   </td>
                 </tr>
               ) : (
                 paginatedRows.map((user) => (
-                  <tr key={user.id} className="entity-row-clickable" onClick={() => navigate(`/users/${user.id}`)}>
-                    <td>
-                      <div className="users-demo-user">
-                        <span className="users-demo-avatar">{getUserInitials(user.name || '?')}</span>
-                        <strong>{user.name}</strong>
+                  <tr key={user.id} className="cursor-pointer border-t border-slate-100 transition hover:bg-slate-50" onClick={() => navigate(`/users/${user.id}`)}>
+                    <td className="px-4 py-3.5">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-amber-100 text-xs font-bold text-amber-600">{getUserInitials(user.name || '?')}</span>
+                        <strong className="font-semibold text-slate-700"><TruncatedText value={user.name} /></strong>
                       </div>
                     </td>
-                    <td>{user.client}</td>
-                    <td>{superadminDemoData.ENV_META[user.env] ? envBadge(user.env) : getEnvLabel(user.env)}</td>
-                    <td>{formatOptionalNumber(user.messages)}</td>
-                    <td>{formatOptionalNumber(user.sessions)}</td>
-                    <td>{formatOptionalNumber(user.balance)}</td>
-                    <td>{formatOptionalNumber(user.pointsSpent)}</td>
-                    <td>{formatOptionalCurrency(user.value)}</td>
-                    <td>{user.twins ?? ''}</td>
-                    <td>{user.lastActiveLabel}</td>
+                    <td className="px-4 py-3.5 text-slate-500"><TruncatedText value={user.client || '---'} /></td>
+                    <td className="px-4 py-3.5 text-slate-500">{superadminDemoData.ENV_META[user.env] ? envBadge(user.env) : getEnvLabel(user.env)}</td>
+                    <td className="px-4 py-3.5 text-slate-500">{formatOptionalNumber(user.messages)}</td>
+                    <td className="px-4 py-3.5 text-slate-500">{formatOptionalNumber(user.sessions)}</td>
+                    <td className="px-4 py-3.5 text-slate-500">{formatOptionalNumber(user.balance)}</td>
+                    <td className="px-4 py-3.5 text-slate-500">{formatOptionalNumber(user.pointsSpent)}</td>
+                    <td className="px-4 py-3.5 text-slate-500">{formatOptionalCurrency(user.value)}</td>
+                    {!isVault ? <td className="px-4 py-3.5 text-slate-500">{user.twins ?? ''}</td> : null}
+                    <td className="px-4 py-3.5 text-slate-500">{user.lastActiveLabel}</td>
                   </tr>
                 ))
               )}
@@ -451,15 +470,16 @@ export function UsersPage() {
           </table>
         </div>
 
-        <div className="users-demo-footer">
+        <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-5 py-3 text-sm text-slate-400">
           <span>
             {pageStart}-{pageEnd} of {pagination.total}
           </span>
-          <div className="users-demo-pagination">
+          <div className="flex items-center gap-2 font-medium text-slate-600">
             <button
               type="button"
               disabled={currentPage === 1 || isTableLoading}
               aria-label="Previous page"
+              className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 disabled:opacity-40"
               onClick={() => setPage((prev) => Math.max(1, prev - 1))}
             >
               <ChevronLeft size={14} />
@@ -471,6 +491,7 @@ export function UsersPage() {
               type="button"
               disabled={currentPage === totalPages || isTableLoading}
               aria-label="Next page"
+              className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 disabled:opacity-40"
               onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
             >
               <ChevronRight size={14} />

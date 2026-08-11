@@ -7,6 +7,8 @@ import { areaChart, stackedBar } from '../utils/chartHelpers';
 import { deltaPercent, formatNumber } from '../utils/dashboardUtils.jsx';
 import { DataTable } from '../components/common/DataTable.jsx';
 import { loadTokenUsage } from '../services/usageService';
+import { useAuth } from '../app/AuthContext';
+import { isServiceForProduct } from '../utils/productAccess';
 
 const formatUSD = (value) =>
   `$${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -39,6 +41,7 @@ function formatAxisBillions(value) {
 }
 
 export function UsagePage() {
+  const { adminProduct } = useAuth();
   const { filters } = useContext(FilterContext);
   const modalityRef = useRef(null);
   const tokensRef = useRef(null);
@@ -50,13 +53,16 @@ export function UsagePage() {
   const scopedFilters = useMemo(
     () => ({
       ...filters,
-      service: null,
+      service: adminProduct === 'vault' ? 'vault' : null,
       vendor: null,
     }),
-    [filters],
+    [adminProduct, filters],
   );
 
-  const rows = useMemo(() => selectFacts(scopedFilters), [scopedFilters]);
+  const rows = useMemo(
+    () => selectFacts(scopedFilters).filter((row) => isServiceForProduct(adminProduct, row.service)),
+    [adminProduct, scopedFilters],
+  );
   const scopeLabel = useMemo(() => formatScopeLabel(filters), [filters]);
   const labels = useMemo(() => timeSeries(rows, 'messages', scopedFilters).labels, [rows, scopedFilters]);
 
@@ -255,122 +261,122 @@ export function UsagePage() {
   }, [apiSeries, labels, modalityData, storageSeries, tokenChartSeries, tokenLabels, videoSeries, voiceSeries]);
 
   return (
-    <section className="page-section usage-demo-page">
-      <header className="usage-demo-header">
-        <div className="usage-demo-header-copy">
-          <h1>Usage Analytics</h1>
-          <p>Deep time-series across modalities, tokens, media, storage and traffic</p>
+    <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">{adminProduct === 'vault' ? 'Vault Usage Analytics' : 'Usage Analytics'}</h1>
+          <p className="mt-1 text-sm text-slate-400 sm:text-base">{adminProduct === 'vault' ? 'Vault-only storage, API traffic, user activity, and service consumption' : 'Deep time-series across modalities, tokens, media, storage and traffic'}</p>
         </div>
-        <div className="usage-demo-scope">
-          <span className="usage-demo-scope-label">Scope</span>
-          <span className="usage-demo-scope-value">{scopeLabel}</span>
+        <div className="text-left sm:text-right">
+          <span className="block text-xs font-bold uppercase tracking-widest text-slate-400">Scope</span>
+          <span className="mt-1 block text-sm font-semibold text-slate-500">{scopeLabel}</span>
         </div>
       </header>
 
-      <div className="usage-demo-metric-grid">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {metricCards.map((card) => {
           const Icon = card.icon;
-          const delta = card.key === 'storageGB' ? null : deltaPercent(scopedFilters, card.key);
+          const delta = card.key === 'storageGB' ? null : deltaPercent(scopedFilters, card.key, null, adminProduct);
           const cardValue = card.key === 'tokens' ? tokensValue : summary[card.key];
 
           return (
-            <article key={card.key} className="table-card usage-demo-metric-card">
-              <div className="usage-demo-metric-top">
-                <span className={`usage-demo-metric-icon usage-demo-metric-icon-${card.tone}`}>
+            <article key={card.key} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
+              <div className="flex items-start justify-between gap-3">
+                <span className="grid h-9 w-9 place-items-center rounded-xl bg-indigo-50 text-indigo-600">
                   <Icon size={17} />
                 </span>
                 {card.key === 'tokens' && isLive ? (
-                  <span className="usage-demo-metric-delta">live</span>
+                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-600">live</span>
                 ) : delta != null ? (
-                  <span className="usage-demo-metric-delta">^ {Math.abs(delta).toFixed(1)}%</span>
+                  <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-600">↑ {Math.abs(delta).toFixed(1)}%</span>
                 ) : null}
               </div>
-              <h2>{formatNumber(cardValue)}</h2>
-              <p>{card.label}</p>
+              <h2 className="mt-4 text-2xl font-bold tracking-tight text-slate-800">{formatNumber(cardValue)}</h2>
+              <p className="mt-1 text-sm text-slate-400">{card.label}</p>
             </article>
           );
         })}
       </div>
 
-      <div className="usage-demo-chart-grid">
-        <section className="table-card usage-demo-chart-card">
-          <div className="usage-demo-card-head">
-            <h2>Messages by modality</h2>
-            <span>stacked, per day</span>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-base font-semibold text-slate-800">Messages by modality</h2>
+            <span className="text-xs text-slate-400">stacked, per day</span>
           </div>
-          <div className="chart-wrapper usage-demo-chart-wrapper">
+          <div className="relative mt-4 h-72">
             <canvas ref={modalityRef} />
           </div>
         </section>
 
-        <section className="table-card usage-demo-chart-card">
-          <div className="usage-demo-card-head">
-            <h2>OpenAI tokens</h2>
-            <span>{isLive ? 'live · PERSONA usage' : 'demo data'}</span>
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-base font-semibold text-slate-800">OpenAI tokens</h2>
+            <span className="text-xs text-slate-400">{isLive ? 'live · PERSONA usage' : 'demo data'}</span>
           </div>
-          <div className="chart-wrapper usage-demo-chart-wrapper">
+          <div className="relative mt-4 h-72">
             <canvas ref={tokensRef} />
           </div>
         </section>
       </div>
 
-      <div className="usage-demo-triple-grid">
-        <section className="table-card usage-demo-chart-card">
-          <div className="usage-demo-card-head">
-            <h2>Video minutes</h2>
+      <div className="grid gap-4 md:grid-cols-3">
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-base font-semibold text-slate-800">Video minutes</h2>
           </div>
-          <div className="chart-wrapper usage-demo-chart-wrapper">
+          <div className="relative mt-4 h-60">
             <canvas ref={videoRef} />
           </div>
         </section>
 
-        <section className="table-card usage-demo-chart-card">
-          <div className="usage-demo-card-head">
-            <h2>Voice characters</h2>
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-base font-semibold text-slate-800">Voice characters</h2>
           </div>
-          <div className="chart-wrapper usage-demo-chart-wrapper">
+          <div className="relative mt-4 h-60">
             <canvas ref={voiceRef} />
           </div>
         </section>
 
-        <section className="table-card usage-demo-chart-card">
-          <div className="usage-demo-card-head">
-            <h2>Storage growth (GB)</h2>
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-base font-semibold text-slate-800">Storage growth (GB)</h2>
           </div>
-          <div className="chart-wrapper usage-demo-chart-wrapper">
+          <div className="relative mt-4 h-60">
             <canvas ref={storageRef} />
           </div>
         </section>
       </div>
 
-      <div className="usage-demo-bottom-grid">
-        <section className="table-card usage-demo-chart-card">
-          <div className="usage-demo-card-head">
-            <h2>API call volume</h2>
-            <span>SDK gateway telemetry</span>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-base font-semibold text-slate-800">API call volume</h2>
+            <span className="text-xs text-slate-400">SDK gateway telemetry</span>
           </div>
-          <div className="chart-wrapper usage-demo-chart-wrapper">
+          <div className="relative mt-4 h-72">
             <canvas ref={apiRef} />
           </div>
         </section>
 
-        <section className="table-card usage-demo-chart-card usage-demo-heatmap-card">
-          <div className="usage-demo-card-head">
-            <h2>Peak-hour heatmap</h2>
-            <span>UTC</span>
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-base font-semibold text-slate-800">Peak-hour heatmap</h2>
+            <span className="text-xs text-slate-400">UTC</span>
           </div>
-          <div className="usage-demo-heatmap">
-            <div className="usage-demo-heatmap-grid">
+          <div className="mt-4 space-y-2">
+            <div className="space-y-1.5">
               {heatmap.grid.map((row) => (
-                <div key={row.day} className="usage-demo-heatmap-row">
-                  <span className="usage-demo-heatmap-day">{row.day}</span>
-                  <div className="usage-demo-heatmap-cells">
+                <div key={row.day} className="flex items-center gap-2">
+                  <span className="w-8 text-xs font-semibold text-slate-400">{row.day}</span>
+                  <div className="flex flex-1 gap-1">
                     {row.row.map((value, index) => {
                       const ratio = value / heatmap.max;
                       return (
                         <span
                           key={index}
-                          className="usage-demo-heatmap-cell"
+                          className="h-5 min-w-0 flex-1 rounded-xs transition hover:scale-110"
                           style={{ backgroundColor: `rgba(79, 70, 229, ${0.10 + ratio * 0.90})` }}
                         />
                       );
@@ -379,19 +385,19 @@ export function UsagePage() {
                 </div>
               ))}
             </div>
-            <div className="usage-demo-heatmap-footer">
-              <div className="usage-demo-heatmap-hours">
+            <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
+              <div className="flex justify-between gap-6 pl-10 pr-2 font-mono">
                 <span>00</span>
                 <span>06</span>
                 <span>12</span>
                 <span>18</span>
                 <span>23</span>
               </div>
-              <div className="usage-demo-heatmap-scale">
+              <div className="flex items-center gap-2">
                 <span>low</span>
-                <div className="usage-demo-heatmap-scale-cells">
+                <div className="flex gap-0.5">
                   {[0.12, 0.28, 0.44, 0.6, 0.76, 0.92].map((alpha) => (
-                    <span key={alpha} className="usage-demo-heatmap-scale-cell" style={{ backgroundColor: `rgba(79, 70, 229, ${alpha})` }} />
+                    <span key={alpha} className="h-3 w-3 rounded-xs" style={{ backgroundColor: `rgba(79, 70, 229, ${alpha})` }} />
                   ))}
                 </div>
                 <span>high</span>
@@ -401,11 +407,11 @@ export function UsagePage() {
         </section>
       </div>
 
-      <div className="usage-demo-chart-grid">
-        <section className="table-card usage-demo-chart-card">
-          <div className="usage-demo-card-head">
-            <h2>OpenAI tokens by user</h2>
-            <span>{isLive ? 'live · per personaUserId' : 'connect backend for live data'}</span>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
+          <div className="flex items-center justify-between gap-3 pb-3">
+            <h2 className="text-base font-semibold text-slate-800">OpenAI tokens by user</h2>
+            <span className="text-xs text-slate-400">{isLive ? 'live · per personaUserId' : 'connect backend for live data'}</span>
           </div>
           {isLive ? (
             <DataTable
@@ -415,16 +421,16 @@ export function UsagePage() {
               emptyMessage="No token usage in range"
             />
           ) : (
-            <p className="usage-demo-empty-hint">
-              Set <code>VITE_API_BASE_URL</code> (and a SuperAdmin token) to load real per-user OpenAI token usage.
+            <p className="py-6 text-center text-xs text-slate-400">
+              Set <code className="rounded bg-slate-100 px-1 py-0.5">VITE_API_BASE_URL</code> (and a SuperAdmin token) to load real per-user OpenAI token usage.
             </p>
           )}
         </section>
 
-        <section className="table-card usage-demo-chart-card">
-          <div className="usage-demo-card-head">
-            <h2>OpenAI tokens by client</h2>
-            <span>{isLive ? 'live · reconciled to TWIN client' : 'connect backend for live data'}</span>
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
+          <div className="flex items-center justify-between gap-3 pb-3">
+            <h2 className="text-base font-semibold text-slate-800">OpenAI tokens by client</h2>
+            <span className="text-xs text-slate-400">{isLive ? 'live · reconciled to TWIN client' : 'connect backend for live data'}</span>
           </div>
           {isLive ? (
             <DataTable
@@ -434,8 +440,8 @@ export function UsagePage() {
               emptyMessage="No token usage in range"
             />
           ) : (
-            <p className="usage-demo-empty-hint">
-              Set <code>VITE_API_BASE_URL</code> (and a SuperAdmin token) to load real per-client OpenAI token usage.
+            <p className="py-6 text-center text-xs text-slate-400">
+              Set <code className="rounded bg-slate-100 px-1 py-0.5">VITE_API_BASE_URL</code> (and a SuperAdmin token) to load real per-client OpenAI token usage.
             </p>
           )}
         </section>

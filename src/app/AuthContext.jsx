@@ -7,8 +7,14 @@ import {
   readStoredSession,
   setAuthToken,
 } from '../services';
+import { getAdminProduct } from '../utils/productAccess';
 
 const AuthContext = createContext(null);
+
+function getRoleLabel(role) {
+  if (typeof role === 'string') return role;
+  return role?.name ?? role?.label ?? role?.title ?? 'Platform SuperAdmin';
+}
 
 function defaultProfileFromSession(session) {
   const email = session?.user?.email ?? session?.email ?? '';
@@ -16,7 +22,7 @@ function defaultProfileFromSession(session) {
     name: session?.user?.name ?? session?.user?.fullName ?? 'Super Admin',
     email,
     phone: session?.user?.phone ?? '',
-    role: session?.user?.role ?? 'Platform SuperAdmin',
+    role: getRoleLabel(session?.user?.role),
     company: session?.user?.company ?? session?.user?.organization ?? 'Twin Protocol',
     bio:
       session?.user?.bio ??
@@ -76,6 +82,7 @@ export function AuthProvider({ children }) {
       token: authState.session?.token ?? null,
       user: authState.session?.user ?? null,
       profile: authState.profile,
+      adminProduct: getAdminProduct(authState.profile?.role ?? authState.session?.user?.role),
       async login(credentials) {
         setAuthState((prev) => ({ ...prev, isLoading: true }));
 

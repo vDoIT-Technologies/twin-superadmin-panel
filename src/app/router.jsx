@@ -5,6 +5,7 @@ import { AppLayout } from '../layouts/AppLayout';
 import { HomeAuthPage } from '../pages/HomeAuthPage';
 import { LoginOtpPage } from '../pages/LoginOtpPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
+import { canAccessPath } from '../utils/productAccess';
 
 const OverviewPage = lazy(() => import('../pages/OverviewPage').then((module) => ({ default: module.OverviewPage })));
 const ProfilePage = lazy(() => import('../pages/ProfilePage').then((module) => ({ default: module.ProfilePage })));
@@ -21,7 +22,7 @@ const TwinDetailPage = lazy(() => import('../pages/EntityDetailPages').then((mod
 const UserDetailPage = lazy(() => import('../pages/EntityDetailPages').then((module) => ({ default: module.UserDetailPage })));
 
 function RouteFallback() {
-  return <div className="route-loading" role="status" aria-live="polite">Loading page...</div>;
+  return <div className="flex min-h-[300px] items-center justify-center p-8 text-sm font-semibold text-slate-400" role="status" aria-live="polite">Loading page...</div>;
 }
 
 function renderLazyPage(element) {
@@ -36,10 +37,10 @@ function LegacyAppRedirect() {
 
 function AuthScreenMessage({ message }) {
   return (
-    <section className="auth-loading-screen">
-      <div className="auth-loading-card">
-        <span className="auth-pill">Twin SuperAdmin</span>
-        <p>{message}</p>
+    <section className="grid min-h-screen place-items-center bg-[radial-gradient(circle_at_top,rgba(99,102,241,0.14),transparent_36%),linear-gradient(180deg,#eff6ff_0%,#f8fafc_55%,#eef2ff_100%)] p-6">
+      <div className="w-full max-w-[420px] rounded-3xl border border-slate-400/25 bg-white/90 p-7 text-center shadow-2xl backdrop-blur-md">
+        <span className="inline-flex min-h-[34px] items-center gap-2 rounded-full border border-indigo-600/10 bg-white/80 px-3.5 text-xs font-bold text-indigo-600 shadow-sm">Twin SuperAdmin</span>
+        <p className="mt-3.5 text-sm text-slate-600">{message}</p>
       </div>
     </section>
   );
@@ -58,6 +59,21 @@ function RequireAuth() {
   }
 
   return <Outlet />;
+}
+
+function ProductRoute({ children }) {
+  const { adminProduct } = useAuth();
+  const location = useLocation();
+
+  if (!canAccessPath(adminProduct, location.pathname)) {
+    return <Navigate to="/" replace />;
+  }
+
+  return children;
+}
+
+function ProductOverview() {
+  return renderLazyPage(<OverviewPage />);
 }
 
 function RedirectIfAuthenticated() {
@@ -79,18 +95,18 @@ export const router = createBrowserRouter([
         element: <AppLayout />,
         errorElement: <NotFoundPage />,
         children: [
-          { index: true, element: renderLazyPage(<OverviewPage />) },
+          { index: true, element: <ProductOverview /> },
           { path: 'profile', element: renderLazyPage(<ProfilePage />) },
           { path: 'clients', element: renderLazyPage(<ClientsPage />) },
           { path: 'clients/:clientId', element: renderLazyPage(<ClientDetailPage />) },
-          { path: 'twins', element: renderLazyPage(<TwinsPage />) },
-          { path: 'twins/:twinId', element: renderLazyPage(<TwinDetailPage />) },
+          { path: 'twins', element: <ProductRoute>{renderLazyPage(<TwinsPage />)}</ProductRoute> },
+          { path: 'twins/:twinId', element: <ProductRoute>{renderLazyPage(<TwinDetailPage />)}</ProductRoute> },
           { path: 'users', element: renderLazyPage(<UsersPage />) },
           { path: 'users/:userId', element: renderLazyPage(<UserDetailPage />) },
           { path: 'services', element: renderLazyPage(<ServicesPage />) },
-          { path: 'vault', element: renderLazyPage(<VaultPage />) },
-          { path: 'financial', element: renderLazyPage(<FinancialPage />) },
-          { path: 'usage', element: renderLazyPage(<UsagePage />) },
+          { path: 'vault', element: <ProductRoute>{renderLazyPage(<VaultPage />)}</ProductRoute> },
+          { path: 'financial', element: <ProductRoute>{renderLazyPage(<FinancialPage />)}</ProductRoute> },
+          { path: 'usage', element: <ProductRoute>{renderLazyPage(<UsagePage />)}</ProductRoute> },
           { path: 'telemetry', element: renderLazyPage(<TelemetryPage />) },
         ],
       },
