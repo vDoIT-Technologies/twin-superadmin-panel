@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import { envBadge, formatNumber } from '../../utils/dashboardUtils';
 import { formatBytes, formatLastActive, getUserInitials } from '../../utils/vaultFormatters';
+import { TruncatedText } from '../common/TruncatedText';
 
 const COLUMNS = [
   ['user', 'User'], ['client', 'Client'], ['env', 'Env'],
@@ -36,9 +37,9 @@ export function TopUsersTable({ users, sortConfig, onSort, onExport }) {
         <h2 className="text-base font-semibold text-slate-800">Top users by storage</h2>
         <button type="button" className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-white px-3 py-2 text-sm font-semibold text-indigo-600 transition hover:bg-indigo-50" onClick={onExport}><Download size={14} />Export CSV</button>
       </div>
-      <div className="overflow-x-auto">
+      <div className="max-h-[65vh] overflow-auto">
         <table className="w-full min-w-[720px] border-collapse text-sm">
-          <thead className="bg-slate-50"><tr>{COLUMNS.map(([key, label]) => (
+          <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_0_0_rgba(226,232,240,1)]"><tr>{COLUMNS.map(([key, label]) => (
             <th key={key} className="px-5 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-400"><button type="button" className="inline-flex items-center gap-1 hover:text-slate-700" onClick={() => onSort(key)}>
               <span>{label}</span><span className={sortConfig.key === key ? 'text-indigo-500' : ''}>{sortConfig.key === key ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}</span>
             </button></th>
@@ -47,8 +48,8 @@ export function TopUsersTable({ users, sortConfig, onSort, onExport }) {
             <tr><td colSpan={6} className="px-5 py-12 text-center text-sm text-slate-400">No storage users found</td></tr>
           ) : paginatedUsers.map((user, index) => (
             <tr className="border-t border-slate-100 transition hover:bg-slate-50" key={user.id || `${user.email}-${user.client}-${pageStart + index}`}>
-              <td className="px-5 py-4"><div className="flex items-center gap-3"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky-500 text-xs font-bold text-white">{getUserInitials(user.name)}</span><strong className="max-w-48 truncate text-slate-700">{user.name}</strong></div></td>
-              <td className="px-5 py-4 text-slate-500">{user.client}</td><td className="px-5 py-4">{envBadge(user.env)}</td>
+              <td className="px-5 py-4"><div className="flex items-center gap-3"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky-500 text-xs font-bold text-white">{getUserInitials(user.name)}</span><strong className="text-slate-700"><TruncatedText value={user.name} /></strong></div></td>
+              <td className="px-5 py-4 text-slate-500"><TruncatedText value={user.client} /></td><td className="px-5 py-4">{envBadge(user.env)}</td>
               <td className="px-5 py-4 font-semibold text-slate-700">{formatBytes(user.storageBytes)}</td>
               <td className="px-5 py-4 text-slate-500">{formatNumber(user.files)}</td><td className="px-5 py-4 text-slate-500">{formatLastActive(user.lastActive)}</td>
             </tr>

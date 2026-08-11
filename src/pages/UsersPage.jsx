@@ -2,6 +2,8 @@ import { useContext, useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Download, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { FilterContext } from '../app/FilterContext';
+import { useAuth } from '../app/AuthContext';
+import { TruncatedText } from '../components/common/TruncatedText';
 import { superadminDemoData } from '../demo-data/superadminDemoData';
 import { dashboardService, dropdownApiAvailable, getUsersDropdown } from '../services';
 import { envBadge, formatCurrencyFull, formatNumber } from '../utils/dashboardUtils';
@@ -114,6 +116,8 @@ function getId(value) {
 }
 
 export function UsersPage() {
+  const { adminProduct } = useAuth();
+  const isVault = adminProduct === 'vault';
   const PAGE_SIZE = 12;
   const { filters } = useContext(FilterContext);
   const navigate = useNavigate();
@@ -337,7 +341,7 @@ export function UsersPage() {
   };
 
   const exportCsv = () => {
-    const header = ['User', 'Client', 'Env', 'Messages', 'Sessions', 'Balance', 'Points Spent', '$ Value', 'Twins', 'Last Active'];
+    const header = ['User', 'Client', 'Env', 'Messages', 'Sessions', 'Balance', 'Points Spent', '$ Value', ...(!isVault ? ['Twins'] : []), 'Last Active'];
     const lines = sortedRows.map((user) =>
       [
         user.name,
@@ -348,7 +352,7 @@ export function UsersPage() {
         formatOptionalNumber(user.balance),
         formatOptionalNumber(user.pointsSpent),
         formatOptionalCurrency(user.value),
-        user.twins ?? '',
+        ...(!isVault ? [user.twins ?? ''] : []),
         user.lastActiveLabel,
       ]
         .map((value) => `"${String(value).replaceAll('"', '""')}"`)
@@ -400,9 +404,9 @@ export function UsersPage() {
           </button>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1100px] border-collapse text-sm">
-            <thead className="bg-slate-50">
+        <div className="max-h-[65vh] overflow-auto">
+          <table className={`w-full border-collapse text-sm ${isVault ? 'min-w-[980px]' : 'min-w-[1100px]'}`}>
+            <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_0_0_rgba(226,232,240,1)]">
               <tr>
                 {[
                   ['user', 'User'],
@@ -413,7 +417,7 @@ export function UsersPage() {
                   ['balance', 'Balance'],
                   ['pointsSpent', 'Points spent'],
                   ['value', '$ Value'],
-                  ['twins', 'Twins'],
+                  ...(!isVault ? [['twins', 'Twins']] : []),
                   ['lastActive', 'Last active'],
                 ].map(([key, label]) => (
                   <th key={key} className="px-4 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
@@ -430,14 +434,14 @@ export function UsersPage() {
             <tbody>
               {isTableLoading ? (
                 <tr>
-                  <td colSpan={10} className="px-5 py-12 text-center text-sm text-slate-400">
+                  <td colSpan={isVault ? 9 : 10} className="px-5 py-12 text-center text-sm text-slate-400">
                     <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-indigo-100 border-t-indigo-600 align-[-2px]" aria-hidden="true" />
                     Loading users...
                   </td>
                 </tr>
               ) : paginatedRows.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-5 py-12 text-center text-sm text-slate-400">
+                  <td colSpan={isVault ? 9 : 10} className="px-5 py-12 text-center text-sm text-slate-400">
                     No users found
                   </td>
                 </tr>
@@ -447,17 +451,17 @@ export function UsersPage() {
                     <td className="px-4 py-3.5">
                       <div className="flex min-w-0 items-center gap-3">
                         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-amber-100 text-xs font-bold text-amber-600">{getUserInitials(user.name || '?')}</span>
-                        <strong className="truncate font-semibold text-slate-700">{user.name}</strong>
+                        <strong className="font-semibold text-slate-700"><TruncatedText value={user.name} /></strong>
                       </div>
                     </td>
-                    <td className="px-4 py-3.5 text-slate-500">{user.client || '---'}</td>
+                    <td className="px-4 py-3.5 text-slate-500"><TruncatedText value={user.client || '---'} /></td>
                     <td className="px-4 py-3.5 text-slate-500">{superadminDemoData.ENV_META[user.env] ? envBadge(user.env) : getEnvLabel(user.env)}</td>
                     <td className="px-4 py-3.5 text-slate-500">{formatOptionalNumber(user.messages)}</td>
                     <td className="px-4 py-3.5 text-slate-500">{formatOptionalNumber(user.sessions)}</td>
                     <td className="px-4 py-3.5 text-slate-500">{formatOptionalNumber(user.balance)}</td>
                     <td className="px-4 py-3.5 text-slate-500">{formatOptionalNumber(user.pointsSpent)}</td>
                     <td className="px-4 py-3.5 text-slate-500">{formatOptionalCurrency(user.value)}</td>
-                    <td className="px-4 py-3.5 text-slate-500">{user.twins ?? ''}</td>
+                    {!isVault ? <td className="px-4 py-3.5 text-slate-500">{user.twins ?? ''}</td> : null}
                     <td className="px-4 py-3.5 text-slate-500">{user.lastActiveLabel}</td>
                   </tr>
                 ))

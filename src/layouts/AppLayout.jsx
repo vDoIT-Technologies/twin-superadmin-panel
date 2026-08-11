@@ -5,6 +5,7 @@ import { FilterContext } from '../app/FilterContext';
 import { FilterToolbar } from '../components/layout/FilterToolbar';
 import { Sidebar } from '../components/layout/Sidebar';
 import { superadminDemoData } from '../demo-data/superadminDemoData';
+import { isServiceForProduct, isVendorForProduct } from '../utils/productAccess';
 import {
   dropdownApiAvailable,
   getClientsDropdown,
@@ -56,7 +57,7 @@ function getUserName(user) {
 export function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated, logout, profile, user } = useAuth();
+  const { adminProduct, isAuthenticated, logout, profile, user } = useAuth();
   const { filters, setFilters } = useContext(FilterContext);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -71,7 +72,8 @@ export function AppLayout() {
   const profileMenuRef = useRef(null);
   const showFilterBar = location.pathname !== '/profile';
   const showOverviewControls = location.pathname === '/';
-  const currentTitle =
+  const visibleScopes = ['granularity', 'client', 'twin', 'user', 'service', 'vendor'];
+  const baseTitle =
     breadcrumbTitles[location.pathname] ??
     (location.pathname.startsWith('/clients/')
       ? 'Clients'
@@ -80,6 +82,11 @@ export function AppLayout() {
         : location.pathname.startsWith('/users/')
           ? 'Users'
           : 'Overview');
+  const currentTitle = adminProduct === 'vault' && location.pathname === '/financial'
+    ? 'Vault Billing'
+    : adminProduct === 'vault' && location.pathname === '/usage'
+      ? 'Vault Usage Analytics'
+      : baseTitle;
   const profileName = profile.name || user?.name || 'Super Admin';
   const profileEmail = profile.email || user?.email || 'No email';
   const initials =
@@ -95,6 +102,20 @@ export function AppLayout() {
   };
 
   const selectedEnv = filters.envs.length === 1 ? filters.envs[0] : undefined;
+
+  useEffect(() => {
+    const invalidService = filters.service && !isServiceForProduct(adminProduct, filters.service);
+    const invalidVendor = filters.vendor && !isVendorForProduct(adminProduct, filters.vendor);
+    const invalidTwin = adminProduct === 'vault' && filters.twin;
+
+    if (invalidService || invalidVendor || invalidTwin) {
+      updateFilters({
+        ...(invalidService ? { service: null } : {}),
+        ...(invalidVendor ? { vendor: null } : {}),
+        ...(invalidTwin ? { twin: null } : {}),
+      });
+    }
+  }, [adminProduct, filters.service, filters.twin, filters.vendor]);
 
   useEffect(() => {
     if (!isAuthenticated || !dropdownApiAvailable()) {
@@ -170,12 +191,10 @@ export function AppLayout() {
     () =>
       superadminDemoData.VENDORS.filter(
         (vendor) =>
-          !filters.service ||
-          superadminDemoData.byId
-            .service(filters.service)
-            ?.vendors.includes(vendor.id),
+          isVendorForProduct(adminProduct, vendor.id) &&
+          (!filters.service || superadminDemoData.byId.service(filters.service)?.vendors.includes(vendor.id)),
       ),
-    [filters.service],
+    [adminProduct, filters.service],
   );
   const clientDropdownOptions = useMemo(
     () =>
@@ -209,12 +228,12 @@ export function AppLayout() {
   );
   const serviceDropdownOptions = useMemo(
     () =>
-      superadminDemoData.SERVICES.map((service) => ({
+      superadminDemoData.SERVICES.filter((service) => isServiceForProduct(adminProduct, service.id)).map((service) => ({
         value: service.id,
         label: service.name,
         meta: service.stack,
       })),
-    [],
+    [adminProduct],
   );
   const vendorDropdownOptions = useMemo(
     () =>
@@ -223,7 +242,7 @@ export function AppLayout() {
         label: vendor.name,
         meta: vendor.cat,
       })),
-    [vendorOptions],
+    [adminProduct, vendorOptions],
   );
   const updateScopeFilter = (key, value) => {
     if (key === 'client') {
@@ -262,7 +281,7 @@ export function AppLayout() {
         path: `/clients/${client.id}`,
       }));
 
-    const twins = superadminDemoData.TWINS.filter((twin) =>
+    const twins = adminProduct === 'twin' ? superadminDemoData.TWINS.filter((twin) =>
       twin.name.toLowerCase().includes(q),
     )
       .slice(0, 4)
@@ -274,7 +293,7 @@ export function AppLayout() {
         sub: superadminDemoData.byId.client(twin.clientId)?.name ?? '',
         icon: <Bot size={14} />,
         path: `/twins/${twin.id}`,
-      }));
+      })) : [];
 
     const users = superadminDemoData.USERS.filter((user) =>
       user.name.toLowerCase().includes(q),
@@ -291,7 +310,7 @@ export function AppLayout() {
       }));
 
     return [...clients, ...twins, ...users];
-  }, [searchQuery]);
+  }, [adminProduct, searchQuery]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -351,7 +370,7 @@ export function AppLayout() {
   };
 
   return (
-    <div className="app-shell flex min-h-screen bg-slate-50 text-slate-800">
+    <div className={`app-shell flex min-h-screen bg-slate-50 text-slate-800 ${adminProduct === 'vault' ? 'product-vault' : 'product-twin'}`} data-product={adminProduct}>
       <Sidebar
         collapsed={isSidebarCollapsed}
         mobileOpen={isMobileSidebarOpen}
@@ -398,6 +417,9 @@ export function AppLayout() {
               <div className="min-w-0">
                 <span className="block truncate text-lg font-semibold text-slate-800">{currentTitle}</span>
               </div>
+              <span className={`hidden rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] sm:inline-flex ${adminProduct === 'vault' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-indigo-200 bg-indigo-50 text-indigo-700'}`}>
+                {adminProduct === 'vault' ? 'Vault Admin' : 'Twin Admin'}
+              </span>
             </div>
 
             <div className={`flex min-w-0 items-center justify-end gap-2 ${isMobileSearchOpen ? 'w-full flex-1' : ''}`}>
@@ -425,7 +447,7 @@ export function AppLayout() {
                   type="text"
                   className={`h-9 w-full rounded-xl border border-slate-200 bg-slate-50/80 pl-9 pr-8 text-xs font-medium text-slate-700 outline-none transition focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100 ${!isMobileSearchOpen ? 'hidden sm:block' : 'block'}`}
                   value={searchQuery}
-                  placeholder="Search clients, twins, users..."
+                  placeholder={adminProduct === 'vault' ? 'Search Vault clients and users...' : 'Search clients, twins, users...'}
                   onChange={(event) => {
                     const nextQuery = event.target.value;
                     setSearchQuery(nextQuery);
@@ -496,7 +518,7 @@ export function AppLayout() {
                   aria-expanded={profileMenuOpen}
                   onClick={() => setProfileMenuOpen((value) => !value)}
                 >
-                  <div className="grid h-8 w-8 place-items-center rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-500 text-xs font-bold text-white shadow-xs">{initials}</div>
+                  <div className={`grid h-8 w-8 place-items-center rounded-xl bg-gradient-to-br text-xs font-bold text-white shadow-xs ${adminProduct === 'vault' ? 'from-emerald-600 to-teal-500' : 'from-indigo-600 to-indigo-500'}`}>{initials}</div>
                   <ChevronDown size={14} className="text-slate-400" />
                 </button>
                 {profileMenuOpen ? (
@@ -526,6 +548,8 @@ export function AppLayout() {
               serviceOptions={serviceDropdownOptions}
               vendorOptions={vendorDropdownOptions}
               showOverviewControls={showOverviewControls}
+              adminProduct={adminProduct}
+              visibleScopes={visibleScopes}
             />
           ) : null}
         </div>

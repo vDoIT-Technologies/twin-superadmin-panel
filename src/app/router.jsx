@@ -5,6 +5,7 @@ import { AppLayout } from '../layouts/AppLayout';
 import { HomeAuthPage } from '../pages/HomeAuthPage';
 import { LoginOtpPage } from '../pages/LoginOtpPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
+import { canAccessPath } from '../utils/productAccess';
 
 const OverviewPage = lazy(() => import('../pages/OverviewPage').then((module) => ({ default: module.OverviewPage })));
 const ProfilePage = lazy(() => import('../pages/ProfilePage').then((module) => ({ default: module.ProfilePage })));
@@ -60,6 +61,21 @@ function RequireAuth() {
   return <Outlet />;
 }
 
+function ProductRoute({ children }) {
+  const { adminProduct } = useAuth();
+  const location = useLocation();
+
+  if (!canAccessPath(adminProduct, location.pathname)) {
+    return <Navigate to="/" replace />;
+  }
+
+  return children;
+}
+
+function ProductOverview() {
+  return renderLazyPage(<OverviewPage />);
+}
+
 function RedirectIfAuthenticated() {
   const { isAuthenticated } = useAuth();
 
@@ -79,18 +95,18 @@ export const router = createBrowserRouter([
         element: <AppLayout />,
         errorElement: <NotFoundPage />,
         children: [
-          { index: true, element: renderLazyPage(<OverviewPage />) },
+          { index: true, element: <ProductOverview /> },
           { path: 'profile', element: renderLazyPage(<ProfilePage />) },
           { path: 'clients', element: renderLazyPage(<ClientsPage />) },
           { path: 'clients/:clientId', element: renderLazyPage(<ClientDetailPage />) },
-          { path: 'twins', element: renderLazyPage(<TwinsPage />) },
-          { path: 'twins/:twinId', element: renderLazyPage(<TwinDetailPage />) },
+          { path: 'twins', element: <ProductRoute>{renderLazyPage(<TwinsPage />)}</ProductRoute> },
+          { path: 'twins/:twinId', element: <ProductRoute>{renderLazyPage(<TwinDetailPage />)}</ProductRoute> },
           { path: 'users', element: renderLazyPage(<UsersPage />) },
           { path: 'users/:userId', element: renderLazyPage(<UserDetailPage />) },
           { path: 'services', element: renderLazyPage(<ServicesPage />) },
-          { path: 'vault', element: renderLazyPage(<VaultPage />) },
-          { path: 'financial', element: renderLazyPage(<FinancialPage />) },
-          { path: 'usage', element: renderLazyPage(<UsagePage />) },
+          { path: 'vault', element: <ProductRoute>{renderLazyPage(<VaultPage />)}</ProductRoute> },
+          { path: 'financial', element: <ProductRoute>{renderLazyPage(<FinancialPage />)}</ProductRoute> },
+          { path: 'usage', element: <ProductRoute>{renderLazyPage(<UsagePage />)}</ProductRoute> },
           { path: 'telemetry', element: renderLazyPage(<TelemetryPage />) },
         ],
       },

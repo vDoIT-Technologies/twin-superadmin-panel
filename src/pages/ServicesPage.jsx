@@ -1,5 +1,10 @@
 import { useEffect, useState } from 'react';
+import { AlertCircle, Clock3, RefreshCw } from 'lucide-react';
 import { dashboardService } from '../services';
+import { useAuth } from '../app/AuthContext';
+
+const VAULT_SERVICE_PATTERN = /vault|filebase|ipfs|storage|object.?store|s3/i;
+const VAULT_ONLY_SERVICE_PATTERN = /vault|filebase|ipfs|storage|object.?store/i;
 
 const statusTone = {
   Configured: 'border-emerald-200 bg-emerald-50 text-emerald-700',
@@ -74,21 +79,30 @@ function formatSimpleValue(v) {
 }
 
 export function ServicesPage() {
+  const { adminProduct } = useAuth();
   const [services, setServices] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [lastChecked, setLastChecked] = useState(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let active = true;
     setIsLoading(true);
+    setError('');
 
     async function load() {
       try {
         const data = await dashboardService.getServicesStatus();
         if (!active) return;
         setServices(data?.data || data);
+        setLastChecked(new Date());
       } catch (err) {
         console.error('GET /config/services-status failed:', err);
-        if (active) setServices(null);
+        if (active) {
+          setServices(null);
+          setError(err?.message || 'Service status could not be loaded.');
+        }
       } finally {
         if (active) setIsLoading(false);
       }
@@ -96,22 +110,28 @@ export function ServicesPage() {
 
     load();
     return () => { active = false; };
-  }, []);
+  }, [reloadKey]);
 
-  const serviceList = services ? Object.entries(services).map(([name, info]) => ({
+  const serviceList = services ? Object.entries(services)
+    .filter(([name]) => adminProduct === 'vault' ? VAULT_SERVICE_PATTERN.test(name) : !VAULT_ONLY_SERVICE_PATTERN.test(name))
+    .map(([name, info]) => ({
     name: name.charAt(0).toUpperCase() + name.slice(1),
     key: name,
     status: info?.status || 'Unknown',
     data: info?.data || null,
     message: info?.message || null,
-  })) : [];
+    })) : [];
 
   return (
     <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
-      <header>
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Services</h1>
-          <p className="mt-1 text-sm text-slate-500">Third-party integration health and status</p>
+          <p className="mt-1 text-sm text-slate-500">{adminProduct === 'vault' ? 'Integration health and configuration for services used by Vault' : 'Third-party integration health and status'}</p>
+        </div>
+        <div className="flex items-center gap-3">
+          {lastChecked ? <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-400"><Clock3 size={13} />Checked {lastChecked.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span> : null}
+          <button type="button" disabled={isLoading} onClick={() => setReloadKey((value) => value + 1)} className="inline-flex h-9 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-indigo-200 hover:text-indigo-700 disabled:opacity-50"><RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />Refresh</button>
         </div>
       </header>
 
@@ -121,12 +141,20 @@ export function ServicesPage() {
             <span className="h-5 w-5 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600" aria-hidden="true" />
             Checking service status...
           </div>
+        ) : error ? (
+          <div className="flex min-h-56 flex-col items-center justify-center text-center">
+            <span className="grid h-11 w-11 place-items-center rounded-xl bg-rose-50 text-rose-600"><AlertCircle size={20} /></span>
+            <h2 className="mt-3 text-sm font-semibold text-slate-800">Unable to check services</h2>
+            <p className="mt-1 max-w-md text-sm text-slate-500">{error}</p>
+            <button type="button" onClick={() => setReloadKey((value) => value + 1)} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white"><RefreshCw size={14} />Try again</button>
+          </div>
         ) : serviceList.length === 0 ? (
           <div className="flex min-h-48 items-center justify-center text-sm font-medium text-slate-500">No services configured</div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {serviceList.map((service) => (
-              <article key={service.key} className="rounded-xl border border-slate-200 bg-slate-50/50 p-5 shadow-sm">
+              <article key={service.key} className="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-50/50 p-5 shadow-sm">
+                <span className={`absolute inset-y-0 left-0 w-1 ${service.status === 'Configured' ? 'bg-emerald-500' : service.status === 'Error' ? 'bg-rose-500' : 'bg-amber-400'}`} aria-hidden="true" />
                 <div className="flex items-start justify-between gap-3">
                   <h3 className="text-base font-semibold text-slate-900">{service.name}</h3>
                   <StatusBadge status={service.status} />
