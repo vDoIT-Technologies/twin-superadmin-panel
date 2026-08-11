@@ -55,6 +55,7 @@ export const dashboardService = {
         page: params.page,
         limit: params.limit,
         clientId: params.clientId,
+        twinId: params.twinId,
         env: params.env,
         range: params.range,
       },

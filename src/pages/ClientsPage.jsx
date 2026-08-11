@@ -2,6 +2,8 @@ import { useContext, useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Download, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { FilterContext } from "../app/FilterContext";
+import { useAuth } from "../app/AuthContext";
+import { TruncatedText } from "../components/common/TruncatedText";
 import { dashboardService } from "../services";
 import { envBadge } from "../utils/dashboardUtils";
 import {
@@ -19,6 +21,8 @@ function getClientId(client) {
 }
 
 export function ClientsPage() {
+  const { adminProduct } = useAuth();
+  const isVault = adminProduct === 'vault';
   const PAGE_SIZE = 10;
   const { filters } = useContext(FilterContext);
   const navigate = useNavigate();
@@ -47,6 +51,7 @@ export function ClientsPage() {
           page,
           limit: PAGE_SIZE,
           clientId: filters.client,
+          twinId: filters.twin,
           env: filters.envs.length === 1 ? filters.envs[0] : undefined,
           range: filters.range,
         });
@@ -75,11 +80,11 @@ export function ClientsPage() {
     return () => {
       isActive = false;
     };
-  }, [filters.client, filters.envs, filters.range, page]);
+  }, [filters.client, filters.envs, filters.range, filters.twin, page]);
 
   useEffect(() => {
     setPage(1);
-  }, [filters.client, filters.envs, filters.range]);
+  }, [filters.client, filters.envs, filters.range, filters.twin]);
 
   const clientRows = useMemo(() => {
     return apiClients.map((client, index) => {
@@ -186,7 +191,7 @@ export function ClientsPage() {
       "Client",
       "Plan",
       "Envs",
-      "Twins",
+      ...(!isVault ? ["Twins"] : []),
       "Users",
       "Messages",
       "Points Spent",
@@ -199,7 +204,7 @@ export function ClientsPage() {
         client.name,
         client.plan,
         client.envs.join(" | "),
-        client.twins,
+        ...(!isVault ? [client.twins] : []),
         client.users,
         formatOptionalNumber(client.messages),
         formatOptionalNumber(client.pointsSpent),
@@ -255,14 +260,14 @@ export function ClientsPage() {
           </button>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1100px] border-collapse text-sm">
-            <thead className="bg-slate-50">
+        <div className="max-h-[65vh] overflow-auto">
+          <table className={`w-full border-collapse text-sm ${isVault ? 'min-w-[980px]' : 'min-w-[1100px]'}`}>
+            <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_0_0_rgba(226,232,240,1)]">
               <tr>
                 {[
                   ["client", "Client"],
                   ["env", "Env"],
-                  ["twins", "Twins"],
+                  ...(!isVault ? [["twins", "Twins"]] : []),
                   ["users", "Users"],
                   ["messages", "Messages"],
                   ["pointsSpent", "Points spent"],
@@ -296,7 +301,7 @@ export function ClientsPage() {
               {isTableLoading ? (
                 <tr>
                   <td
-                    colSpan={10}
+                    colSpan={isVault ? 9 : 10}
                     className="px-5 py-12 text-center text-sm text-slate-400"
                   >
                     <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-indigo-100 border-t-indigo-600 align-[-2px]" aria-hidden="true" />
@@ -305,7 +310,7 @@ export function ClientsPage() {
                 </tr>
               ) : sortedRows.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-5 py-12 text-center text-sm text-slate-400">
+                  <td colSpan={isVault ? 9 : 10} className="px-5 py-12 text-center text-sm text-slate-400">
                     No clients found
                   </td>
                 </tr>
@@ -318,8 +323,8 @@ export function ClientsPage() {
                           {getClientInitials(client.name)}
                         </span>
                         <div className="min-w-0">
-                          <strong className="block truncate font-semibold text-slate-700">{client.name}</strong>
-                          <span className="mt-0.5 block truncate text-xs text-slate-400">{client.plan}</span>
+                          <strong className="block font-semibold text-slate-700"><TruncatedText value={client.name} /></strong>
+                          <span className="mt-0.5 block text-xs text-slate-400"><TruncatedText value={client.plan} /></span>
                         </div>
                       </div>
                     </td>
@@ -332,7 +337,7 @@ export function ClientsPage() {
                         ))}
                       </div>
                     </td>
-                    <td className="px-4 py-3.5 text-slate-500">{formatOptionalNumber(client.twins)}</td>
+                    {!isVault ? <td className="px-4 py-3.5 text-slate-500">{formatOptionalNumber(client.twins)}</td> : null}
                     <td className="px-4 py-3.5 text-slate-500">{formatOptionalNumber(client.users)}</td>
                     <td className="px-4 py-3.5 text-slate-500">{formatOptionalNumber(client.messages)}</td>
                     <td className="px-4 py-3.5 text-slate-500">{formatOptionalNumber(client.pointsSpent)}</td>

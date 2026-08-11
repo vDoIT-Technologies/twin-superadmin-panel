@@ -15,3 +15,114 @@ body {
   background-color: #f8fafc;
   color: #1e293b;
 }
+
+.brand-mark {
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 0.5rem;
+  background: #eef2ff;
+  color: #4f46e5;
+}
+
+.product-vault .brand-mark {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.product-vault ::selection {
+  background: #a7f3d0;
+  color: #064e3b;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+
+.product-vault button:focus-visible,
+.product-vault a:focus-visible,
+.product-vault input:focus-visible,
+.product-vault select:focus-visible {
+  outline-color: #10b981;
+}
+
+.themed-tooltip[data-tooltip] {
+  position: relative;
+  cursor: help;
+}
+
+.themed-tooltip[data-tooltip]::before,
+.themed-tooltip[data-tooltip]::after {
+  position: absolute;
+  z-index: 60;
+  left: 50%;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 140ms ease, transform 140ms ease, visibility 140ms ease;
+}
+
+.themed-tooltip[data-tooltip]::after {
+  content: attr(data-tooltip);
+  bottom: calc(100% + 8px);
+  width: max-content;
+  max-width: min(24rem, 70vw);
+  transform: translate(-50%, 3px);
+  overflow-wrap: anywhere;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.5rem;
+  background: #1e293b;
+  padding: 0.375rem 0.625rem;
+  color: #f8fafc;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1rem;
+  letter-spacing: 0;
+  text-align: left;
+  white-space: normal;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18), 0 2px 6px rgba(15, 23, 42, 0.12);
+}
+
+.themed-tooltip[data-tooltip]::before {
+  content: '';
+  bottom: calc(100% + 5px);
+  width: 7px;
+  height: 7px;
+  transform: translate(-50%, 3px) rotate(45deg);
+  background: #1e293b;
+}
+
+.themed-tooltip[data-tooltip]:hover::before,
+.themed-tooltip[data-tooltip]:hover::after,
+.themed-tooltip[data-tooltip]:focus-visible::before,
+.themed-tooltip[data-tooltip]:focus-visible::after {
+  opacity: 1;
+  visibility: visible;
+}
+
+.themed-tooltip[data-tooltip]:hover::after,
+.themed-tooltip[data-tooltip]:focus-visible::after {
+  transform: translate(-50%, 0);
+}
+
+.themed-tooltip[data-tooltip]:hover::before,
+.themed-tooltip[data-tooltip]:focus-visible::before {
+  transform: translate(-50%, 0) rotate(45deg);
+}
+
+.product-vault .themed-tooltip[data-tooltip]::after {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: #1e293b;
+  color: #f8fafc;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18), 0 2px 6px rgba(15, 23, 42, 0.12);
+}
+
+.product-vault .themed-tooltip[data-tooltip]::before {
+  background: #1e293b;
+}
