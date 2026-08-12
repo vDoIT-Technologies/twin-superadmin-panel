@@ -9,6 +9,7 @@ const baseURL = import.meta.env.VITE_API_BASE_URL;
 const refreshPath = import.meta.env.VITE_AUTH_REFRESH_PATH;
 let authToken = null;
 let refreshRequest = null;
+export const TOKEN_REFRESH_LEEWAY_MS = 30_000;
 
 const api = axios.create({
   baseURL,
@@ -69,7 +70,126 @@ function getTokenBundle(data) {
       data?.refreshToken ||
       data?.refresh_token ||
       null,
+    expiresAt:
+      payload.expiresAt ||
+      payload.expires_at ||
+      payload.accessTokenExpiresAt ||
+      payload.access_token_expires_at ||
+      data?.expiresAt ||
+      data?.expires_at ||
+      data?.accessTokenExpiresAt ||
+      data?.access_token_expires_at ||
+      null,
+    expiresIn:
+      payload.expiresIn ??
+      payload.expires_in ??
+      payload.accessTokenExpiresIn ??
+      payload.access_token_expires_in ??
+      data?.expiresIn ??
+      data?.expires_in ??
+      data?.accessTokenExpiresIn ??
+      data?.access_token_expires_in ??
+      null,
+    refreshTokenExpiresAt:
+      payload.refreshTokenExpiresAt ||
+      payload.refresh_token_expires_at ||
+      data?.refreshTokenExpiresAt ||
+      data?.refresh_token_expires_at ||
+      null,
   };
+}
+
+function normalizeExpiryTimestamp(value) {
+  if (value == null) {
+    return null;
+  }
+
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value > 1e12 ? value : value * 1000;
+  }
+
+  if (typeof value === 'string') {
+    const numeric = Number(value);
+
+    if (Number.isFinite(numeric) && value.trim() !== '') {
+      return numeric > 1e12 ? numeric : numeric * 1000;
+    }
+
+    const parsed = Date.parse(value);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+
+  return null;
+}
+
+function normalizeExpiryDurationMs(value) {
+  if (value == null) {
+    return null;
+  }
+
+  const numeric = typeof value === 'string' ? Number(value) : value;
+
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return null;
+  }
+
+  return numeric * 1000;
+}
+
+function parseJwtPayload(token) {
+  if (!token || typeof token !== 'string') {
+    return null;
+  }
+
+  const parts = token.split('.');
+
+  if (parts.length < 2) {
+    return null;
+  }
+
+  try {
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const normalized = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+    return JSON.parse(window.atob(normalized));
+  } catch {
+    return null;
+  }
+}
+
+export function getTokenExpiryMs(token) {
+  const payload = parseJwtPayload(token);
+
+  if (!payload?.exp || typeof payload.exp !== 'number') {
+    return null;
+  }
+
+  return payload.exp * 1000;
+}
+
+export function resolveSessionExpiryMs(sessionLike) {
+  const explicitExpiryMs = normalizeExpiryTimestamp(sessionLike?.expiresAt);
+
+  if (explicitExpiryMs) {
+    return explicitExpiryMs;
+  }
+
+  const expiresInMs = normalizeExpiryDurationMs(sessionLike?.expiresIn);
+
+  if (expiresInMs) {
+    return Date.now() + expiresInMs;
+  }
+
+  return getTokenExpiryMs(sessionLike?.token);
+}
+
+export function shouldRefreshToken(token) {
+  const expiryMs = resolveSessionExpiryMs({ token });
+
+  if (!expiryMs) {
+    return false;
+  }
+
+  return expiryMs - Date.now() <= TOKEN_REFRESH_LEEWAY_MS;
 }
 
 function isAuthRoute(url = '') {
@@ -90,7 +210,10 @@ async function requestTokenRefresh(refreshToken) {
 
   for (const path of refreshPaths) {
     try {
-      const response = await refreshClient.post(path, { refreshToken });
+      const response = await refreshClient.post(path, {
+        refreshToken,
+        refresh_token: refreshToken,
+      });
       const message = getMessage(response.data, 'Unable to refresh your session.');
 
       if (response.data?.success === false) {
@@ -118,7 +241,7 @@ async function requestTokenRefresh(refreshToken) {
   throw lastError ?? new Error('Unable to refresh your session.');
 }
 
-async function refreshAccessToken() {
+export async function refreshAccessToken() {
   if (!refreshRequest) {
     refreshRequest = (async () => {
       const session = readStoredSession();
