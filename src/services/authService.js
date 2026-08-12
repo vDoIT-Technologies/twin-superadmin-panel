@@ -72,6 +72,32 @@ function toSession(data, email) {
     type: 'authenticated',
     token: payload.token || payload.accessToken || payload.access_token || payload.jwt || data?.token || data?.accessToken || data?.access_token || data?.jwt || null,
     refreshToken: payload.refreshToken || payload.refresh_token || data?.refreshToken || data?.refresh_token || null,
+    expiresAt:
+      payload.expiresAt ||
+      payload.expires_at ||
+      payload.accessTokenExpiresAt ||
+      payload.access_token_expires_at ||
+      data?.expiresAt ||
+      data?.expires_at ||
+      data?.accessTokenExpiresAt ||
+      data?.access_token_expires_at ||
+      null,
+    expiresIn:
+      payload.expiresIn ??
+      payload.expires_in ??
+      payload.accessTokenExpiresIn ??
+      payload.access_token_expires_in ??
+      data?.expiresIn ??
+      data?.expires_in ??
+      data?.accessTokenExpiresIn ??
+      data?.access_token_expires_in ??
+      null,
+    refreshTokenExpiresAt:
+      payload.refreshTokenExpiresAt ||
+      payload.refresh_token_expires_at ||
+      data?.refreshTokenExpiresAt ||
+      data?.refresh_token_expires_at ||
+      null,
     user: toUser(data, email),
     raw: data,
   };

@@ -1,5 +1,13 @@
 export { default as api } from './httpClient';
-export { clearAuthToken, setAuthToken } from './httpClient';
+export {
+  clearAuthToken,
+  getTokenExpiryMs,
+  refreshAccessToken,
+  resolveSessionExpiryMs,
+  setAuthToken,
+  shouldRefreshToken,
+  TOKEN_REFRESH_LEEWAY_MS,
+} from './httpClient';
 export {
   AUTH_SESSION_CHANGED_EVENT,
   AUTH_STORAGE_KEY,

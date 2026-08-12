@@ -60,6 +60,9 @@ export function updateStoredSessionTokens(tokens, { notify = false } = {}) {
     ...currentSession,
     token: tokens.token,
     refreshToken: tokens.refreshToken ?? currentSession.refreshToken ?? null,
+    expiresAt: tokens.expiresAt ?? currentSession.expiresAt ?? null,
+    expiresIn: tokens.expiresIn ?? currentSession.expiresIn ?? null,
+    refreshTokenExpiresAt: tokens.refreshTokenExpiresAt ?? currentSession.refreshTokenExpiresAt ?? null,
   };
 
   persistStoredSession(nextSession, { notify });

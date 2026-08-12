@@ -5,7 +5,10 @@ import {
   clearAuthToken,
   persistStoredSession,
   readStoredSession,
+  refreshAccessToken,
+  resolveSessionExpiryMs,
   setAuthToken,
+  TOKEN_REFRESH_LEEWAY_MS,
 } from '../services';
 import { getAdminProduct } from '../utils/productAccess';
 
@@ -48,6 +51,31 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     persistStoredSession(authState.session);
   }, [authState.session]);
+
+  useEffect(() => {
+    const token = authState.session?.token;
+    const refreshToken = authState.session?.refreshToken;
+
+    if (!token || !refreshToken) {
+      return undefined;
+    }
+
+    const expiryMs = resolveSessionExpiryMs(authState.session);
+
+    if (!expiryMs) {
+      return undefined;
+    }
+
+    const refreshDelayMs = Math.max(expiryMs - Date.now() - TOKEN_REFRESH_LEEWAY_MS, 0);
+    const timeoutId = window.setTimeout(() => {
+      refreshAccessToken().catch(() => {
+        // The HTTP client clears invalid sessions and the auth sync effect
+        // below updates UI state when a refresh cannot be recovered.
+      });
+    }, refreshDelayMs);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [authState.session?.refreshToken, authState.session?.token]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
