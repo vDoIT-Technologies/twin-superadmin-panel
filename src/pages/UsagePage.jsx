@@ -124,11 +124,11 @@ export function UsagePage() {
         render: (r) => (r.userId && r.userId !== 'anonymous' ? `${String(r.userId).slice(0, 14)}…` : 'anonymous'),
       },
       { key: 'clientName', label: 'Client' },
-      { key: 'tokens', label: 'Tokens', render: (r) => formatNumber(r.tokens) },
-      { key: 'promptTokens', label: 'Prompt', render: (r) => formatNumber(r.promptTokens) },
-      { key: 'completionTokens', label: 'Completion', render: (r) => formatNumber(r.completionTokens) },
-      { key: 'apiCalls', label: 'Calls', render: (r) => formatNumber(r.apiCalls) },
-      { key: 'cost', label: 'Cost', render: (r) => formatUSD(r.cost) },
+      { key: 'tokens', label: 'Tokens', align: 'right', render: (r) => formatNumber(r.tokens) },
+      { key: 'promptTokens', label: 'Prompt', align: 'right', render: (r) => formatNumber(r.promptTokens) },
+      { key: 'completionTokens', label: 'Completion', align: 'right', render: (r) => formatNumber(r.completionTokens) },
+      { key: 'apiCalls', label: 'Calls', align: 'right', render: (r) => formatNumber(r.apiCalls) },
+      { key: 'cost', label: 'Cost', align: 'right', render: (r) => formatUSD(r.cost) },
     ],
     [],
   );
@@ -140,11 +140,11 @@ export function UsagePage() {
   const clientUsageColumns = useMemo(
     () => [
       { key: 'clientName', label: 'Client' },
-      { key: 'tokens', label: 'Tokens', render: (r) => formatNumber(r.tokens) },
-      { key: 'promptTokens', label: 'Prompt', render: (r) => formatNumber(r.promptTokens) },
-      { key: 'completionTokens', label: 'Completion', render: (r) => formatNumber(r.completionTokens) },
-      { key: 'apiCalls', label: 'Calls', render: (r) => formatNumber(r.apiCalls) },
-      { key: 'cost', label: 'Cost', render: (r) => formatUSD(r.cost) },
+      { key: 'tokens', label: 'Tokens', align: 'right', render: (r) => formatNumber(r.tokens) },
+      { key: 'promptTokens', label: 'Prompt', align: 'right', render: (r) => formatNumber(r.promptTokens) },
+      { key: 'completionTokens', label: 'Completion', align: 'right', render: (r) => formatNumber(r.completionTokens) },
+      { key: 'apiCalls', label: 'Calls', align: 'right', render: (r) => formatNumber(r.apiCalls) },
+      { key: 'cost', label: 'Cost', align: 'right', render: (r) => formatUSD(r.cost) },
     ],
     [],
   );

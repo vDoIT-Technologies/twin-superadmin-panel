@@ -246,7 +246,7 @@ export function TelemetryPage() {
         </div>
 
         <div className="max-h-[65vh] overflow-auto">
-          <table className="min-w-[1040px] w-full border-collapse text-left text-sm">
+          <table className="min-w-[1040px] w-full border-collapse text-left text-sm [&_td]:!text-left [&_td>div]:justify-start [&_th]:!text-left">
             <thead className="sticky top-0 z-10 bg-slate-50 text-xs uppercase tracking-wide text-slate-400 shadow-[0_1px_0_0_rgba(226,232,240,1)]">
               <tr>
                 {[
@@ -261,8 +261,8 @@ export function TelemetryPage() {
                   ['units', 'Units'],
                   ['cost', 'Cost'],
                 ].map(([key, label]) => (
-                  <th key={key}>
-                    <button type="button" className="inline-flex items-center gap-1.5 py-3 text-left font-semibold transition hover:text-slate-700" onClick={() => toggleSort(key)}>
+                  <th key={key} className={`px-4 ${key === 'env' || key === 'level' ? 'text-center' : key === 'units' || key === 'cost' ? 'text-right' : 'text-left'}`}>
+                    <button type="button" className="inline-flex items-center gap-1.5 py-3 font-semibold transition hover:text-slate-700" onClick={() => toggleSort(key)}>
                       <span>{label}</span>
                       <span className={`text-xs text-slate-300 ${sortConfig.key === key ? 'text-indigo-600' : ''}`}>
                         {sortConfig.key === key ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}
@@ -276,19 +276,19 @@ export function TelemetryPage() {
               {paginatedRows.length ? paginatedRows.map((row) => (
                 <tr key={row.id} className="border-t border-slate-100 transition hover:bg-slate-50/70">
                   <td className="whitespace-nowrap px-4 py-3.5 text-slate-500">{row.ts}</td>
-                  <td className="px-4 py-3.5">{levelBadge(row.level)}</td>
-                  <td className="px-4 py-3.5">{envBadge(row.env)}</td>
+                  <td className="px-4 py-3.5 text-center">{levelBadge(row.level)}</td>
+                  <td className="px-4 py-3.5 text-center">{envBadge(row.env)}</td>
                   <td className="px-4 py-3.5 font-medium text-slate-700"><TruncatedText value={row.service} /></td>
                   <td className="px-4 py-3.5 text-slate-700"><TruncatedText value={row.event} /></td>
                   <td className="px-4 py-3.5 text-slate-600"><TruncatedText value={row.client} /></td>
                   {adminProduct !== 'vault' ? <td className="px-4 py-3.5 text-slate-600"><TruncatedText value={row.twin} /></td> : null}
                   <td className="px-4 py-3.5 text-slate-600"><TruncatedText value={row.user} /></td>
-                  <td className="whitespace-nowrap px-4 py-3.5">
+                  <td className="whitespace-nowrap px-4 py-3.5 text-right tabular-nums">
                     <span className="text-slate-500">
                       <strong className="font-semibold text-slate-800">{formatNumber(row.units)}</strong> <span>{row.unitLabel}</span>
                     </span>
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3.5 font-semibold text-slate-800">${row.cost.toFixed(4)}</td>
+                  <td className="whitespace-nowrap px-4 py-3.5 text-right font-semibold tabular-nums text-slate-800">${row.cost.toFixed(4)}</td>
                 </tr>
               )) : (
                 <tr><td colSpan={adminProduct === 'vault' ? 9 : 10} className="px-5 py-12 text-center text-sm text-slate-400">No log events match the selected filters.</td></tr>

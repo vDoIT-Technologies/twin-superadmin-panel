@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import {
   Activity,
   ArrowLeft,
@@ -16,6 +16,7 @@ import {
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { dashboardService } from '../services';
 import { useAuth } from '../app/AuthContext';
+import { FilterContext } from '../app/FilterContext';
 import { envBadge, formatCurrency, formatNumber } from '../utils/dashboardUtils';
 
 const DETAIL_PAGE_SIZE = 10;
@@ -170,8 +171,74 @@ function parseDecimal(value) {
   return 0;
 }
 
+function firstDecimal(...values) {
+  for (const value of values) {
+    if (value == null || value === '') continue;
+    const parsed = typeof value === 'object' && '$numberDecimal' in value ? Number(value.$numberDecimal) : Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+const formatOptionalCurrency = (value) => value == null ? '---' : formatCurrency(value);
+
+const serviceLabels = {
+  openai: 'OpenAI', elevenlabs: 'ElevenLabs', did: 'D-ID', heygen: 'HeyGen',
+  apify: 'Apify', filebase: 'Filebase / IPFS', s3ses: 'AWS S3 + SES', aws: 'AWS S3 + SES', blockchain: 'Polygon gas',
+  polygon: 'Polygon gas', stripe: 'Stripe', moonpay: 'MoonPay',
+};
+
+// Frontend-only preview data shared by Client and Twin details. Remove this
+// fallback when their APIs return per-service usage and cost breakdowns.
+const demoServiceUsageRows = [
+  { key: 'elevenlabs', label: 'ElevenLabs', units: 8400, unitLabel: 'chars', cost: 1.43 },
+  { key: 'filebase', label: 'Filebase / IPFS', units: 50.02, unitLabel: 'GB', cost: 0.30 },
+  { key: 'openai', label: 'OpenAI', units: 31000, unitLabel: 'tokens', cost: 0.42 },
+  { key: 'did', label: 'D-ID', units: 12, unitLabel: 'min', cost: 3.36 },
+  { key: 'stripe', label: 'Stripe', units: 7, unitLabel: 'txn', cost: 1.05 },
+  { key: 's3ses', label: 'AWS S3 + SES', units: 3.8, unitLabel: 'GB', cost: 0.18 },
+];
+
+function getServiceUsageRows(clientData) {
+  const usage = clientData?.usage || {};
+  const costSources = [
+    clientData?.serviceCosts, clientData?.vendorCost, clientData?.costs,
+    usage?.serviceCosts, usage?.vendorCost, usage?.costs,
+  ].filter((source) => source && typeof source === 'object' && !Array.isArray(source));
+  const usageSources = [usage?.byService, usage?.services, clientData?.serviceUsage]
+    .filter((source) => source && typeof source === 'object');
+  const rows = new Map();
+  const add = (rawKey, details = {}, explicitCost = null) => {
+    const key = String(rawKey || details?.id || details?.key || details?.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (!key || key === 'total') return;
+    const cost = explicitCost ?? firstDecimal(details?.cost, details?.totalCost, details?.amount, details?.costUsd, details?.costUSD);
+    const units = firstDecimal(details?.usage, details?.units, details?.count, details?.calls, details?.tokens, details?.minutes, details?.characters);
+    if (!(cost > 0) && !(units > 0)) return;
+    const previous = rows.get(key) || {};
+    rows.set(key, {
+      key,
+      label: details?.label || details?.name || serviceLabels[key] || rawKey,
+      cost: cost ?? previous.cost ?? null,
+      units: units ?? previous.units ?? null,
+      unitLabel: details?.unitLabel || details?.unit || previous.unitLabel || '',
+    });
+  };
+
+  costSources.forEach((source) => Object.entries(source).forEach(([key, value]) => {
+    if (value && typeof value === 'object') add(key, value);
+    else add(key, {}, firstDecimal(value));
+  }));
+  usageSources.forEach((source) => {
+    const entries = Array.isArray(source) ? source.map((item) => [item?.id || item?.key || item?.name, item]) : Object.entries(source);
+    entries.forEach(([key, value]) => add(key, value && typeof value === 'object' ? value : { usage: value }));
+  });
+
+  return [...rows.values()].sort((left, right) => (right.cost ?? 0) - (left.cost ?? 0));
+}
+
 export function ClientDetailPage() {
   const { adminProduct } = useAuth();
+  const { filters } = useContext(FilterContext);
   const navigate = useNavigate();
   const location = useLocation();
   const { clientId } = useParams();
@@ -179,9 +246,7 @@ export function ClientDetailPage() {
   const [clientData, setClientData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const requestedTab = searchParams.get('tab');
-  const clientTabs = adminProduct === 'vault'
-    ? ['overview', 'users', 'services', 'vault', 'timeline']
-    : ['overview', 'twins', 'users', 'services', 'cost', 'timeline'];
+  const clientTabs = ['overview'];
   const initialTab = clientTabs.includes(requestedTab) ? requestedTab : 'overview';
   const [activeTab, setActiveTab] = useState(initialTab);
 
@@ -190,10 +255,19 @@ export function ClientDetailPage() {
   const [tabPages, setTabPages] = useState({ twins: 1, users: 1, vault: 1 });
 
   useEffect(() => {
+    if (!filters.client || String(filters.client) === String(clientId)) return;
+    navigate(`/clients/${filters.client}${location.search}`, {
+      replace: true,
+      state: location.state,
+    });
+  }, [clientId, filters.client, location.search, location.state, navigate]);
+
+  useEffect(() => {
     let isActive = true;
 
     async function loadClient() {
       setIsLoading(true);
+      setClientData(null);
       try {
         const response = await dashboardService.getEntityClientById(clientId);
         if (!isActive) return;
@@ -274,6 +348,18 @@ export function ClientDetailPage() {
   }
 
   const { profile, kpis, usage } = clientData;
+  const openAiCost = firstDecimal(usage?.openaiCost, usage?.openAICost, usage?.openAiCost, usage?.open_ai_cost, kpis?.openaiCost, kpis?.openAICost, kpis?.open_ai_cost, clientData?.costs?.openai);
+  const didCost = firstDecimal(usage?.didCost, usage?.didUsageCost, usage?.did_cost, kpis?.didCost, kpis?.didUsageCost, kpis?.did_cost, clientData?.costs?.did);
+  const totalCost = firstDecimal(kpis?.cost, kpis?.totalCost, usage?.cost, usage?.totalCost, clientData?.costs?.total)
+    ?? (openAiCost != null || didCost != null ? (openAiCost ?? 0) + (didCost ?? 0) : null);
+  const apiServiceUsageRows = getServiceUsageRows(clientData);
+  const isUsingDemoServiceUsage = apiServiceUsageRows.length === 0;
+  const serviceUsageRows = isUsingDemoServiceUsage ? demoServiceUsageRows : apiServiceUsageRows;
+  if (openAiCost > 0 && !serviceUsageRows.some((row) => row.key === 'openai')) serviceUsageRows.push({ key: 'openai', label: 'OpenAI', cost: openAiCost });
+  if (didCost > 0 && !serviceUsageRows.some((row) => row.key === 'did')) serviceUsageRows.push({ key: 'did', label: 'D-ID', cost: didCost });
+  const displayedTotalCost = isUsingDemoServiceUsage
+    ? serviceUsageRows.reduce((sum, service) => sum + (service.cost ?? 0), 0)
+    : totalCost;
   const twins = tabData.twins?.twins || [];
   const users = tabData.users?.users || [];
   const vault = tabData.vault?.vault || [];
@@ -327,16 +413,15 @@ export function ClientDetailPage() {
           <MetricCard icon={TrendingUp} label="Storage used" value={formatBytes(kpis?.storedOnIpfsBytes || 0)} tone="violet" />
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-          <MetricCard icon={Wallet} label="COGS" value={formatCurrency(kpis?.cost || 0)} tone="indigo" />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <MetricCard icon={Wallet} label="Cost" value={formatOptionalCurrency(displayedTotalCost)} tone="indigo" />
           <MetricCard icon={TrendingUp} label="Revenue" value={formatCurrency(kpis?.revenue || 0)} tone="emerald" />
-          <MetricCard icon={Percent} label="Margin" value={`${kpis?.margin || 0}%`} tone="violet" />
           <MetricCard icon={Bot} label="Twins" value={String(kpis?.twinsCount || 0)} tone="rose" />
           <MetricCard icon={Users} label="Users" value={String(kpis?.usersCount || 0)} tone="amber" />
         </div>
       )}
 
-      <div className="flex flex-wrap gap-1.5 rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm">
+      {clientTabs.length > 1 ? <div className="flex flex-wrap gap-1.5 rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm">
         {tabs.map((tab) => (
           <button
             key={tab}
@@ -347,7 +432,7 @@ export function ClientDetailPage() {
             {tab}
           </button>
         ))}
-      </div>
+      </div> : null}
 
       {activeTab === 'overview' ? (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -358,10 +443,9 @@ export function ClientDetailPage() {
               <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Email</span><strong className="font-semibold text-slate-700">{profile?.email || '-'}</strong></div>
               <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Plan</span><strong className="font-semibold text-slate-700">{plan || '-'}</strong></div>
               <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Environment</span><strong className="font-semibold text-slate-700">{profile?.env || '-'}</strong></div>
-              <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Created</span><strong className="font-semibold text-slate-700">{profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString() : '-'}</strong></div>
             </div>
           </CardSection>
-          <CardSection title={adminProduct === 'vault' ? 'Vault summary' : 'Usage summary'} flush>
+          <CardSection title={adminProduct === 'vault' ? 'Vault summary' : 'All-service usage & cost'} flush>
             <div className="divide-y divide-slate-100">
               {adminProduct === 'vault' ? (
                 <>
@@ -371,12 +455,17 @@ export function ClientDetailPage() {
                 </>
               ) : (
                 <>
-                  <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Total tokens</span><strong className="font-semibold text-slate-700">{formatNumber(usage?.tokens || 0)}</strong></div>
-                  <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Prompt tokens</span><strong className="font-semibold text-slate-700">{formatNumber(usage?.promptTokens || 0)}</strong></div>
-                  <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Completion tokens</span><strong className="font-semibold text-slate-700">{formatNumber(usage?.completionTokens || 0)}</strong></div>
-                  <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Audio seconds</span><strong className="font-semibold text-slate-700">{formatNumber(usage?.audioSeconds || 0)}</strong></div>
-                  <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">API calls</span><strong className="font-semibold text-slate-700">{formatNumber(usage?.apiCalls || 0)}</strong></div>
-                  <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Usage cost</span><strong className="font-semibold text-slate-700">{formatCurrency(usage?.cost || 0)}</strong></div>
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-4 bg-slate-50 px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    <span>Service used</span><span className="text-right">Usage</span><span className="w-20 text-right">Cost</span>
+                  </div>
+                  {serviceUsageRows.map((service) => (
+                    <div key={service.key} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-4 px-5 py-3 text-xs">
+                      <strong className="truncate font-semibold text-slate-700">{service.label}</strong>
+                      <span className="text-right tabular-nums text-slate-500">{service.units == null ? '---' : `${formatNumber(service.units)}${service.unitLabel ? ` ${service.unitLabel}` : ''}`}</span>
+                      <strong className="w-20 text-right font-semibold tabular-nums text-slate-800">{formatOptionalCurrency(service.cost)}</strong>
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between bg-slate-50/70 px-5 py-3 text-xs"><span className="font-semibold text-slate-500">Total cost</span><strong className="font-bold text-slate-900">{formatOptionalCurrency(displayedTotalCost)}</strong></div>
                 </>
               )}
             </div>
@@ -442,7 +531,6 @@ export function ClientDetailPage() {
                 <span className="w-20">Env</span>
                 <span className="w-24 text-right">Points</span>
                 {adminProduct !== 'vault' ? <span className="w-24 text-right">Twins used</span> : null}
-                <span className="w-24 text-right">Last active</span>
               </div>
               {paginatedUsers.map((user) => (
                 <div
@@ -463,7 +551,6 @@ export function ClientDetailPage() {
                   <span className="w-20">{envBadge(user.env)}</span>
                   <span className="w-24 text-right font-medium text-slate-600">{formatNumber(parseDecimal(user.points))}</span>
                   {adminProduct !== 'vault' ? <span className="w-24 text-right font-medium text-slate-600">{user.twinsUsed || 0}</span> : null}
-                  <span className="w-24 text-right font-medium text-slate-400">{formatDateShort(user.lastActive)}</span>
                 </div>
               ))}
               <DetailPagination
@@ -506,7 +593,7 @@ export function ClientDetailPage() {
           {vault.length ? (
             <div className="w-full text-xs">
               <div className="flex items-center justify-between bg-slate-50 px-5 py-3 font-bold uppercase tracking-wider text-slate-400">
-                <span className="flex-1">User / drive</span><span className="w-28 text-right">Storage</span><span className="w-28 text-right">Limit</span><span className="w-24 text-right">Files</span><span className="w-28 text-right">Last active</span>
+                <span className="flex-1">User / drive</span><span className="w-28 text-right">Storage</span><span className="w-28 text-right">Limit</span><span className="w-24 text-right">Files</span>
               </div>
               {paginatedVault.map((drive, index) => (
                 <div key={drive._id || drive.userId || index} className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 transition hover:bg-slate-50">
@@ -514,7 +601,6 @@ export function ClientDetailPage() {
                   <span className="w-28 text-right font-semibold text-slate-700">{formatBytes(drive.storageUsed || 0)}</span>
                   <span className="w-28 text-right text-slate-500">{formatBytes(drive.storageLimit || 0)}</span>
                   <span className="w-24 text-right text-slate-500">{formatNumber(drive.filesCount || 0)}</span>
-                  <span className="w-28 text-right text-slate-400">{formatDateShort(drive.lastActive || drive.updatedAt)}</span>
                 </div>
               ))}
               <DetailPagination
@@ -573,6 +659,21 @@ export function TwinDetailPage() {
   if (!twinData) return <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8"><div className="rounded-2xl border border-slate-200 bg-white py-16 text-center text-sm text-slate-400 shadow-panel">Twin not found.</div></section>;
 
   const { profile, kpis, usage } = twinData;
+  const apiServiceUsageRows = getServiceUsageRows(twinData);
+  const serviceUsageRows = apiServiceUsageRows.length ? apiServiceUsageRows : demoServiceUsageRows;
+  const totalServiceCost = firstDecimal(kpis?.cost, kpis?.totalCost, usage?.cost, usage?.totalCost, twinData?.costs?.total)
+    ?? serviceUsageRows.reduce((sum, service) => sum + (service.cost ?? 0), 0);
+  const associatedUsers = twinData?.associatedUsers ?? twinData?.users ?? twinData?.linkedUsers ?? profile?.associatedUsers ?? profile?.users;
+  const demoAssociatedUsers = ['Shreyash Gupta', 'Akshat Chadha', 'Rajendra Soni'];
+  const associatedUsersForDisplay = Array.isArray(associatedUsers) ? associatedUsers : demoAssociatedUsers.slice(0, 2 + (String(twinId).charCodeAt(String(twinId).length - 1) % 2));
+  const associatedUserNames = associatedUsersForDisplay
+    .map((user) => {
+      if (typeof user === 'string') return user;
+      const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim();
+      return user?.name || user?.fullName || user?.profile?.name || fullName || user?.email || '';
+    })
+    .filter(Boolean)
+    .join(', ');
 
   return (
     <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
@@ -597,16 +698,22 @@ export function TwinDetailPage() {
             <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Name</span><strong className="font-semibold text-slate-700">{profile?.name || '-'}</strong></div>
             <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Role</span><strong className="font-semibold text-slate-700">{profile?.role || '-'}</strong></div>
             <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Client</span><strong className="font-semibold text-slate-700">{profile?.clientName || '-'}</strong></div>
-            <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Created</span><strong className="font-semibold text-slate-700">{profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString() : '-'}</strong></div>
+            <div className="flex items-center justify-between gap-6 px-5 py-3 text-xs"><span className="shrink-0 text-slate-400">Associated Users</span><strong className="min-w-0 truncate text-right font-semibold text-slate-700" title={associatedUserNames || undefined}>{associatedUserNames || '---'}</strong></div>
           </div>
         </CardSection>
-        <CardSection title="Usage Summary" flush>
+        <CardSection title="All-service usage & cost" flush>
           <div className="divide-y divide-slate-100">
-            <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Total Tokens</span><strong className="font-semibold text-slate-700">{formatNumber(usage?.tokens || 0)}</strong></div>
-            <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Prompt Tokens</span><strong className="font-semibold text-slate-700">{formatNumber(usage?.promptTokens || 0)}</strong></div>
-            <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Completion Tokens</span><strong className="font-semibold text-slate-700">{formatNumber(usage?.completionTokens || 0)}</strong></div>
-            <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">API Calls</span><strong className="font-semibold text-slate-700">{formatNumber(usage?.apiCalls || 0)}</strong></div>
-            <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Audio Seconds</span><strong className="font-semibold text-slate-700">{formatNumber(usage?.audioSeconds || 0)}</strong></div>
+            <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-4 bg-slate-50 px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              <span>Service used</span><span className="text-right">Usage</span><span className="w-20 text-right">Cost</span>
+            </div>
+            {serviceUsageRows.map((service) => (
+              <div key={service.key} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-4 px-5 py-3 text-xs">
+                <strong className="truncate font-semibold text-slate-700">{service.label}</strong>
+                <span className="text-right tabular-nums text-slate-500">{service.units == null ? '---' : `${formatNumber(service.units)}${service.unitLabel ? ` ${service.unitLabel}` : ''}`}</span>
+                <strong className="w-20 text-right font-semibold tabular-nums text-slate-800">{formatOptionalCurrency(service.cost)}</strong>
+              </div>
+            ))}
+            <div className="flex items-center justify-between bg-slate-50/70 px-5 py-3 text-xs"><span className="font-semibold text-slate-500">Total cost</span><strong className="font-bold text-slate-900">{formatOptionalCurrency(totalServiceCost)}</strong></div>
           </div>
         </CardSection>
       </div>

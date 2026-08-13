@@ -5,8 +5,9 @@ import { FilterContext } from '../app/FilterContext';
 import { FilterToolbar } from '../components/layout/FilterToolbar';
 import { Sidebar } from '../components/layout/Sidebar';
 import { superadminDemoData } from '../demo-data/superadminDemoData';
-import { isServiceForProduct, isVendorForProduct } from '../utils/productAccess';
+import { isServiceForProduct } from '../utils/productAccess';
 import {
+  dashboardService,
   dropdownApiAvailable,
   getClientsDropdown,
   getTwinsDropdown,
@@ -68,9 +69,16 @@ export function AppLayout() {
   const [clients, setClients] = useState([]);
   const [twins, setTwins] = useState([]);
   const [users, setUsers] = useState([]);
+  const [serviceStatusOptions, setServiceStatusOptions] = useState([]);
   const searchRef = useRef(null);
   const profileMenuRef = useRef(null);
-  const showFilterBar = location.pathname !== '/profile';
+  const isEntityRoute = ['/clients', '/twins', '/users'].some((route) =>
+    location.pathname === route || location.pathname.startsWith(`${route}/`),
+  );
+  const isStandalonePage = ['/financial', '/usage', '/telemetry'].some((route) =>
+    location.pathname === route || location.pathname.startsWith(`${route}/`),
+  );
+  const showFilterBar = location.pathname !== '/profile' && !isEntityRoute && !isStandalonePage;
   const showOverviewControls = location.pathname === '/';
   const visibleScopes = ['granularity', 'client', 'twin', 'user', 'service', 'vendor'];
   const baseTitle =
@@ -105,13 +113,11 @@ export function AppLayout() {
 
   useEffect(() => {
     const invalidService = filters.service && !isServiceForProduct(adminProduct, filters.service);
-    const invalidVendor = filters.vendor && !isVendorForProduct(adminProduct, filters.vendor);
     const invalidTwin = adminProduct === 'vault' && filters.twin;
 
-    if (invalidService || invalidVendor || invalidTwin) {
+    if (invalidService || invalidTwin) {
       updateFilters({
         ...(invalidService ? { service: null } : {}),
-        ...(invalidVendor ? { vendor: null } : {}),
         ...(invalidTwin ? { twin: null } : {}),
       });
     }
@@ -187,15 +193,49 @@ export function AppLayout() {
     };
   }, [filters.client, filters.twin, isAuthenticated, selectedEnv]);
 
-  const vendorOptions = useMemo(
-    () =>
-      superadminDemoData.VENDORS.filter(
-        (vendor) =>
-          isVendorForProduct(adminProduct, vendor.id) &&
-          (!filters.service || superadminDemoData.byId.service(filters.service)?.vendors.includes(vendor.id)),
-      ),
-    [adminProduct, filters.service],
-  );
+  useEffect(() => {
+    if (!isAuthenticated) return undefined;
+    let active = true;
+    const labels = {
+      openai: 'OpenAI',
+      elevenlabs: 'ElevenLabs',
+      did: 'D-ID',
+      aws: 'AWS S3 + SES',
+      s3ses: 'AWS S3 + SES',
+      filebase: 'Filebase / IPFS',
+      stripe: 'Stripe',
+    };
+    const excludedServices = new Set(['heygen', 'polygon', 'blockchain', 'apify', 'moonpay', 'moopifay']);
+
+    dashboardService.getServicesStatus()
+      .then((response) => {
+        if (!active) return;
+        const services = response?.data ?? response;
+        const options = Object.entries(services && typeof services === 'object' ? services : {})
+          .map(([serviceKey, info]) => {
+            const normalizedKey = serviceKey.toLowerCase().replace(/[^a-z0-9]/g, '');
+            if (excludedServices.has(normalizedKey)) return null;
+            const serviceId = info?.data?.id ?? info?.data?._id ?? info?.id ?? info?._id ?? serviceKey;
+            const apiName = info?.data?.serviceName ?? info?.data?.name ?? info?.serviceName ?? info?.name;
+            const fallbackName = serviceKey
+              .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+              .replace(/[_-]+/g, ' ')
+              .replace(/\b\w/g, (character) => character.toUpperCase());
+            return {
+              value: String(serviceId),
+              label: labels[normalizedKey] ?? apiName ?? fallbackName,
+            };
+          })
+          .filter(Boolean);
+        setServiceStatusOptions(options);
+      })
+      .catch((error) => {
+        console.error('[AppLayout] Failed to load service-status dropdown:', error);
+        if (active) setServiceStatusOptions([]);
+      });
+
+    return () => { active = false; };
+  }, [isAuthenticated]);
   const clientDropdownOptions = useMemo(
     () =>
       clients.map((client) => ({
@@ -226,24 +266,7 @@ export function AppLayout() {
       }),
     [users],
   );
-  const serviceDropdownOptions = useMemo(
-    () =>
-      superadminDemoData.SERVICES.filter((service) => isServiceForProduct(adminProduct, service.id)).map((service) => ({
-        value: service.id,
-        label: service.name,
-        meta: service.stack,
-      })),
-    [adminProduct],
-  );
-  const vendorDropdownOptions = useMemo(
-    () =>
-      vendorOptions.map((vendor) => ({
-        value: vendor.id,
-        label: vendor.name,
-        meta: vendor.cat,
-      })),
-    [adminProduct, vendorOptions],
-  );
+  const vendorDropdownOptions = serviceStatusOptions;
   const updateScopeFilter = (key, value) => {
     if (key === 'client') {
       updateFilters({ client: value, twin: null, user: null });
@@ -417,9 +440,6 @@ export function AppLayout() {
               <div className="min-w-0">
                 <span className="block truncate text-lg font-semibold text-slate-800">{currentTitle}</span>
               </div>
-              <span className={`hidden rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] sm:inline-flex ${adminProduct === 'vault' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-indigo-200 bg-indigo-50 text-indigo-700'}`}>
-                {adminProduct === 'vault' ? 'Vault Admin' : 'Twin Admin'}
-              </span>
             </div>
 
             <div className={`flex min-w-0 items-center justify-end gap-2 ${isMobileSearchOpen ? 'w-full flex-1' : ''}`}>
@@ -545,7 +565,6 @@ export function AppLayout() {
               clientOptions={clientDropdownOptions}
               twinOptions={twinDropdownOptions}
               userOptions={userDropdownOptions}
-              serviceOptions={serviceDropdownOptions}
               vendorOptions={vendorDropdownOptions}
               showOverviewControls={showOverviewControls}
               adminProduct={adminProduct}

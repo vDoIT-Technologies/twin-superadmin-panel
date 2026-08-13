@@ -1,5 +1,5 @@
 import { useContext, useEffect, useMemo, useState } from 'react';
-import { AlertCircle, Database, FileUp, Gauge, Package, RefreshCw, TrendingUp, Users } from 'lucide-react';
+import { AlertCircle, Bot, Database, Gauge, Package, RefreshCw, TrendingUp, Users } from 'lucide-react';
 import { TopUsersTable } from '../components/vault/TopUsersTable';
 import { FilterContext } from '../app/FilterContext';
 import { StorageByClientCard } from '../components/vault/StorageByClientCard';
@@ -120,6 +120,7 @@ export function VaultPage() {
     0;
   const activeDrives = Number(kpis.activeDrives || 0);
   const totalFiles = Number(kpis.totalFiles || 0);
+  const totalBots = firstNumber(kpis.totalBots, kpis.bots, stats?.totalBots, stats?.bots) ?? 0;
   const modeCopy = {
     cost: {
       title: 'Vault Overview',
@@ -144,7 +145,7 @@ export function VaultPage() {
     ]
     : [
       { label: 'Stored on IPFS', value: formatBytes(storageUsed), icon: Database, tone: 'indigo' },
-      { label: 'Storage operations', value: formatNumber(kpis?.bots || 0), icon: FileUp, tone: 'sky' },
+      { label: 'Total bots', value: formatNumber(totalBots), icon: Bot, tone: 'sky' },
       { label: 'Total files', value: formatNumber(totalFiles), icon: Package, tone: 'violet' },
       { label: 'Active drives · users', value: String(activeDrives), icon: Users, tone: 'rose' },
     ];
