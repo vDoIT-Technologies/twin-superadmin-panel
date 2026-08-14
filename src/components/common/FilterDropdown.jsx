@@ -10,6 +10,8 @@ export function FilterDropdown({
   searchable = true,
   align = 'left',
   showPlaceholderOption = true,
+  tone = 'twin',
+  highlightWhenOpen = true,
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -29,6 +31,7 @@ export function FilterDropdown({
 
   const selected = uniqueOptions.find((option) => String(option.value) === String(value)) ?? null;
   const canClear = Boolean(selected && showPlaceholderOption);
+  const isVault = tone === 'vault';
 
   const clearSelection = () => {
     onChange(null);
@@ -63,20 +66,20 @@ export function FilterDropdown({
 
   return (
     <div ref={rootRef} className={`relative min-w-0${open ? ' z-40' : ''}`}>
-      <div className={`flex h-9 w-full items-center rounded-full border bg-white shadow-2xs transition-all duration-150 ${open ? 'border-indigo-500 ring-2 ring-indigo-100' : 'border-slate-200 hover:border-indigo-300 hover:bg-slate-50/50'}`}>
+      <div className={`flex h-9 w-full items-center rounded-full border bg-white shadow-2xs transition-all duration-150 ${open && highlightWhenOpen ? (isVault ? 'border-emerald-500 ring-2 ring-emerald-100' : 'border-indigo-500 ring-2 ring-indigo-100') : (isVault ? 'border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/30' : 'border-slate-200 hover:border-indigo-300 hover:bg-slate-50/50')}`}>
         <button
           type="button"
-          className={`flex min-w-0 flex-1 items-center justify-between gap-2 rounded-full px-3.5 text-left text-xs font-semibold outline-none transition ${selected ? 'text-indigo-600' : 'text-slate-700 hover:text-slate-900'}`}
+          className={`filter-dropdown-trigger flex min-w-0 flex-1 items-center justify-between gap-2 rounded-full px-3.5 text-left text-xs font-semibold outline-none transition ${selected ? (isVault ? 'text-emerald-700' : 'text-indigo-600') : 'text-slate-700 hover:text-slate-900'}`}
           onClick={() => setOpen((current) => !current)}
           aria-expanded={open}
         >
           <span className="truncate">{selected?.buttonLabel ?? selected?.label ?? placeholder}</span>
-          {!canClear ? <ChevronDown size={14} className={`shrink-0 transition-transform duration-200 ${open ? 'rotate-180 text-indigo-600' : 'text-slate-400'}`} /> : null}
+          {!canClear ? <ChevronDown size={14} className={`shrink-0 transition-transform duration-200 ${open ? (isVault ? 'rotate-180 text-emerald-600' : 'rotate-180 text-indigo-600') : 'text-slate-400'}`} /> : null}
         </button>
         {canClear ? (
           <button
             type="button"
-            className="mr-1.5 grid h-5 w-5 shrink-0 place-items-center rounded-full text-indigo-500 transition hover:bg-indigo-100 hover:text-indigo-700"
+            className={`mr-1.5 grid h-5 w-5 shrink-0 place-items-center rounded-full transition ${isVault ? 'text-emerald-500 hover:bg-emerald-100 hover:text-emerald-700' : 'text-indigo-500 hover:bg-indigo-100 hover:text-indigo-700'}`}
             aria-label={`Clear ${selected.label}`}
             onClick={clearSelection}
           >
@@ -88,7 +91,7 @@ export function FilterDropdown({
       {open ? (
         <div className={`absolute z-50 mt-2 max-h-80 w-60 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl ring-1 ring-slate-900/5 ${align === 'right' ? 'right-0' : 'left-0'}`}>
           {searchable ? (
-            <label className="mb-1.5 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-slate-400 focus-within:border-indigo-300 focus-within:bg-white">
+            <label className={`mb-1.5 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-slate-400 focus-within:bg-white ${isVault ? 'focus-within:border-emerald-300' : 'focus-within:border-indigo-300'}`}>
               <Search size={14} className="shrink-0" />
               <input
                 className="min-w-0 flex-1 bg-transparent text-xs text-slate-700 outline-none placeholder:text-slate-400"
@@ -104,7 +107,7 @@ export function FilterDropdown({
             {showPlaceholderOption ? (
               <button
                 type="button"
-                className={`flex w-full items-center rounded-xl px-3 py-2 text-left text-xs font-medium transition hover:bg-indigo-50 hover:text-indigo-700 ${value == null ? 'bg-indigo-50 font-semibold text-indigo-700' : 'text-slate-600'}`}
+                className={`flex w-full items-center rounded-xl px-3 py-2 text-left text-xs font-medium transition ${isVault ? 'hover:bg-emerald-50 hover:text-emerald-700' : 'hover:bg-indigo-50 hover:text-indigo-700'} ${value == null ? (isVault ? 'bg-emerald-50 font-semibold text-emerald-700' : 'bg-indigo-50 font-semibold text-indigo-700') : 'text-slate-600'}`}
                 onClick={() => {
                   onChange(null);
                   setOpen(false);
@@ -118,7 +121,7 @@ export function FilterDropdown({
               <button
                 key={option.value}
                 type="button"
-                className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left text-xs font-medium transition hover:bg-indigo-50 hover:text-indigo-700 ${String(option.value) === String(value) ? 'bg-indigo-50 font-semibold text-indigo-700' : 'text-slate-600'}`}
+                className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left text-xs font-medium transition ${isVault ? 'hover:bg-emerald-50 hover:text-emerald-700' : 'hover:bg-indigo-50 hover:text-indigo-700'} ${String(option.value) === String(value) ? (isVault ? 'bg-emerald-50 font-semibold text-emerald-700' : 'bg-indigo-50 font-semibold text-indigo-700') : 'text-slate-600'}`}
                 onClick={() => {
                   onChange(option.value);
                   setOpen(false);

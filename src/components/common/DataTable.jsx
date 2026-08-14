@@ -51,13 +51,14 @@ export function DataTable({
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-panel">
       <div className="max-h-[65vh] overflow-auto">
-        <table className="min-w-full divide-y divide-slate-100 text-left">
+        <table className="min-w-full divide-y divide-slate-100 text-left [&_td]:!text-left [&_td>div]:justify-start [&_th]:!text-left">
           <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_0_0_rgba(226,232,240,1)]">
             <tr>
               {columns.map((column) => {
                 const isActive = sortConfig.key === column.key;
+                const alignment = column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : 'text-left';
                 return (
-                  <th key={column.key} className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-400 first:pl-5">
+                  <th key={column.key} className={`px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-400 first:pl-5 ${alignment}`}>
                     <button type="button" className="inline-flex items-center gap-1.5 whitespace-nowrap transition hover:text-indigo-600" onClick={() => toggleSort(column.key)}>
                       <span>{column.label}</span>
                       <span className={isActive ? 'font-bold text-indigo-500' : 'text-slate-300'}>
@@ -87,9 +88,10 @@ export function DataTable({
                     const value = column.render ? column.render(row) : row[column.key];
                     const isStatus = column.key === statusKey;
                     const isPrimary = column.key === 'name';
+                    const alignment = column.align === 'right' ? 'text-right tabular-nums' : column.align === 'center' ? 'text-center' : 'text-left';
 
                     return (
-                      <td key={column.key} className={`${isPrimary ? 'font-medium text-slate-800' : ''} px-4 py-4 first:pl-5`}>
+                      <td key={column.key} className={`${isPrimary ? 'font-medium text-slate-800' : ''} px-4 py-4 first:pl-5 ${alignment}`}>
                         {isStatus
                           ? <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusTone(String(value))}`}>{value}</span>
                           : typeof value === 'string'

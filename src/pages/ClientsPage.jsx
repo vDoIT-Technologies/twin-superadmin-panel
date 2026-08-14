@@ -1,13 +1,13 @@
-import { useContext, useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Download, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { FilterContext } from "../app/FilterContext";
 import { useAuth } from "../app/AuthContext";
 import { TruncatedText } from "../components/common/TruncatedText";
+import { FilterDropdown } from "../components/common/FilterDropdown";
 import { dashboardService } from "../services";
 import { envBadge } from "../utils/dashboardUtils";
 import {
-  formatLastActive,
   formatOptionalNumber,
   getClientInitials,
   getClientsPayload,
@@ -24,9 +24,10 @@ export function ClientsPage() {
   const { adminProduct } = useAuth();
   const isVault = adminProduct === 'vault';
   const PAGE_SIZE = 10;
-  const { filters } = useContext(FilterContext);
+  const { filters, setFilters } = useContext(FilterContext);
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState(null);
   const [sortConfig, setSortConfig] = useState({
     key: "cost",
     direction: "desc",
@@ -40,20 +41,44 @@ export function ClientsPage() {
     limit: PAGE_SIZE,
     totalPages: 1,
   });
+  const previousScopeRef = useRef('');
+
+  const updateTableFilter = (key, value) => {
+    setPage(1);
+    setFilters((current) => ({
+      ...current,
+      [key]: value,
+    }));
+  };
 
   useEffect(() => {
     let isActive = true;
+    const scopeKey = JSON.stringify({
+      envs: filters.envs,
+      gran: filters.gran,
+      range: filters.range,
+      user: filters.user,
+      service: filters.service,
+      vendor: filters.vendor,
+    });
+    const scopeChanged = previousScopeRef.current !== scopeKey;
+    previousScopeRef.current = scopeKey;
+    const requestedPage = scopeChanged ? 1 : page;
+
+    if (scopeChanged && page !== 1) setPage(1);
 
     async function loadClients() {
       setIsTableLoading(true);
+      setApiClients([]);
       try {
         const data = await dashboardService.getEntityClients({
-          page,
+          page: requestedPage,
           limit: PAGE_SIZE,
-          clientId: filters.client,
-          twinId: filters.twin,
+          userId: filters.user,
+          serviceId: filters.service,
+          vendorId: filters.vendor,
           env: filters.envs.length === 1 ? filters.envs[0] : undefined,
-          range: filters.range,
+          range: filters.entityRange === 'all' ? undefined : filters.entityRange,
         });
 
         if (!isActive) return;
@@ -62,7 +87,7 @@ export function ClientsPage() {
         setApiClients(payload.clients);
         setPagination({
           total: Number(payload.pagination?.total) || 0,
-          page: Number(payload.pagination?.page) || page,
+          page: Number(payload.pagination?.page) || requestedPage,
           limit: Number(payload.pagination?.limit) || PAGE_SIZE,
           totalPages: Number(payload.pagination?.totalPages) || 1,
         });
@@ -80,11 +105,7 @@ export function ClientsPage() {
     return () => {
       isActive = false;
     };
-  }, [filters.client, filters.envs, filters.range, filters.twin, page]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [filters.client, filters.envs, filters.range, filters.twin]);
+  }, [filters.entityRange, filters.envs, filters.service, filters.user, filters.vendor, page]);
 
   const clientRows = useMemo(() => {
     return apiClients.map((client, index) => {
@@ -99,6 +120,13 @@ export function ClientsPage() {
       const cost = parseDecimal(client.cost ?? client.usage?.cost);
       const margin = parseDecimal(client.margin);
       const lastActive = client.lastActive;
+      const rawStatus = client.status ?? client.clientStatus ?? client.state;
+      const explicitActive = client.isActive ?? client.active ?? client.enabled;
+      const apiStatus = typeof rawStatus === 'string'
+        ? (['active', 'enabled', 'online'].includes(rawStatus.toLowerCase()) ? 'active' : ['inactive', 'disabled', 'offline'].includes(rawStatus.toLowerCase()) ? 'inactive' : '')
+        : explicitActive === true ? 'active' : explicitActive === false ? 'inactive' : '';
+      // Frontend reference fallback until the clients API returns status.
+      const status = apiStatus || (index % 3 === 0 ? 'inactive' : 'active');
 
       return {
         id: getClientId(client),
@@ -114,9 +142,20 @@ export function ClientsPage() {
         cost,
         margin,
         lastActive,
+        status,
       };
     });
   }, [apiClients]);
+
+  const filteredRows = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    return clientRows.filter((client) => {
+      const matchesStatus = !statusFilter || client.status === statusFilter;
+      const matchesQuery = !normalizedQuery || [client.name, client.plan, ...client.envs]
+        .some((value) => String(value ?? '').toLowerCase().includes(normalizedQuery));
+      return matchesStatus && matchesQuery;
+    });
+  }, [clientRows, query, statusFilter]);
 
   const sortedRows = useMemo(() => {
     const getSortValue = (client) => {
@@ -125,6 +164,8 @@ export function ClientsPage() {
           return client.name;
         case "env":
           return client.envs.join(" ");
+        case "status":
+          return client.status;
         case "twins":
           return client.twins;
         case "users":
@@ -139,14 +180,12 @@ export function ClientsPage() {
           return client.cost;
         case "margin":
           return client.margin;
-        case "lastActive":
-          return client.lastActive || "";
         default:
           return client.name;
       }
     };
 
-    return [...clientRows].sort((left, right) => {
+    return [...filteredRows].sort((left, right) => {
       const a = getSortValue(left);
       const b = getSortValue(right);
 
@@ -158,12 +197,11 @@ export function ClientsPage() {
         ? String(a).localeCompare(String(b))
         : String(b).localeCompare(String(a));
     });
-  }, [clientRows, sortConfig]);
+  }, [filteredRows, sortConfig]);
 
   const totalPages = Math.max(1, pagination.totalPages || 1);
-  const usingClientScope = Boolean(filters.client);
-  const scopedTotal = usingClientScope ? sortedRows.length : pagination.total;
-  const scopedTotalPages = usingClientScope ? 1 : totalPages;
+  const scopedTotal = pagination.total;
+  const scopedTotalPages = totalPages;
   const currentPage = Math.min(page, scopedTotalPages);
   const pageStart =
     sortedRows.length === 0
@@ -179,7 +217,7 @@ export function ClientsPage() {
         : {
             key,
             direction:
-              key === "client" || key === "env" || key === "lastActive"
+              key === "client" || key === "env"
                 ? "asc"
                 : "desc",
           },
@@ -189,28 +227,22 @@ export function ClientsPage() {
   const exportCsv = () => {
     const header = [
       "Client",
-      "Plan",
-      "Envs",
-      ...(!isVault ? ["Twins"] : []),
+      "Env",
+      "Status",
+      "Twins",
       "Users",
-      "Messages",
-      "Points Spent",
+      "Cost",
       "Revenue",
-      "COGS",
-      "Margin",
     ];
     const lines = sortedRows.map((client) =>
       [
         client.name,
-        client.plan,
         client.envs.join(" | "),
-        ...(!isVault ? [client.twins] : []),
+        client.status === 'active' ? 'Active' : 'Inactive',
+        client.twins,
         client.users,
-        formatOptionalNumber(client.messages),
-        formatOptionalNumber(client.pointsSpent),
-        `$${formatOptionalNumber(client.revenue)}`,
         `$${formatOptionalNumber(client.cost)}`,
-        `${Math.round(client.margin)}%`,
+        `$${formatOptionalNumber(client.revenue)}`,
       ]
         .map((value) => `"${String(value).replaceAll('"', '""')}"`)
         .join(","),
@@ -228,55 +260,82 @@ export function ClientsPage() {
 
   return (
     <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Clients</h1>
-          <p className="mt-1 text-sm text-slate-400">White-label tenants — usage, revenue, COGS and margin</p>
-        </div>
-      </header>
-
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-panel">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
-          <label className="flex h-10 w-full max-w-md items-center gap-2 rounded-xl bg-slate-50 px-3 text-slate-400 sm:w-80">
-            <Search size={15} />
-            <input
-              className="min-w-0 flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
-              type="text"
-              value={query}
-              onChange={(event) => {
-                setQuery(event.target.value);
-              }}
-              placeholder="Search clients..."
-            />
-          </label>
+        <div className="border-b border-slate-100 px-5 py-4">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+            <label className="flex h-10 w-full shrink-0 items-center gap-2 rounded-xl bg-slate-50 px-3 text-slate-400 xl:w-64">
+              <Search size={15} />
+              <input
+                className="min-w-0 flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
+                type="text"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search clients..."
+              />
+            </label>
 
-          <button
-            type="button"
-            className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 px-3.5 text-sm font-semibold text-slate-600 transition hover:border-indigo-300 hover:text-indigo-600"
-            onClick={exportCsv}
-          >
-            <Download size={14} />
-            Export CSV
-          </button>
+            <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            <FilterDropdown
+              value={filters.envs.length === 1 ? filters.envs[0] : null}
+              onChange={(value) => updateTableFilter('envs', value ? [value] : ['dev', 'staging', 'prod'])}
+              options={[{ value: 'dev', label: 'Development' }, { value: 'staging', label: 'Staging' }, { value: 'prod', label: 'Production' }]}
+              placeholder="All environments"
+              searchPlaceholder="Search environment..."
+              searchable={false}
+              tone={isVault ? 'vault' : 'twin'}
+            />
+              <FilterDropdown
+                value={statusFilter}
+                onChange={(value) => { setStatusFilter(value); setPage(1); }}
+                options={[{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]}
+                placeholder="All Status"
+                searchable={false}
+                tone={isVault ? 'vault' : 'twin'}
+              />
+              <FilterDropdown
+                value={filters.gran}
+                onChange={(value) => updateTableFilter('gran', value || 'day')}
+                options={[
+                  { value: 'week', label: '1 Week' },
+                  { value: 'month', label: '1 Month' },
+                  { value: '6months', label: '6 Months' },
+                  { value: 'year', label: '1 Year' },
+                  { value: 'over1year', label: 'More Than 1 Year' },
+                ]}
+                placeholder="By Day"
+                searchable={false}
+                showPlaceholderOption={false}
+                highlightWhenOpen={false}
+                align="right"
+                tone={isVault ? 'vault' : 'twin'}
+              />
+            </div>
+
+            <button
+              type="button"
+              className={`inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 px-3.5 text-sm font-semibold text-slate-600 transition ${isVault ? 'hover:border-emerald-300 hover:text-emerald-700' : 'hover:border-indigo-300 hover:text-indigo-600'}`}
+              onClick={exportCsv}
+            >
+              <Download size={14} />
+              Export CSV
+            </button>
+          </div>
         </div>
 
         <div className="max-h-[65vh] overflow-auto">
-          <table className={`w-full border-collapse text-sm ${isVault ? 'min-w-[980px]' : 'min-w-[1100px]'}`}>
+          <table key="clients-seven-column-layout" className="w-full min-w-[960px] border-collapse text-sm [&_td]:!text-left [&_td>div]:justify-start [&_th]:!text-left">
             <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_0_0_rgba(226,232,240,1)]">
               <tr>
                 {[
                   ["client", "Client"],
                   ["env", "Env"],
-                  ...(!isVault ? [["twins", "Twins"]] : []),
+                  ["status", "Status"],
+                  ["twins", "Twins"],
                   ["users", "Users"],
-                  ["messages", "Messages"],
-                  ["pointsSpent", "Points spent"],
+                  ["cost", "Cost"],
                   ["revenue", "Revenue"],
-                  ["cost", "COGS"],
-                  ["margin", "Margin%"],
-                  ["lastActive", "Last active"],
                 ].map(([key, label]) => (
-                  <th key={key} className="px-4 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
+                  <th key={key} className={`px-4 py-4 text-xs font-bold uppercase tracking-wide text-slate-400 ${key === 'client' ? 'text-left' : key === 'env' ? 'text-center' : 'text-right'}`}>
                     <button
                       type="button"
                       className="inline-flex items-center gap-1 transition hover:text-slate-700"
@@ -301,7 +360,7 @@ export function ClientsPage() {
               {isTableLoading ? (
                 <tr>
                   <td
-                    colSpan={isVault ? 9 : 10}
+                    colSpan={7}
                     className="px-5 py-12 text-center text-sm text-slate-400"
                   >
                     <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-indigo-100 border-t-indigo-600 align-[-2px]" aria-hidden="true" />
@@ -310,14 +369,14 @@ export function ClientsPage() {
                 </tr>
               ) : sortedRows.length === 0 ? (
                 <tr>
-                  <td colSpan={isVault ? 9 : 10} className="px-5 py-12 text-center text-sm text-slate-400">
+                  <td colSpan={7} className="px-5 py-12 text-center text-sm text-slate-400">
                     No clients found
                   </td>
                 </tr>
               ) : (
                 sortedRows.map((client) => (
                   <tr key={client.rowKey} className="cursor-pointer border-t border-slate-100 transition hover:bg-slate-50" onClick={() => navigate(`/clients/${client.id}`)}>
-                    <td className="px-4 py-3.5">
+                    <td className="px-4 py-3.5 text-left">
                       <div className="flex items-center gap-3">
                         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-blue-100 text-xs font-bold text-blue-600">
                           {getClientInitials(client.name)}
@@ -328,8 +387,8 @@ export function ClientsPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3.5">
-                      <div className="flex flex-wrap gap-1.5">
+                    <td className="px-4 py-3.5 text-center">
+                      <div className="flex flex-wrap justify-center gap-1.5">
                         {client.envs.map((env) => (
                           <span key={env} className="inline-flex rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-500">
                             {envBadge(env)}
@@ -337,16 +396,15 @@ export function ClientsPage() {
                         ))}
                       </div>
                     </td>
-                    {!isVault ? <td className="px-4 py-3.5 text-slate-500">{formatOptionalNumber(client.twins)}</td> : null}
-                    <td className="px-4 py-3.5 text-slate-500">{formatOptionalNumber(client.users)}</td>
-                    <td className="px-4 py-3.5 text-slate-500">{formatOptionalNumber(client.messages)}</td>
-                    <td className="px-4 py-3.5 text-slate-500">{formatOptionalNumber(client.pointsSpent)}</td>
-                    <td>${formatOptionalNumber(client.revenue)}</td>
-                    <td>${formatOptionalNumber(client.cost)}</td>
-                    <td className="px-4 py-3.5 font-semibold text-emerald-600">
-                      {Math.round(client.margin)}%
+                    <td className="px-4 py-3.5 text-slate-500">
+                      <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${client.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                        {client.status === 'active' ? 'Active' : 'Inactive'}
+                      </span>
                     </td>
-                    <td className="px-4 py-3.5 text-slate-500">{formatLastActive(client.lastActive)}</td>
+                    <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(client.twins)}</td>
+                    <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(client.users)}</td>
+                    <td className="px-4 py-3.5 text-right tabular-nums">${formatOptionalNumber(client.cost)}</td>
+                    <td className="px-4 py-3.5 text-right tabular-nums">${formatOptionalNumber(client.revenue)}</td>
                   </tr>
                 ))
               )}

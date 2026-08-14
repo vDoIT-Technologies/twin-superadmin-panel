@@ -39,17 +39,24 @@ body {
 
 button:focus-visible,
 a:focus-visible,
-input:focus-visible,
 select:focus-visible {
   outline: 2px solid #6366f1;
   outline-offset: 2px;
 }
 
+/* Filter controls already expose their open state through the chevron/menu. */
+button.filter-dropdown-trigger:focus-visible {
+  outline: none;
+}
+
 .product-vault button:focus-visible,
 .product-vault a:focus-visible,
-.product-vault input:focus-visible,
 .product-vault select:focus-visible {
   outline-color: #10b981;
+}
+
+.sidebar-nav-link:focus-visible {
+  outline: none;
 }
 
 .themed-tooltip[data-tooltip] {
