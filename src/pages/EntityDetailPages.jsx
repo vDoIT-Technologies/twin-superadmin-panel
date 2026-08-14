@@ -181,6 +181,7 @@ function firstDecimal(...values) {
 }
 
 const formatOptionalCurrency = (value) => value == null ? '---' : formatCurrency(value);
+const formatOptionalNumber = (value) => value == null ? '---' : formatNumber(value);
 
 const serviceLabels = {
   openai: 'OpenAI', elevenlabs: 'ElevenLabs', did: 'D-ID', heygen: 'HeyGen',
@@ -414,9 +415,9 @@ export function ClientDetailPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <MetricCard icon={Wallet} label="Cost" value={formatOptionalCurrency(displayedTotalCost)} tone="indigo" />
           <MetricCard icon={TrendingUp} label="Revenue" value={formatCurrency(kpis?.revenue || 0)} tone="emerald" />
-          <MetricCard icon={Bot} label="Twins" value={String(kpis?.twinsCount || 0)} tone="rose" />
+          <MetricCard icon={Wallet} label="Cost" value={formatOptionalCurrency(displayedTotalCost)} tone="rose" />
+          <MetricCard icon={Bot} label="Twins" value={String(kpis?.twinsCount || 0)} tone="indigo" />
           <MetricCard icon={Users} label="Users" value={String(kpis?.usersCount || 0)} tone="amber" />
         </div>
       )}
@@ -674,6 +675,22 @@ export function TwinDetailPage() {
     })
     .filter(Boolean)
     .join(', ');
+  const twinPackageValue = profile?.package?.name
+    ?? profile?.packageName
+    ?? profile?.package
+    ?? profile?.plan?.name
+    ?? profile?.plan?.id
+    ?? profile?.plan
+    ?? twinData?.package?.name
+    ?? twinData?.packageName
+    ?? twinData?.package
+    ?? twinData?.plan?.name
+    ?? twinData?.plan?.id
+    ?? twinData?.plan
+    ?? '';
+  const twinPackage = typeof twinPackageValue === 'object'
+    ? twinPackageValue?.name ?? twinPackageValue?.label ?? twinPackageValue?.id ?? twinPackageValue?._id ?? ''
+    : twinPackageValue;
 
   return (
     <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
@@ -686,10 +703,10 @@ export function TwinDetailPage() {
       />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={MessagesSquare} label="Messages" value={formatNumber(kpis?.messages || 0)} tone="indigo" />
-        <MetricCard icon={Wallet} label="Cost" value={formatCurrency(kpis?.cost || 0)} tone="rose" />
         <MetricCard icon={TrendingUp} label="Revenue" value={formatCurrency(kpis?.revenue || 0)} tone="emerald" />
-        <MetricCard icon={BookOpen} label="Knowledge Sources" value={formatNumber(kpis?.knowledgeSources || 0)} tone="amber" />
+        <MetricCard icon={Wallet} label="Cost" value={formatCurrency(kpis?.cost || 0)} tone="rose" />
+        <MetricCard icon={MessagesSquare} label="Messages" value={formatNumber(kpis?.messages || kpis?.messagesCount || 0)} tone="indigo" />
+        <MetricCard icon={BookOpen} label="Knowledge Files" value={formatNumber(kpis?.knowledgeFiles || kpis?.knowledgeSources || kpis?.sourcesCount || 0)} tone="amber" />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -698,6 +715,7 @@ export function TwinDetailPage() {
             <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Name</span><strong className="font-semibold text-slate-700">{profile?.name || '-'}</strong></div>
             <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Role</span><strong className="font-semibold text-slate-700">{profile?.role || '-'}</strong></div>
             <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Client</span><strong className="font-semibold text-slate-700">{profile?.clientName || '-'}</strong></div>
+            <div className="flex items-center justify-between gap-6 px-5 py-3 text-xs"><span className="shrink-0 text-slate-400">Package</span><strong className="min-w-0 truncate text-right font-semibold text-slate-700" title={twinPackage ? String(twinPackage) : undefined}>{twinPackage || '---'}</strong></div>
             <div className="flex items-center justify-between gap-6 px-5 py-3 text-xs"><span className="shrink-0 text-slate-400">Associated Users</span><strong className="min-w-0 truncate text-right font-semibold text-slate-700" title={associatedUserNames || undefined}>{associatedUserNames || '---'}</strong></div>
           </div>
         </CardSection>
@@ -752,7 +770,39 @@ export function UserDetailPage() {
   if (isLoading) return <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8"><div className="rounded-2xl border border-slate-200 bg-white py-16 text-center text-sm text-slate-400 shadow-panel">Loading user...</div></section>;
   if (!userData) return <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8"><div className="rounded-2xl border border-slate-200 bg-white py-16 text-center text-sm text-slate-400 shadow-panel">User not found.</div></section>;
 
-  const { profile, kpis, modalityMix, twins, sessionHistory } = userData;
+  const { profile, kpis } = userData;
+  const associatedTwinsValue = userData?.twins
+    ?? userData?.associatedTwins
+    ?? userData?.linkedTwins
+    ?? profile?.twins
+    ?? profile?.associatedTwins
+    ?? [];
+  const twins = Array.isArray(associatedTwinsValue)
+    ? associatedTwinsValue
+    : Array.isArray(associatedTwinsValue?.items)
+      ? associatedTwinsValue.items
+      : [];
+  const userPackageValue = profile?.packages
+    ?? profile?.package?.name
+    ?? profile?.packageName
+    ?? profile?.package
+    ?? profile?.plan?.name
+    ?? profile?.plan?.id
+    ?? profile?.plan
+    ?? userData?.packages
+    ?? userData?.package?.name
+    ?? userData?.packageName
+    ?? userData?.package
+    ?? userData?.plan?.name
+    ?? userData?.plan?.id
+    ?? userData?.plan
+    ?? '';
+  const userPackages = (Array.isArray(userPackageValue) ? userPackageValue : [userPackageValue])
+    .map((item) => (typeof item === 'object'
+      ? item?.name ?? item?.label ?? item?.id ?? item?._id ?? ''
+      : item))
+    .filter((item) => item != null && String(item).trim())
+    .join(', ');
 
   return (
     <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
@@ -771,42 +821,32 @@ export function UserDetailPage() {
       />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={MessagesSquare} label="Messages" value={formatNumber(kpis?.messages || 0)} tone="indigo" />
-        <MetricCard icon={Activity} label="Sessions" value={formatNumber(kpis?.sessions || 0)} tone="sky" />
-        <MetricCard icon={Coins} label="Points Balance" value={formatNumber(kpis?.pointsBalance || 0)} tone="amber" />
-        <MetricCard icon={Wallet} label="Spend Value" value={formatCurrency(kpis?.spendValue || 0)} tone="emerald" />
+        <MetricCard icon={Wallet} label="Cost" value={formatCurrency(kpis?.cost || kpis?.totalCost || kpis?.spendValue || 0)} tone="rose" />
+        <MetricCard icon={TrendingUp} label="Revenue" value={formatOptionalCurrency(firstDecimal(kpis?.revenue, kpis?.totalRevenue))} tone="emerald" />
+        <MetricCard icon={Coins} label="Total Points" value={formatOptionalNumber(firstDecimal(kpis?.totalPoints, kpis?.pointsBalance, kpis?.balance))} tone="amber" />
+        <MetricCard icon={Activity} label="Points Spent" value={formatOptionalNumber(firstDecimal(kpis?.pointsSpent, kpis?.spentPoints, kpis?.totalPointsSpent))} tone="indigo" />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <CardSection title="Modality Mix" subtitle={`${formatNumber(kpis?.messages || 0)} messages`} flush>
-          <div className="divide-y divide-slate-100">
-            <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Text</span><strong className="font-semibold text-slate-700">{formatNumber(modalityMix?.text || 0)}</strong></div>
-            <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Audio</span><strong className="font-semibold text-slate-700">{formatNumber(modalityMix?.audio || 0)}</strong></div>
-            <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Video</span><strong className="font-semibold text-slate-700">{formatNumber(modalityMix?.video || 0)}</strong></div>
-          </div>
-        </CardSection>
         <CardSection title="User Info" flush>
           <div className="divide-y divide-slate-100">
             <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Email</span><strong className="font-semibold text-slate-700">{profile?.email || '-'}</strong></div>
             <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Client</span><strong className="font-semibold text-slate-700">{profile?.clientName || '-'}</strong></div>
             <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Environment</span><strong className="font-semibold text-slate-700">{profile?.env || '-'}</strong></div>
-            <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Created</span><strong className="font-semibold text-slate-700">{profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString() : '-'}</strong></div>
+            <div className="flex items-center justify-between gap-6 px-5 py-3 text-xs"><span className="shrink-0 text-slate-400">Packages</span><strong className="min-w-0 truncate text-right font-semibold text-slate-700" title={userPackages || undefined}>{userPackages || '---'}</strong></div>
           </div>
         </CardSection>
-      </div>
-
-      <div className={`grid grid-cols-1 gap-4 ${adminProduct === 'vault' ? '' : 'lg:grid-cols-2'}`}>
         {adminProduct !== 'vault' ? <CardSection title="Twins Used" subtitle={`${twins?.length || 0} linked twins`} flush>
           {twins?.length ? (
             <div>
               {twins.map((twin) => (
                 <EntityListRow
-                  key={twin._id}
+                  key={twin._id ?? twin.id ?? twin.twinId ?? twin.name}
                   avatarClassName="twin"
                   initials={getInitials(twin.name || '')}
                   title={twin.name || 'Unnamed'}
                   subtitle={twin.role || ''}
-                  onClick={() => navigate(`/twins/${twin._id}`)}
+                  onClick={() => navigate(`/twins/${twin._id ?? twin.id ?? twin.twinId}`)}
                 />
               ))}
             </div>
@@ -814,21 +854,6 @@ export function UserDetailPage() {
             <EmptyDetailState message="No twins used." />
           )}
         </CardSection> : null}
-
-        <CardSection title="Session History" flush>
-          {sessionHistory?.length ? (
-            <div className="divide-y divide-slate-100">
-              {sessionHistory.map((session, i) => (
-                <div key={session.sessionId || i} className="flex items-center justify-between px-5 py-3 text-xs">
-                  <span className="text-slate-400">{adminProduct === 'vault' ? `Session ${i + 1}` : session.twinName || 'Unknown'}</span>
-                  <strong className="font-semibold text-slate-700">{session.messages || 0} msgs · {session.duration || '-'}</strong>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <EmptyDetailState message="No session history." />
-          )}
-        </CardSection>
       </div>
     </section>
   );

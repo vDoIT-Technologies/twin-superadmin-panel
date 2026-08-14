@@ -6,7 +6,7 @@ import { useAuth } from '../app/AuthContext';
 import { TruncatedText } from '../components/common/TruncatedText';
 import { FilterDropdown } from '../components/common/FilterDropdown';
 import { superadminDemoData } from '../demo-data/superadminDemoData';
-import { dashboardService, dropdownApiAvailable, getClientsDropdown, getTwinsDropdown, getUsersDropdown } from '../services';
+import { dashboardService, dropdownApiAvailable, getClientsDropdown, getUsersDropdown } from '../services';
 import { envBadge, formatCurrencyFull, formatNumber } from '../utils/dashboardUtils';
 
 function getUserInitials(name) {
@@ -34,22 +34,6 @@ function parseDecimal(value) {
     return Number.isNaN(parsed) ? null : parsed;
   }
   return null;
-}
-
-function getTwinCount(twinIds) {
-  if (Array.isArray(twinIds)) {
-    return twinIds.length;
-  }
-
-  if (twinIds == null) {
-    return 0;
-  }
-
-  if (typeof twinIds === 'object') {
-    return Object.keys(twinIds).length;
-  }
-
-  return 1;
 }
 
 function formatOptionalNumber(value) {
@@ -121,7 +105,6 @@ export function UsersPage() {
   const [clientNamesById, setClientNamesById] = useState({});
   const [userEnrichmentByKey, setUserEnrichmentByKey] = useState({});
   const [clientFilterOptions, setClientFilterOptions] = useState([]);
-  const [twinFilterOptions, setTwinFilterOptions] = useState([]);
   const [isTableLoading, setIsTableLoading] = useState(true);
   const [pagination, setPagination] = useState({
     total: 0,
@@ -133,22 +116,15 @@ export function UsersPage() {
   useEffect(() => {
     let active = true;
     const env = filters.envs.length === 1 ? filters.envs[0] : undefined;
-    Promise.all([
-      getClientsDropdown({ env }),
-      isVault ? Promise.resolve([]) : getTwinsDropdown({ env, clientId: filters.client || undefined }),
-    ]).then(([clients, twins]) => {
+    getClientsDropdown({ env }).then((clients) => {
       if (!active) return;
       setClientFilterOptions(clients.map((client) => ({
         value: client.id ?? client._id ?? client.clientId,
         label: client.name ?? client.clientName ?? client.label ?? 'Unnamed client',
       })));
-      setTwinFilterOptions(twins.map((twin) => ({
-        value: twin.id ?? twin._id ?? twin.twinId,
-        label: twin.name ?? twin.label ?? 'Unnamed twin',
-      })));
     }).catch((error) => console.error('User table filters failed to load:', error));
     return () => { active = false; };
-  }, [filters.client, filters.envs, isVault]);
+  }, [filters.envs]);
 
   const updateTableFilter = (key, value) => {
     setPage(1);
@@ -168,7 +144,6 @@ export function UsersPage() {
       const dropdownUsers = await getUsersDropdown({
         env: selectedEnv,
         clientId: filters.client || undefined,
-        twinId: filters.twin || undefined,
       });
       const total = dropdownUsers.length;
       const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -194,7 +169,6 @@ export function UsersPage() {
           page,
           limit: PAGE_SIZE,
           clientId: filters.client,
-          twinId: filters.twin,
           env: filters.envs.length === 1 ? filters.envs[0] : undefined,
           range: filters.range,
           granularity: filters.gran,
@@ -243,7 +217,7 @@ export function UsersPage() {
     return () => {
       isActive = false;
     };
-  }, [filters.client, filters.envs, filters.gran, filters.range, filters.twin, page]);
+  }, [filters.client, filters.envs, filters.gran, filters.range, page]);
 
   useEffect(() => {
     if (!isVault) {
@@ -301,7 +275,7 @@ export function UsersPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [filters.client, filters.envs, filters.gran, filters.range, filters.twin]);
+  }, [filters.client, filters.envs, filters.gran, filters.range]);
 
   const userRows = useMemo(() => {
     return apiUsers
@@ -337,16 +311,6 @@ export function UsersPage() {
           ?? enrichment?.points_balance
           ?? enrichment?.point_balance,
         );
-        const explicitTwinCount = parseDecimal(
-          user?.twinsCount
-          ?? user?.twinCount
-          ?? user?.associatedTwinsCount
-          ?? enrichment?.twinsCount
-          ?? enrichment?.twinCount
-          ?? enrichment?.associatedTwinsCount,
-        );
-        const twinSource = user?.twinIds ?? user?.twins ?? enrichment?.twinIds ?? enrichment?.twins;
-        const twinCount = explicitTwinCount ?? (twinSource == null ? null : getTwinCount(twinSource));
         const pointsSpent = parseDecimal(
           user?.pointsSpent
           ?? user?.spentPoints
@@ -401,7 +365,6 @@ export function UsersPage() {
           cost,
           revenue,
           pointsSpent,
-          twins: twinCount,
           status,
           lastActiveDaysAgo: lastDaysAgo,
           lastActiveLabel,
@@ -444,8 +407,6 @@ export function UsersPage() {
           return user.revenue;
         case 'pointsSpent':
           return user.pointsSpent;
-        case 'twins':
-          return user.twins;
         case 'lastActive':
           return user.lastActiveDaysAgo;
         default:
@@ -484,13 +445,12 @@ export function UsersPage() {
   };
 
   const exportCsv = () => {
-    const header = ['User', 'Env', 'Client', 'Twins', 'Cost', 'Revenue', 'Total Points', 'Points Spent', 'Messages', 'Sessions'];
+    const header = ['User', 'Env', 'Client', 'Cost', 'Revenue', 'Total Points', 'Points Spent', 'Messages', 'Sessions'];
     const lines = sortedRows.map((user) =>
       [
         user.name,
         getEnvLabel(user.env),
         user.client || '---',
-        formatOptionalNumber(user.twins),
         formatOptionalCurrency(user.cost),
         formatOptionalCurrency(user.revenue),
         formatOptionalNumber(user.balance),
@@ -531,7 +491,7 @@ export function UsersPage() {
             />
           </label>
 
-          <div className={`grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-2 ${isVault ? 'xl:grid-cols-4' : 'xl:grid-cols-5'}`}>
+          <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
             <FilterDropdown
               value={filters.envs.length === 1 ? filters.envs[0] : null}
               onChange={(value) => updateTableFilter('envs', value ? [value] : ['dev', 'staging', 'prod'])}
@@ -566,7 +526,6 @@ export function UsersPage() {
               tone={isVault ? 'vault' : 'twin'}
             />
             <FilterDropdown value={filters.client} onChange={(value) => updateTableFilter('client', value)} options={clientFilterOptions} placeholder="All clients" searchPlaceholder="Search client..." tone={isVault ? 'vault' : 'twin'} />
-            {!isVault ? <FilterDropdown value={filters.twin} onChange={(value) => updateTableFilter('twin', value)} options={twinFilterOptions} placeholder="All twins" searchPlaceholder="Search twin..." align="right" tone="twin" /> : null}
           </div>
 
           <button type="button" className={`inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 px-3.5 text-sm font-semibold text-slate-600 transition ${isVault ? 'hover:border-emerald-300 hover:text-emerald-700' : 'hover:border-indigo-300 hover:text-indigo-600'}`} onClick={exportCsv}>
@@ -584,7 +543,6 @@ export function UsersPage() {
                   ['user', 'User'],
                   ['env', 'Env'],
                   ['client', 'Client'],
-                  ['twins', 'Twins'],
                   ['cost', 'Cost'],
                   ['revenue', 'Revenue'],
                   ['balance', 'Total Points'],
@@ -606,14 +564,14 @@ export function UsersPage() {
             <tbody>
               {isTableLoading ? (
                 <tr>
-                  <td colSpan={10} className="px-5 py-12 text-center text-sm text-slate-400">
+                  <td colSpan={9} className="px-5 py-12 text-center text-sm text-slate-400">
                     <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-indigo-100 border-t-indigo-600 align-[-2px]" aria-hidden="true" />
                     Loading users...
                   </td>
                 </tr>
               ) : paginatedRows.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-5 py-12 text-center text-sm text-slate-400">
+                  <td colSpan={9} className="px-5 py-12 text-center text-sm text-slate-400">
                     No users found
                   </td>
                 </tr>
@@ -628,7 +586,6 @@ export function UsersPage() {
                     </td>
                     <td className="px-4 py-3.5 text-center text-slate-500">{superadminDemoData.ENV_META[user.env] ? envBadge(user.env) : getEnvLabel(user.env)}</td>
                     <td className="px-4 py-3.5 text-slate-500"><TruncatedText value={user.client || '---'} /></td>
-                    <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(user.twins)}</td>
                     <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalCurrency(user.cost)}</td>
                     <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalCurrency(user.revenue)}</td>
                     <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(user.balance)}</td>
