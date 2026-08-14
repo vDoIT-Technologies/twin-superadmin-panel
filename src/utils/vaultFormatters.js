@@ -47,12 +47,14 @@ export function normalizeStorageUsage(payload) {
   const quotaBytes = firstNumber(
     quota.totalQuotaBytes, quota.totalQuotaInBytes, quota.totalQuota,
     quota.storageLimitBytes, quota.storageLimit, quota.quotaBytes, quota.quota,
+    quota.total_quota_bytes, quota.storage_limit_bytes, quota.quota_bytes,
   );
   const quotaTb = firstNumber(quota.totalQuotaTB, quota.totalQuotaTb, quota.quotaTB, quota.quotaTb);
   const quotaGb = firstNumber(quota.totalQuotaGB, quota.totalQuotaGb, quota.quotaGB, quota.quotaGb);
   const usageBytes = firstNumber(
     quota.totalUsageBytes, quota.totalUsageInBytes, quota.totalUsage,
     quota.storageUsedBytes, quota.storageUsed, quota.usedBytes, quota.usage, quota.used,
+    quota.total_usage_bytes, quota.storage_used_bytes, quota.used_bytes,
   );
   const usageTb = firstNumber(
     quota.totalUsageTB, quota.totalUsageTb, quota.usageTB, quota.usageTb, quota.usedTB, quota.usedTb,
@@ -63,12 +65,18 @@ export function normalizeStorageUsage(payload) {
   const percentage = firstNumber(
     quota.percentage, quota.usagePercentage, quota.usagePercent, quota.quotaUsedPercentage,
     quota.quotaPercent, quota.percentageUsed, quota.percentUsed,
+    quota.usage_percentage, quota.usage_percent, quota.quota_used_percentage,
+    quota.quota_percent, quota.percentage_used, quota.percent_used,
   );
 
+  const totalQuota = quotaTb != null ? quotaTb * BYTES_PER_TB : quotaGb != null ? quotaGb * BYTES_PER_GB : quotaBytes;
+  const totalUsage = usageTb != null ? usageTb * BYTES_PER_TB : usageGb != null ? usageGb * BYTES_PER_GB : usageBytes;
+  const usagePercent = percentage ?? (totalQuota > 0 && totalUsage != null ? (totalUsage / totalQuota) * 100 : null);
+
   return {
-    totalQuota: quotaTb != null ? quotaTb * BYTES_PER_TB : quotaGb != null ? quotaGb * BYTES_PER_GB : quotaBytes,
-    totalUsage: usageTb != null ? usageTb * BYTES_PER_TB : usageGb != null ? usageGb * BYTES_PER_GB : usageBytes,
-    usagePercent: percentage == null ? null : Math.min(100, Math.max(0, percentage)),
+    totalQuota,
+    totalUsage,
+    usagePercent: usagePercent == null ? null : Math.min(100, Math.max(0, usagePercent)),
   };
 }
 
@@ -157,7 +165,6 @@ export function sortTopUsers(users, { key, direction }) {
   const valueFor = (user) => ({
     user: user.name || '', client: user.client || '', env: user.env || '',
     storage: user.storageBytes, files: user.files,
-    lastActive: new Date(user.lastActive).getTime() || 0,
   })[key] ?? user.storageBytes;
 
   return [...users].sort((left, right) => {
@@ -169,10 +176,10 @@ export function sortTopUsers(users, { key, direction }) {
 }
 
 export function exportTopUsersCsv(users) {
-  const header = ['User', 'Email', 'Client', 'Env', 'Storage', 'Files', 'Last Active'];
+  const header = ['User', 'Email', 'Client', 'Env', 'Storage', 'Files'];
   const rows = users.map((user) => [
     user.name, user.email, user.client, user.env, formatBytes(user.storageBytes),
-    user.files, formatLastActive(user.lastActive),
+    user.files,
   ]);
   const csv = [header, ...rows]
     .map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(','))

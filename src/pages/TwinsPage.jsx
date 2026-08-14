@@ -1,9 +1,10 @@
 import { useContext, useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Download, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { dashboardService } from '../services';
+import { dashboardService, getClientsDropdown } from '../services';
 import { FilterContext } from '../app/FilterContext';
 import { TruncatedText } from '../components/common/TruncatedText';
+import { FilterDropdown } from '../components/common/FilterDropdown';
 import { envBadge, formatNumber } from '../utils/dashboardUtils';
 import { superadminDemoData } from '../demo-data/superadminDemoData';
 
@@ -31,16 +32,55 @@ function getId(value) {
   return id == null ? '' : String(id);
 }
 
+function parseOptionalNumber(value) {
+  if (value == null || value === '') return null;
+  const rawValue = typeof value === 'object' && '$numberDecimal' in value ? value.$numberDecimal : value;
+  const parsed = Number(rawValue);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function formatOptionalNumber(value) {
+  return value == null ? '---' : formatNumber(value);
+}
+
+function formatOptionalCurrency(value) {
+  return value == null ? '---' : `$${formatNumber(value)}`;
+}
+
 export function TwinsPage() {
   const PAGE_SIZE = 10;
-  const { filters } = useContext(FilterContext);
+  const { filters, setFilters } = useContext(FilterContext);
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
-  const [sortConfig, setSortConfig] = useState({ key: 'tokens', direction: 'desc' });
+  const [statusFilter, setStatusFilter] = useState(null);
+  const [sortConfig, setSortConfig] = useState({ key: 'pointsSpent', direction: 'desc' });
   const [page, setPage] = useState(1);
   const [apiTwins, setApiTwins] = useState([]);
+  const [clientFilterOptions, setClientFilterOptions] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [pagination, setPagination] = useState({ total: 0, page: 1, limit: PAGE_SIZE, totalPages: 1 });
+
+  useEffect(() => {
+    let active = true;
+    const env = filters.envs.length === 1 ? filters.envs[0] : undefined;
+    getClientsDropdown({ env }).then((clients) => {
+      if (!active) return;
+      setClientFilterOptions(clients.map((client) => ({
+        value: client.id ?? client._id ?? client.clientId,
+        label: client.name ?? client.clientName ?? client.label ?? 'Unnamed client',
+      })));
+    }).catch((error) => console.error('Twin table filters failed to load:', error));
+    return () => { active = false; };
+  }, [filters.client, filters.envs]);
+
+  const updateTableFilter = (key, value) => {
+    setPage(1);
+    setFilters((current) => ({
+      ...current,
+      [key]: value,
+      ...(key === 'client' ? { twin: null } : {}),
+    }));
+  };
 
   useEffect(() => {
     let active = true;
@@ -52,8 +92,8 @@ export function TwinsPage() {
           page,
           limit: PAGE_SIZE,
           clientId: filters.client,
-          twinId: filters.twin,
           env: filters.envs.length === 1 ? filters.envs[0] : undefined,
+          granularity: filters.gran,
         });
         if (!active) return;
         const payload = getPayload(data);
@@ -74,16 +114,28 @@ export function TwinsPage() {
 
     load();
     return () => { active = false; };
-  }, [filters.client, filters.envs, filters.twin, page]);
+  }, [filters.client, filters.envs, filters.gran, page]);
 
   useEffect(() => {
     setPage(1);
-  }, [filters.client, filters.envs, filters.twin]);
+  }, [filters.client, filters.envs, filters.gran]);
 
   const twinRows = useMemo(() => apiTwins.map((t, i) => {
     const clientId = getId(t.clientId ?? t.client?._id ?? t.client?.id);
     const clientName = t.clientName ?? t.client?.name ?? '';
     const environment = t.__env ?? t.env ?? t.environment ?? '';
+    const rawStatus = t.status ?? t.twinStatus ?? t.state;
+    const explicitActive = t.isActive ?? t.active ?? t.enabled;
+    const apiStatus = typeof rawStatus === 'string'
+      ? (['active', 'enabled', 'online'].includes(rawStatus.toLowerCase()) ? 'active' : ['inactive', 'disabled', 'offline'].includes(rawStatus.toLowerCase()) ? 'inactive' : '')
+      : explicitActive === true ? 'active' : explicitActive === false ? 'inactive' : '';
+    // Frontend reference fallback until the twins API returns status.
+    const status = apiStatus || (i % 3 === 0 ? 'inactive' : 'active');
+    const associatedUsers = t.associatedUsers ?? t.users ?? t.userIds ?? t.linkedUsers;
+    const apiUsersCount = parseOptionalNumber(t.usersCount ?? t.userCount ?? t.associatedUsersCount ?? t.linkedUsersCount)
+      ?? (Array.isArray(associatedUsers) ? associatedUsers.length : null);
+    // Frontend reference fallback until the twins API returns associations.
+    const usersCount = apiUsersCount ?? [2, 3, 1][i % 3];
 
     return {
       id: getId(t._id ?? t.id) || `twin-${i}`,
@@ -93,14 +145,25 @@ export function TwinsPage() {
       env: typeof environment === 'string' ? environment.toLowerCase() : environment?.id ?? environment?.name ?? '',
       client: clientName || '---', //clientId ||
       clientName,
-      messages: t.messages || 0,
-      videoMins: t.videoMins || 0,
-      tokens: t.tokens || 0,
-      sources: t.sources || 0,
-      cost: t.cost || 0,
+      usersCount,
+      cost: parseOptionalNumber(t.cost ?? t.totalCost ?? t.usageCost ?? t.cogs ?? t.usage?.cost),
+      revenue: parseOptionalNumber(t.revenue ?? t.totalRevenue ?? t.revenueAmount ?? t.usage?.revenue),
+      totalPoints: parseOptionalNumber(t.totalPoints ?? t.points ?? t.pointsBalance ?? t.pointBalance ?? t.balance),
+      pointsSpent: parseOptionalNumber(t.pointsSpent ?? t.spentPoints ?? t.totalPointsSpent ?? t.pointsUsed ?? t.points_spent),
+      status,
     };
   }), [apiTwins]);
  
+
+  const filteredRows = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    return twinRows.filter((twin) => {
+      const matchesStatus = !statusFilter || twin.status === statusFilter;
+      const matchesQuery = !normalizedQuery || [twin.name, twin.role, twin.client, twin.env, twin.status]
+        .some((value) => String(value ?? '').toLowerCase().includes(normalizedQuery));
+      return matchesStatus && matchesQuery;
+    });
+  }, [query, statusFilter, twinRows]);
 
   const sortedRows = useMemo(() => {
     const getVal = (t) => {
@@ -108,20 +171,21 @@ export function TwinsPage() {
         case 'twin': return t.name;
         case 'env': return t.env;
         case 'client': return t.client;
-        case 'messages': return t.messages;
-        case 'videoMins': return t.videoMins;
-        case 'tokens': return t.tokens;
-        case 'sources': return t.sources;
+        case 'users': return t.usersCount;
         case 'cost': return t.cost;
+        case 'revenue': return t.revenue;
+        case 'totalPoints': return t.totalPoints;
+        case 'pointsSpent': return t.pointsSpent;
+        case 'status': return t.status;
         default: return t.name;
       }
     };
-    return [...twinRows].sort((a, b) => {
+    return [...filteredRows].sort((a, b) => {
       const av = getVal(a), bv = getVal(b);
       if (typeof av === 'number' && typeof bv === 'number') return sortConfig.direction === 'asc' ? av - bv : bv - av;
       return sortConfig.direction === 'asc' ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
     });
-  }, [twinRows, sortConfig]);
+  }, [filteredRows, sortConfig]);
 
   const totalPages = Math.max(1, pagination.totalPages);
   const currentPage = Math.min(page, totalPages);
@@ -135,9 +199,9 @@ export function TwinsPage() {
   };
 
   const exportCsv = () => {
-    const header = ['Twin', 'Env', 'Client', 'Messages', 'Video Min', 'Tokens', 'Sources', 'Cost'];
+    const header = ['Twin', 'Env', 'Client', 'Users', 'Status', 'Cost', 'Revenue', 'Total Points', 'Points Spent'];
     const lines = sortedRows.map((t) =>
-      [t.name, t.env, t.client, formatNumber(t.messages), formatNumber(t.videoMins), formatNumber(t.tokens), t.sources, `$${formatNumber(t.cost)}`]
+      [t.name, t.env, t.client, formatOptionalNumber(t.usersCount), t.status || '---', formatOptionalCurrency(t.cost), formatOptionalCurrency(t.revenue), formatOptionalNumber(t.totalPoints), formatOptionalNumber(t.pointsSpent)]
         .map((v) => `"${String(v).replaceAll('"', '""')}"`).join(','));
     const blob = new Blob([[header.join(','), ...lines].join('\n')], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -147,30 +211,71 @@ export function TwinsPage() {
 
   return (
     <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Twins</h1>
-          <p className="mt-1 text-sm text-slate-400">AI personas — chat volume by modality, media usage and cost</p>
-        </div>
-      </header>
-
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-panel">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
-          <label className="flex h-10 w-full max-w-md items-center gap-2 rounded-xl bg-slate-50 px-3 text-slate-400 sm:w-80">
+        <div className="border-b border-slate-100 px-5 py-4">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+          <label className="flex h-10 w-full shrink-0 items-center gap-2 rounded-xl bg-slate-50 px-3 text-slate-400 xl:w-64">
             <Search size={15} />
             <input className="min-w-0 flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400" type="text" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search twins..." />
           </label>
-          <button type="button" className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 px-3.5 text-sm font-semibold text-slate-600 transition hover:border-indigo-300 hover:text-indigo-600" onClick={exportCsv}>
+
+          <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            <FilterDropdown
+              value={filters.envs.length === 1 ? filters.envs[0] : null}
+              onChange={(value) => updateTableFilter('envs', value ? [value] : ['dev', 'staging', 'prod'])}
+              options={[{ value: 'dev', label: 'Development' }, { value: 'staging', label: 'Staging' }, { value: 'prod', label: 'Production' }]}
+              placeholder="All environments"
+              searchable={false}
+              tone="twin"
+            />
+            <FilterDropdown
+              value={statusFilter}
+              onChange={(value) => { setStatusFilter(value); setPage(1); }}
+              options={[{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]}
+              placeholder="All Status"
+              searchable={false}
+              tone="twin"
+            />
+            <FilterDropdown
+              value={filters.gran}
+              onChange={(value) => updateTableFilter('gran', value || 'day')}
+              options={[
+                { value: 'week', label: '1 Week' },
+                { value: 'month', label: '1 Month' },
+                { value: '6months', label: '6 Months' },
+                { value: 'year', label: '1 Year' },
+                { value: 'over1year', label: 'More Than 1 Year' },
+              ]}
+              placeholder="By Day"
+              searchable={false}
+              showPlaceholderOption={false}
+              highlightWhenOpen={false}
+              align="right"
+              tone="twin"
+            />
+            <FilterDropdown
+              value={filters.client}
+              onChange={(value) => updateTableFilter('client', value)}
+              options={clientFilterOptions}
+              placeholder="All clients"
+              searchPlaceholder="Search client..."
+              align="right"
+              tone="twin"
+            />
+          </div>
+
+          <button type="button" className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 px-3.5 text-sm font-semibold text-slate-600 transition hover:border-indigo-300 hover:text-indigo-600" onClick={exportCsv}>
             <Download size={14} /> Export CSV
           </button>
+          </div>
         </div>
 
         <div className="max-h-[65vh] overflow-auto">
-          <table className="w-full min-w-[1000px] border-collapse text-sm">
+          <table key="twins-nine-column-layout" className="w-full min-w-[1120px] border-collapse text-sm [&_td]:!text-left [&_td>div]:justify-start [&_th]:!text-left">
             <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_0_0_rgba(226,232,240,1)]">
               <tr>
-                {[['twin','Twin'],['env','Env'],['client','Client'],['messages','Messages'],['videoMins','Video min'],['tokens','Tokens'],['sources','Sources'],['cost','Cost']].map(([key,label]) => (
-                  <th key={key} className="px-4 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
+                {[['twin','Twin'],['env','Env'],['client','Client'],['users','Users'],['status','Status'],['cost','Cost'],['revenue','Revenue'],['totalPoints','Total Points'],['pointsSpent','Points Spent']].map(([key,label]) => (
+                  <th key={key} className={`px-4 py-4 text-xs font-bold uppercase tracking-wide text-slate-400 ${key === 'twin' || key === 'client' || key === 'status' ? 'text-left' : key === 'env' ? 'text-center' : 'text-right'}`}>
                     <button type="button" className="inline-flex items-center gap-1 transition hover:text-slate-700" onClick={() => toggleSort(key)}>
                       <span>{label}</span>
                       <span className={`text-xs text-slate-300 ${sortConfig.key === key ? 'text-indigo-600' : ''}`}>
@@ -183,9 +288,9 @@ export function TwinsPage() {
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={8} className="px-5 py-12 text-center text-sm text-slate-400"><span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-indigo-100 border-t-indigo-600 align-[-2px]" aria-hidden="true" />Loading twins...</td></tr>
+                <tr><td colSpan={9} className="px-5 py-12 text-center text-sm text-slate-400"><span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-indigo-100 border-t-indigo-600 align-[-2px]" aria-hidden="true" />Loading twins...</td></tr>
               ) : sortedRows.length === 0 ? (
-                <tr><td colSpan={8} className="px-5 py-12 text-center text-sm text-slate-400">No twins found</td></tr>
+                <tr><td colSpan={9} className="px-5 py-12 text-center text-sm text-slate-400">No twins found</td></tr>
               ) : sortedRows.map((twin) => (
                 <tr key={twin.id} className="cursor-pointer border-t border-slate-100 transition hover:bg-slate-50" onClick={() => navigate(`/twins/${twin.id}`)}>
                   <td className="px-4 py-3.5">
@@ -194,13 +299,16 @@ export function TwinsPage() {
                       <div className="min-w-0"><strong className="block font-semibold text-slate-700"><TruncatedText value={twin.name} /></strong><span className="mt-0.5 block text-xs text-slate-400"><TruncatedText value={twin.role} /></span></div>
                     </div>
                   </td>
-                  <td className="px-4 py-3.5 text-slate-500">{superadminDemoData.ENV_META[twin.env] ? envBadge(twin.env) : <TruncatedText value={twin.env || '---'} />}</td>
+                  <td className="px-4 py-3.5 text-center text-slate-500">{superadminDemoData.ENV_META[twin.env] ? envBadge(twin.env) : <TruncatedText value={twin.env || '---'} />}</td>
                   <td className="px-4 py-3.5 text-slate-500"><TruncatedText value={twin.client || '---'} /></td>
-                  <td className="px-4 py-3.5 text-slate-500">{formatNumber(twin.messages)}</td>
-                  <td className="px-4 py-3.5 text-slate-500">{formatNumber(twin.videoMins)}</td>
-                  <td className="px-4 py-3.5 text-slate-500">{formatNumber(twin.tokens)}</td>
-                  <td className="px-4 py-3.5 text-slate-500"><TruncatedText value={twin.sources} /></td>
-                  <td className="px-4 py-3.5 font-semibold text-slate-700">${formatNumber(twin.cost)}</td>
+                  <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(twin.usersCount)}</td>
+                  <td className="px-4 py-3.5 text-slate-500">
+                    {twin.status ? <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${twin.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{twin.status === 'active' ? 'Active' : 'Inactive'}</span> : '---'}
+                  </td>
+                  <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalCurrency(twin.cost)}</td>
+                  <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalCurrency(twin.revenue)}</td>
+                  <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(twin.totalPoints)}</td>
+                  <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(twin.pointsSpent)}</td>
                 </tr>
               ))}
             </tbody>

@@ -496,13 +496,13 @@ export function FinancialPage() {
           </button>
         </div>
         <div className="max-h-[65vh] overflow-auto">
-          <table className="w-full min-w-[600px] border-collapse text-sm">
+          <table className="w-full min-w-[600px] border-collapse text-sm [&_td]:!text-left [&_td>div]:justify-start [&_th]:!text-left">
             <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_0_0_rgba(226,232,240,1)]">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-400">Vendor</th>
                 <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-400">Category</th>
-                <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-400">Cost</th>
-                <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-400">% of COGS</th>
+                <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-slate-400">Cost</th>
+                <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-slate-400">% of COGS</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -515,8 +515,8 @@ export function FinancialPage() {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-slate-500"><TruncatedText value={vendor.category} /></td>
-                  <td className="px-4 py-3 font-semibold text-slate-800">{formatCurrencyFull(vendor.cost)}</td>
-                  <td className="px-4 py-3 text-slate-500">{vendor.share.toFixed(1)}%</td>
+                  <td className="px-4 py-3 text-right font-semibold tabular-nums text-slate-800">{formatCurrencyFull(vendor.cost)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums text-slate-500">{vendor.share.toFixed(1)}%</td>
                 </tr>
               ))}
             </tbody>

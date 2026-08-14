@@ -18,7 +18,7 @@ const GRANULARITIES = [
   { value: 'month', label: 'By Months' },
 ];
 
-function ScopeDropdown({ filterKey, filters, updateScopeFilter, options, placeholder, searchPlaceholder, ...props }) {
+function ScopeDropdown({ filterKey, filters, updateScopeFilter, options, placeholder, searchPlaceholder, tone, ...props }) {
   return (
     <div className="min-w-0">
       <FilterDropdown
@@ -27,6 +27,7 @@ function ScopeDropdown({ filterKey, filters, updateScopeFilter, options, placeho
         options={options}
         placeholder={placeholder}
         searchPlaceholder={searchPlaceholder}
+        tone={tone}
         {...props}
       />
     </div>
@@ -40,15 +41,15 @@ export function FilterToolbar({
   clientOptions,
   twinOptions,
   userOptions,
-  serviceOptions,
   vendorOptions,
   showOverviewControls,
   adminProduct,
   visibleScopes = ['granularity', 'client', 'twin', 'user', 'service', 'vendor'],
+  showEnvironment = true,
 }) {
   const isVault = adminProduct === 'vault';
   const isVisible = (scope) => visibleScopes.includes(scope);
-  const visibleCount = visibleScopes.filter((scope) => scope !== 'twin' || !isVault).length;
+  const visibleCount = visibleScopes.filter((scope) => scope !== 'service' && (scope !== 'twin' || !isVault)).length;
   const desktopGridClass = {
     1: 'xl:grid-cols-1', 2: 'xl:grid-cols-2', 3: 'xl:grid-cols-3',
     4: 'xl:grid-cols-4', 5: 'xl:grid-cols-5', 6: 'xl:grid-cols-6',
@@ -57,7 +58,7 @@ export function FilterToolbar({
     <>
       <div className="border-b border-slate-200 bg-white px-4 py-3 sm:px-6 lg:px-8">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
-          <div className="flex shrink-0 items-center gap-2">
+          {showEnvironment ? <div className="flex shrink-0 items-center gap-2">
             <span className="mr-1 text-xs font-bold uppercase tracking-[0.12em] text-slate-400">Environment</span>
             <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 no-scrollbar">
               {ENVIRONMENTS.map((option) => {
@@ -78,9 +79,9 @@ export function FilterToolbar({
                 );
               })}
             </div>
-          </div>
+          </div> : null}
 
-          <div className={`grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 ${desktopGridClass}`}>
+          <div className={`grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 ${desktopGridClass} ${showEnvironment ? '' : 'lg:ml-auto lg:max-w-xl'}`}>
             {isVisible('granularity') ? <div className="min-w-0">
               <FilterDropdown
                 value={filters.gran}
@@ -89,13 +90,13 @@ export function FilterToolbar({
                 placeholder="By Days"
                 searchable={false}
                 showPlaceholderOption={false}
+                tone={isVault ? 'vault' : 'twin'}
               />
             </div> : null}
-            {isVisible('client') ? <ScopeDropdown filterKey="client" filters={filters} updateScopeFilter={updateScopeFilter} options={clientOptions} placeholder="All clients" searchPlaceholder="Search client..." /> : null}
+            {isVisible('client') ? <ScopeDropdown tone={isVault ? 'vault' : 'twin'} filterKey="client" filters={filters} updateScopeFilter={updateScopeFilter} options={clientOptions} placeholder="All clients" searchPlaceholder="Search client..." /> : null}
             {!isVault && isVisible('twin') ? <ScopeDropdown filterKey="twin" filters={filters} updateScopeFilter={updateScopeFilter} options={twinOptions} placeholder="All twins" searchPlaceholder="Search twin..." align="right" /> : null}
-            {isVisible('user') ? <ScopeDropdown filterKey="user" filters={filters} updateScopeFilter={updateScopeFilter} options={userOptions} placeholder="All users" searchPlaceholder="Search user..." /> : null}
-            {isVisible('service') ? <ScopeDropdown filterKey="service" filters={filters} updateScopeFilter={updateScopeFilter} options={serviceOptions} placeholder="All services" searchPlaceholder="Search service..." align="right" /> : null}
-            {isVisible('vendor') ? <ScopeDropdown filterKey="vendor" filters={filters} updateScopeFilter={updateScopeFilter} options={vendorOptions} placeholder="All vendors" searchPlaceholder="Search vendor..." align="right" /> : null}
+            {isVisible('user') ? <ScopeDropdown tone={isVault ? 'vault' : 'twin'} filterKey="user" filters={filters} updateScopeFilter={updateScopeFilter} options={userOptions} placeholder="All users" searchPlaceholder="Search user..." /> : null}
+            {isVisible('vendor') ? <ScopeDropdown tone={isVault ? 'vault' : 'twin'} filterKey="vendor" filters={filters} updateScopeFilter={updateScopeFilter} options={vendorOptions} placeholder="All services" searchPlaceholder="Search service..." align="right" /> : null}
           </div>
         </div>
       </div>
@@ -105,11 +106,11 @@ export function FilterToolbar({
           <div className="flex flex-wrap items-center gap-2.5">
             <div className="flex h-9 shrink-0 items-center rounded-full border border-slate-200 bg-white p-1 shadow-2xs">
               {RANGES.map((range) => (
-                <button key={range} type="button" className={`h-7 rounded-full px-3 text-xs font-semibold transition ${filters.range === range ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'}`} onClick={() => updateFilters({ range })}>{range}</button>
+                <button key={range} type="button" className={`h-7 rounded-full px-3 text-xs font-semibold transition ${filters.range === range ? `${isVault ? 'bg-emerald-600' : 'bg-indigo-600'} text-white shadow-xs` : 'text-slate-500 hover:text-slate-800'}`} onClick={() => updateFilters({ range })}>{range}</button>
               ))}
             </div>
 
-            <button type="button" className={`inline-flex h-9 items-center gap-2 rounded-full border px-3.5 text-xs font-semibold shadow-2xs transition ${filters.compare ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:text-indigo-700'}`} onClick={() => updateFilters({ compare: !filters.compare })}>
+            <button type="button" className={`inline-flex h-9 items-center gap-2 rounded-full border px-3.5 text-xs font-semibold shadow-2xs transition ${filters.compare ? (isVault ? 'border-emerald-400 bg-emerald-50 text-emerald-700' : 'border-indigo-400 bg-indigo-50 text-indigo-700') : (isVault ? 'border-slate-200 bg-white text-slate-600 hover:border-emerald-200 hover:text-emerald-700' : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:text-indigo-700')}`} onClick={() => updateFilters({ compare: !filters.compare })}>
               <Columns2 size={15} />
               Compare
             </button>
@@ -117,7 +118,7 @@ export function FilterToolbar({
 
           <div className="flex h-9 shrink-0 items-center rounded-full border border-slate-200 bg-white p-1 shadow-2xs">
             {LENSES.map((lens) => (
-              <button key={lens.id} type="button" className={`h-7 rounded-full px-3 text-xs font-semibold transition ${filters.lens === lens.id ? 'bg-indigo-50 font-bold text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`} onClick={() => updateFilters({ lens: lens.id })}>
+              <button key={lens.id} type="button" className={`h-7 rounded-full px-3 text-xs font-semibold transition ${filters.lens === lens.id ? (isVault ? 'bg-emerald-50 font-bold text-emerald-700' : 'bg-indigo-50 font-bold text-indigo-700') : 'text-slate-500 hover:text-slate-700'}`} onClick={() => updateFilters({ lens: lens.id })}>
                 {lens.label}
               </button>
             ))}

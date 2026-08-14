@@ -4,18 +4,10 @@ import { useNavigate } from 'react-router-dom';
 import { FilterContext } from '../app/FilterContext';
 import { useAuth } from '../app/AuthContext';
 import { TruncatedText } from '../components/common/TruncatedText';
+import { FilterDropdown } from '../components/common/FilterDropdown';
 import { superadminDemoData } from '../demo-data/superadminDemoData';
-import { dashboardService, dropdownApiAvailable, getUsersDropdown } from '../services';
+import { dashboardService, dropdownApiAvailable, getClientsDropdown, getUsersDropdown } from '../services';
 import { envBadge, formatCurrencyFull, formatNumber } from '../utils/dashboardUtils';
-
-function formatScopeLabel(filters) {
-  if (filters.envs.length === superadminDemoData.ENVS.length) {
-    return `All envs · last ${filters.range}`;
-  }
-  const separator = filters.envs.length > 1 ? ' + ' : ', ';
-  const envLabel = filters.envs.map((env) => superadminDemoData.ENV_META[env]?.label ?? env).join(separator);
-  return `${envLabel} · last ${filters.range}`;
-}
 
 function getUserInitials(name) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -44,28 +36,12 @@ function parseDecimal(value) {
   return null;
 }
 
-function getTwinCount(twinIds) {
-  if (Array.isArray(twinIds)) {
-    return twinIds.length;
-  }
-
-  if (twinIds == null) {
-    return 0;
-  }
-
-  if (typeof twinIds === 'object') {
-    return Object.keys(twinIds).length;
-  }
-
-  return 1;
-}
-
 function formatOptionalNumber(value) {
-  return value == null ? '' : formatNumber(value);
+  return value == null ? '---' : formatNumber(value);
 }
 
 function formatOptionalCurrency(value) {
-  return value == null ? '' : formatCurrencyFull(value);
+  return value == null ? '---' : formatCurrencyFull(value);
 }
 
 function getUsersPayload(response) {
@@ -118,13 +94,17 @@ function getId(value) {
 export function UsersPage() {
   const { adminProduct } = useAuth();
   const isVault = adminProduct === 'vault';
-  const PAGE_SIZE = 12;
-  const { filters } = useContext(FilterContext);
+  const PAGE_SIZE = 10;
+  const { filters, setFilters } = useContext(FilterContext);
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState(null);
   const [sortConfig, setSortConfig] = useState({ key: 'pointsSpent', direction: 'desc' });
   const [page, setPage] = useState(1);
   const [apiUsers, setApiUsers] = useState([]);
+  const [clientNamesById, setClientNamesById] = useState({});
+  const [userEnrichmentByKey, setUserEnrichmentByKey] = useState({});
+  const [clientFilterOptions, setClientFilterOptions] = useState([]);
   const [isTableLoading, setIsTableLoading] = useState(true);
   const [pagination, setPagination] = useState({
     total: 0,
@@ -134,6 +114,29 @@ export function UsersPage() {
   });
 
   useEffect(() => {
+    let active = true;
+    const env = filters.envs.length === 1 ? filters.envs[0] : undefined;
+    getClientsDropdown({ env }).then((clients) => {
+      if (!active) return;
+      setClientFilterOptions(clients.map((client) => ({
+        value: client.id ?? client._id ?? client.clientId,
+        label: client.name ?? client.clientName ?? client.label ?? 'Unnamed client',
+      })));
+    }).catch((error) => console.error('User table filters failed to load:', error));
+    return () => { active = false; };
+  }, [filters.envs]);
+
+  const updateTableFilter = (key, value) => {
+    setPage(1);
+    setFilters((current) => ({
+      ...current,
+      [key]: value,
+      ...(key === 'client' ? { twin: null, user: null } : {}),
+      ...(key === 'twin' ? { user: null } : {}),
+    }));
+  };
+
+  useEffect(() => {
     let isActive = true;
 
     const loadDropdownFallback = async () => {
@@ -141,8 +144,6 @@ export function UsersPage() {
       const dropdownUsers = await getUsersDropdown({
         env: selectedEnv,
         clientId: filters.client || undefined,
-        twinId: filters.twin || undefined,
-        userId: filters.user || undefined,
       });
       const total = dropdownUsers.length;
       const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -168,10 +169,9 @@ export function UsersPage() {
           page,
           limit: PAGE_SIZE,
           clientId: filters.client,
-          twinId: filters.twin,
-          userId: filters.user,
           env: filters.envs.length === 1 ? filters.envs[0] : undefined,
           range: filters.range,
+          granularity: filters.gran,
         });
 
         if (!isActive) {
@@ -217,26 +217,126 @@ export function UsersPage() {
     return () => {
       isActive = false;
     };
-  }, [filters.client, filters.envs, filters.range, filters.twin, filters.user, page]);
+  }, [filters.client, filters.envs, filters.gran, filters.range, page]);
+
+  useEffect(() => {
+    if (!isVault) {
+      setClientNamesById({});
+      setUserEnrichmentByKey({});
+      return undefined;
+    }
+
+    let isActive = true;
+    const selectedEnv = filters.envs.length === 1 ? filters.envs[0] : undefined;
+
+    getClientsDropdown({ env: selectedEnv })
+      .then(async (clients) => {
+        if (!isActive) return;
+        const clientEntries = clients.map((client) => {
+          const id = getId(client?._id ?? client?.id ?? client?.clientId);
+          const name = client?.clientName ?? client?.name ?? client?.companyName ?? '';
+          return [id, name];
+        }).filter(([id, name]) => id && name);
+        setClientNamesById(Object.fromEntries(clientEntries));
+
+        const clientUsersResults = await Promise.allSettled(
+          clientEntries.map(async ([clientId, clientName]) => {
+            const response = await dashboardService.getEntityClientUsers(clientId);
+            return { clientId, clientName, users: getUsersPayload(response).users };
+          }),
+        );
+
+        if (!isActive) return;
+        const enrichment = {};
+        clientUsersResults.forEach((result) => {
+          if (result.status !== 'fulfilled') return;
+          const { clientId, clientName, users } = result.value;
+          users.forEach((user) => {
+            const keys = [
+              getId(user?._id ?? user?.id ?? user?.userId),
+              typeof user?.email === 'string' ? user.email.toLowerCase() : '',
+            ].filter(Boolean);
+            const value = { ...user, clientId, clientName };
+            keys.forEach((key) => { enrichment[key] = value; });
+          });
+        });
+        setUserEnrichmentByKey(enrichment);
+      })
+      .catch((error) => {
+        console.error('GET /api/v1/dropdown/clients failed:', error);
+        if (isActive) {
+          setClientNamesById({});
+          setUserEnrichmentByKey({});
+        }
+      });
+
+    return () => { isActive = false; };
+  }, [filters.envs, isVault]);
 
   useEffect(() => {
     setPage(1);
-  }, [filters.client, filters.envs, filters.range, filters.twin, filters.user]);
-
-  const scopeLabel = useMemo(() => formatScopeLabel(filters), [filters]);
+  }, [filters.client, filters.envs, filters.gran, filters.range]);
 
   const userRows = useMemo(() => {
     return apiUsers
       .map((user, index) => {
+        const userKey = getId(user?._id ?? user?.id ?? user?.userId);
+        const emailKey = typeof user?.email === 'string' ? user.email.toLowerCase() : '';
+        const enrichment = userEnrichmentByKey[userKey] ?? userEnrichmentByKey[emailKey] ?? {};
         const firstName = user?.firstName?.trim?.() ?? '';
         const lastName = user?.lastName?.trim?.() ?? '';
         const fullName = [firstName, lastName].filter(Boolean).join(' ');
         const env = user?.__env ?? '';
-        // Backend sends clientName as flat string, not nested object
-        const clientName = user?.clientName ?? user?.client?.name ?? '';
-        const balance = parseDecimal(user?.points);
-        const twinCount = getTwinCount(user?.twinIds);
-        const pointsSpent = parseDecimal(user?.pointsSpent);
+        const clientId = getId(user?.clientId ?? user?.client?._id ?? user?.client?.id ?? enrichment?.clientId);
+        const clientName = user?.clientName
+          ?? user?.client?.name
+          ?? user?.client?.clientName
+          ?? enrichment?.clientName
+          ?? enrichment?.client?.name
+          ?? clientNamesById[clientId]
+          ?? '';
+        const balance = parseDecimal(
+          user?.points
+          ?? user?.balance
+          ?? user?.pointsBalance
+          ?? user?.pointBalance
+          ?? user?.availablePoints
+          ?? user?.points_balance
+          ?? user?.point_balance
+          ?? enrichment?.points
+          ?? enrichment?.balance
+          ?? enrichment?.pointsBalance
+          ?? enrichment?.pointBalance
+          ?? enrichment?.availablePoints
+          ?? enrichment?.points_balance
+          ?? enrichment?.point_balance,
+        );
+        const pointsSpent = parseDecimal(
+          user?.pointsSpent
+          ?? user?.spentPoints
+          ?? user?.totalPointsSpent
+          ?? user?.pointsUsed
+          ?? user?.points_spent
+          ?? user?.spent_points
+          ?? user?.total_points_spent
+          ?? enrichment?.pointsSpent
+          ?? enrichment?.spentPoints
+          ?? enrichment?.totalPointsSpent
+          ?? enrichment?.pointsUsed
+          ?? enrichment?.points_spent
+          ?? enrichment?.spent_points
+          ?? enrichment?.total_points_spent,
+        );
+        const cost = parseDecimal(
+          user?.cost ?? user?.totalCost ?? user?.usageCost ?? user?.cogs
+          ?? user?.usage?.cost ?? enrichment?.cost ?? enrichment?.totalCost
+          ?? enrichment?.usageCost ?? enrichment?.cogs ?? enrichment?.usage?.cost,
+        );
+        const revenue = parseDecimal(
+          user?.revenue ?? user?.totalRevenue ?? user?.revenueAmount
+          ?? user?.usage?.revenue ?? enrichment?.revenue ?? enrichment?.totalRevenue
+          ?? enrichment?.revenueAmount ?? enrichment?.usage?.revenue,
+        );
         const lastDaysAgo = user?.lastActiveDaysAgo;
         let lastActiveLabel = '';
         if (lastDaysAgo != null) {
@@ -247,40 +347,44 @@ export function UsersPage() {
         }
 
         const suppliedName = typeof user?.name === 'string' ? user.name.trim() : '';
+        const rawStatus = user?.status ?? user?.userStatus ?? user?.state;
+        const explicitActive = user?.isActive ?? user?.active ?? user?.enabled;
+        const status = typeof rawStatus === 'string'
+          ? (['active', 'enabled', 'online'].includes(rawStatus.toLowerCase()) ? 'active' : ['inactive', 'disabled', 'offline'].includes(rawStatus.toLowerCase()) ? 'inactive' : '')
+          : explicitActive === true ? 'active' : explicitActive === false ? 'inactive' : '';
 
         return {
           id: getId(user?._id ?? user?.id) || user?.email || `user-row-${index}`,
           name: fullName || suppliedName || user?.email || '',
           client: clientName,
-          clientId: getId(user?.clientId ?? user?.client?._id ?? user?.client?.id),
+          clientId,
           env,
           messages: user?.messages ?? 0,
           sessions: user?.sessions ?? 0,
           balance,
+          cost,
+          revenue,
           pointsSpent,
-          value: pointsSpent ? pointsSpent * 0.01 : 0,
-          twins: twinCount,
+          status,
           lastActiveDaysAgo: lastDaysAgo,
           lastActiveLabel,
         };
       })
       .filter((user) => (user.env ? filters.envs.includes(user.env) : true));
-  }, [apiUsers, filters.envs]);
+  }, [apiUsers, clientNamesById, filters.envs, userEnrichmentByKey]);
 
   const filteredRows = useMemo(() => {
     const q = query.trim().toLowerCase();
 
-    if (!q) {
-      return userRows;
-    }
-
-    return userRows.filter(
-      (user) =>
-        user.name.toLowerCase().includes(q) ||
-        user.client.toLowerCase().includes(q) ||
-        getEnvLabel(user.env).toLowerCase().includes(q),
-    );
-  }, [query, userRows]);
+    return userRows.filter((user) => {
+      const matchesStatus = !statusFilter || user.status === statusFilter;
+      const matchesQuery = !q
+        || user.name.toLowerCase().includes(q)
+        || user.client.toLowerCase().includes(q)
+        || getEnvLabel(user.env).toLowerCase().includes(q);
+      return matchesStatus && matchesQuery;
+    });
+  }, [query, statusFilter, userRows]);
 
   const sortedRows = useMemo(() => {
     const getSortValue = (user) => {
@@ -297,12 +401,12 @@ export function UsersPage() {
           return user.sessions;
         case 'balance':
           return user.balance;
+        case 'cost':
+          return user.cost;
+        case 'revenue':
+          return user.revenue;
         case 'pointsSpent':
           return user.pointsSpent;
-        case 'value':
-          return user.value;
-        case 'twins':
-          return user.twins;
         case 'lastActive':
           return user.lastActiveDaysAgo;
         default:
@@ -341,19 +445,18 @@ export function UsersPage() {
   };
 
   const exportCsv = () => {
-    const header = ['User', 'Client', 'Env', 'Messages', 'Sessions', 'Balance', 'Points Spent', '$ Value', ...(!isVault ? ['Twins'] : []), 'Last Active'];
+    const header = ['User', 'Env', 'Client', 'Cost', 'Revenue', 'Total Points', 'Points Spent', 'Messages', 'Sessions'];
     const lines = sortedRows.map((user) =>
       [
         user.name,
-        user.client,
         getEnvLabel(user.env),
-        formatOptionalNumber(user.messages),
-        formatOptionalNumber(user.sessions),
+        user.client || '---',
+        formatOptionalCurrency(user.cost),
+        formatOptionalCurrency(user.revenue),
         formatOptionalNumber(user.balance),
         formatOptionalNumber(user.pointsSpent),
-        formatOptionalCurrency(user.value),
-        ...(!isVault ? [user.twins ?? ''] : []),
-        user.lastActiveLabel,
+        formatOptionalNumber(user.messages),
+        formatOptionalNumber(user.sessions),
       ]
         .map((value) => `"${String(value).replaceAll('"', '""')}"`)
         .join(','),
@@ -371,20 +474,10 @@ export function UsersPage() {
 
   return (
     <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Users</h1>
-          <p className="mt-1 text-sm text-slate-400">End users — sessions, points balance and spend</p>
-        </div>
-        <div className="text-right">
-          <span className="block text-xs font-bold uppercase tracking-[0.14em] text-slate-400">Scope</span>
-          <span className="mt-1 block text-sm font-semibold text-slate-500">{scopeLabel}</span>
-        </div>
-      </header>
-
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-panel">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
-          <label className="flex h-10 w-full max-w-md items-center gap-2 rounded-xl bg-slate-50 px-3 text-slate-400 sm:w-80">
+        <div className="border-b border-slate-100 px-5 py-4">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+          <label className="flex h-10 w-full shrink-0 items-center gap-2 rounded-xl bg-slate-50 px-3 text-slate-400 xl:w-64">
             <Search size={15} />
            <input
               className="min-w-0 flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
@@ -398,29 +491,66 @@ export function UsersPage() {
             />
           </label>
 
-          <button type="button" className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 px-3.5 text-sm font-semibold text-slate-600 transition hover:border-indigo-300 hover:text-indigo-600" onClick={exportCsv}>
+          <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            <FilterDropdown
+              value={filters.envs.length === 1 ? filters.envs[0] : null}
+              onChange={(value) => updateTableFilter('envs', value ? [value] : ['dev', 'staging', 'prod'])}
+              options={[{ value: 'dev', label: 'Development' }, { value: 'staging', label: 'Staging' }, { value: 'prod', label: 'Production' }]}
+              placeholder="All environments"
+              searchable={false}
+              tone={isVault ? 'vault' : 'twin'}
+            />
+            <FilterDropdown
+              value={statusFilter}
+              onChange={(value) => { setStatusFilter(value); setPage(1); }}
+              options={[{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]}
+              placeholder="All Status"
+              searchable={false}
+              tone={isVault ? 'vault' : 'twin'}
+            />
+            <FilterDropdown
+              value={filters.gran}
+              onChange={(value) => updateTableFilter('gran', value || 'day')}
+              options={[
+                { value: 'week', label: '1 Week' },
+                { value: 'month', label: '1 Month' },
+                { value: '6months', label: '6 Months' },
+                { value: 'year', label: '1 Year' },
+                { value: 'over1year', label: 'More Than 1 Year' },
+              ]}
+              placeholder="By Day"
+              searchable={false}
+              showPlaceholderOption={false}
+              highlightWhenOpen={false}
+              align="right"
+              tone={isVault ? 'vault' : 'twin'}
+            />
+            <FilterDropdown value={filters.client} onChange={(value) => updateTableFilter('client', value)} options={clientFilterOptions} placeholder="All clients" searchPlaceholder="Search client..." tone={isVault ? 'vault' : 'twin'} />
+          </div>
+
+          <button type="button" className={`inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 px-3.5 text-sm font-semibold text-slate-600 transition ${isVault ? 'hover:border-emerald-300 hover:text-emerald-700' : 'hover:border-indigo-300 hover:text-indigo-600'}`} onClick={exportCsv}>
             <Download size={14} />
             Export CSV
           </button>
+          </div>
         </div>
 
         <div className="max-h-[65vh] overflow-auto">
-          <table className={`w-full border-collapse text-sm ${isVault ? 'min-w-[980px]' : 'min-w-[1100px]'}`}>
+          <table className="min-w-[1380px] w-full border-collapse text-sm [&_td]:!text-left [&_td>div]:justify-start [&_th]:!text-left">
             <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_0_0_rgba(226,232,240,1)]">
               <tr>
                 {[
                   ['user', 'User'],
-                  ['client', 'Client'],
                   ['env', 'Env'],
+                  ['client', 'Client'],
+                  ['cost', 'Cost'],
+                  ['revenue', 'Revenue'],
+                  ['balance', 'Total Points'],
+                  ['pointsSpent', 'Points spent'],
                   ['messages', 'Messages'],
                   ['sessions', 'Sessions'],
-                  ['balance', 'Balance'],
-                  ['pointsSpent', 'Points spent'],
-                  ['value', '$ Value'],
-                  ...(!isVault ? [['twins', 'Twins']] : []),
-                  ['lastActive', 'Last active'],
                 ].map(([key, label]) => (
-                  <th key={key} className="px-4 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-400">
+                  <th key={key} className={`px-4 py-4 text-xs font-bold uppercase tracking-wide text-slate-400 ${key === 'user' || key === 'client' ? 'text-left' : key === 'env' ? 'text-center' : 'text-right'}`}>
                     <button type="button" className="inline-flex items-center gap-1 transition hover:text-slate-700" onClick={() => toggleSort(key)}>
                       <span>{label}</span>
                       <span className={`text-xs text-slate-300 ${sortConfig.key === key ? 'text-indigo-600' : ''}`}>
@@ -434,14 +564,14 @@ export function UsersPage() {
             <tbody>
               {isTableLoading ? (
                 <tr>
-                  <td colSpan={isVault ? 9 : 10} className="px-5 py-12 text-center text-sm text-slate-400">
+                  <td colSpan={9} className="px-5 py-12 text-center text-sm text-slate-400">
                     <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-indigo-100 border-t-indigo-600 align-[-2px]" aria-hidden="true" />
                     Loading users...
                   </td>
                 </tr>
               ) : paginatedRows.length === 0 ? (
                 <tr>
-                  <td colSpan={isVault ? 9 : 10} className="px-5 py-12 text-center text-sm text-slate-400">
+                  <td colSpan={9} className="px-5 py-12 text-center text-sm text-slate-400">
                     No users found
                   </td>
                 </tr>
@@ -454,15 +584,14 @@ export function UsersPage() {
                         <strong className="font-semibold text-slate-700"><TruncatedText value={user.name} /></strong>
                       </div>
                     </td>
+                    <td className="px-4 py-3.5 text-center text-slate-500">{superadminDemoData.ENV_META[user.env] ? envBadge(user.env) : getEnvLabel(user.env)}</td>
                     <td className="px-4 py-3.5 text-slate-500"><TruncatedText value={user.client || '---'} /></td>
-                    <td className="px-4 py-3.5 text-slate-500">{superadminDemoData.ENV_META[user.env] ? envBadge(user.env) : getEnvLabel(user.env)}</td>
-                    <td className="px-4 py-3.5 text-slate-500">{formatOptionalNumber(user.messages)}</td>
-                    <td className="px-4 py-3.5 text-slate-500">{formatOptionalNumber(user.sessions)}</td>
-                    <td className="px-4 py-3.5 text-slate-500">{formatOptionalNumber(user.balance)}</td>
-                    <td className="px-4 py-3.5 text-slate-500">{formatOptionalNumber(user.pointsSpent)}</td>
-                    <td className="px-4 py-3.5 text-slate-500">{formatOptionalCurrency(user.value)}</td>
-                    {!isVault ? <td className="px-4 py-3.5 text-slate-500">{user.twins ?? ''}</td> : null}
-                    <td className="px-4 py-3.5 text-slate-500">{user.lastActiveLabel}</td>
+                    <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalCurrency(user.cost)}</td>
+                    <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalCurrency(user.revenue)}</td>
+                    <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(user.balance)}</td>
+                    <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(user.pointsSpent)}</td>
+                    <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(user.messages)}</td>
+                    <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(user.sessions)}</td>
                   </tr>
                 ))
               )}

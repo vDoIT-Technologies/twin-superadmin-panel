@@ -23,7 +23,7 @@ export function Sidebar({ collapsed, mobileOpen, onNavigate, initials, profileNa
             <p className={`mb-2 px-2 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400 ${collapsed ? 'lg:hidden' : ''}`}>{group.label}</p>
             <div className="space-y-1">
               {group.items.map(({ icon: Icon, ...item }) => (
-                <NavLink key={item.to} end={item.end} to={item.to} onClick={onNavigate} className="block">
+                <NavLink key={item.to} end={item.end} to={item.to} onClick={onNavigate} className="sidebar-nav-link block">
                   {({ isActive }) => (
                     <span className={`flex h-11 items-center gap-3 rounded-xl px-2.5 text-sm font-semibold transition hover:bg-slate-50 ${isActive ? (adminProduct === 'vault' ? 'text-emerald-600' : 'text-indigo-600') : 'text-slate-500 hover:text-slate-800'}`}>
                       <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg transition-colors ${isActive ? (adminProduct === 'vault' ? 'text-emerald-600' : 'text-indigo-600') : 'bg-slate-50 text-slate-500'}`}><Icon size={18} /></span>

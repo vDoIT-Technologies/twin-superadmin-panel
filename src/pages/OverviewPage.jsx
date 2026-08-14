@@ -1,4 +1,4 @@
-import { useContext, useEffect, useMemo, useRef } from 'react';
+import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Bot,
   CircleAlert,
@@ -17,6 +17,9 @@ import { RANGE_DAYS, groupBy, selectFacts, sumMetric, timeSeries, twinShare } fr
 import { areaChart, donut, stackedBar } from '../utils/chartHelpers';
 import { useAuth } from '../app/AuthContext';
 import { isServiceForProduct, isVendorForProduct } from '../utils/productAccess';
+import { VaultQuotaCard } from '../components/vault/VaultQuotaCard';
+import { dashboardService, getStorageUsage } from '../services';
+import { firstNumber, normalizeStorageUsage } from '../utils/vaultFormatters';
 
 function formatOverviewCurrency(value) {
   const absolute = Math.abs(value);
@@ -68,6 +71,56 @@ export function OverviewPage() {
   const trendChartRef = useRef(null);
   const modalityChartRef = useRef(null);
   const vendorChartRef = useRef(null);
+  const [filebaseQuota, setFilebaseQuota] = useState(null);
+  const [filebaseQuotaStatus, setFilebaseQuotaStatus] = useState('loading');
+
+  useEffect(() => {
+    if (adminProduct !== 'twin') return undefined;
+
+    let active = true;
+    setFilebaseQuotaStatus('loading');
+    const env = filters.envs.length === 1 ? filters.envs[0] : undefined;
+    const params = {
+      env,
+      clientId: filters.client || undefined,
+      range: filters.range,
+      granularity: filters.gran,
+    };
+
+    Promise.allSettled([
+      getStorageUsage(params),
+      dashboardService.getEntityVaultStats(params),
+    ])
+      .then(([quotaResult, statsResult]) => {
+        const quota = quotaResult.status === 'fulfilled'
+          ? normalizeStorageUsage(quotaResult.value)
+          : {};
+        const statsPayload = statsResult.status === 'fulfilled'
+          ? (statsResult.value?.data || statsResult.value)
+          : {};
+        const kpis = statsPayload?.kpis || {};
+        const totalUsage = quota.totalUsage ?? firstNumber(kpis.storedOnIpfsBytes);
+        const totalQuota = quota.totalQuota ?? firstNumber(kpis.storageLimitBytes);
+        const usagePercent = quota.usagePercent
+          ?? firstNumber(kpis.quotaPercent)
+          ?? (totalQuota > 0 && totalUsage != null ? (totalUsage / totalQuota) * 100 : null);
+        const actualQuota = { totalUsage, totalQuota, usagePercent };
+
+        if (active) {
+          setFilebaseQuota(totalQuota > 0 ? actualQuota : null);
+          setFilebaseQuotaStatus(totalQuota > 0 ? 'ready' : 'unavailable');
+        }
+      })
+      .catch((error) => {
+        console.error('Filebase quota load failed:', error);
+        if (active) {
+          setFilebaseQuota(null);
+          setFilebaseQuotaStatus('unavailable');
+        }
+      });
+
+    return () => { active = false; };
+  }, [adminProduct, filters.client, filters.envs, filters.gran, filters.range]);
 
   const scopeLabel = useMemo(() => {
     if (filters.envs.length === superadminDemoData.ENVS.length) {
@@ -384,7 +437,7 @@ export function OverviewPage() {
         })}
       </div>
 
-      <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 ${adminProduct === 'vault' ? 'xl:grid-cols-5' : 'xl:grid-cols-6'}`}>
+      <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${adminProduct === 'vault' ? 'lg:grid-cols-3 xl:grid-cols-5' : 'lg:grid-cols-4'}`}>
         {overviewMetrics.map((metric) => {
           const config = metricConfig.find((item) => item.key === metric.key);
           const Icon = config.icon;
@@ -410,6 +463,27 @@ export function OverviewPage() {
           );
         })}
       </div>
+
+      {adminProduct === 'twin' ? (
+        <div>
+            {filebaseQuotaStatus === 'loading' ? (
+              <div className="h-56 animate-pulse rounded-2xl border border-slate-200 bg-white shadow-panel" aria-label="Loading Filebase quota" />
+            ) : filebaseQuotaStatus === 'ready' ? (
+              <VaultQuotaCard
+                percentage={filebaseQuota.usagePercent}
+                storageUsed={filebaseQuota.totalUsage}
+                storageLimit={filebaseQuota.totalQuota}
+              />
+            ) : (
+              <div className="flex min-h-40 items-center justify-center rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-panel">
+                <div>
+                  <h2 className="text-base font-semibold text-slate-800">Filebase quota unavailable</h2>
+                  <p className="mt-1 text-sm text-slate-500">The storage API did not return a valid provisioned quota.</p>
+                </div>
+              </div>
+            )}
+        </div>
+      ) : null}
 
       <div className="grid gap-4 xl:grid-cols-3">
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel xl:col-span-2">
@@ -477,6 +551,7 @@ export function OverviewPage() {
             </div>
           </div>
         </section>
+
       </div>
 
       <div className="grid gap-4 xl:grid-cols-3">
