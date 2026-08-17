@@ -61,6 +61,7 @@ export function ClientsPage() {
     const scopeKey = JSON.stringify({
       envs: filters.envs,
       range: filters.entityRange,
+      status: filters.status,
     });
     const scopeChanged = previousScopeRef.current !== scopeKey;
     previousScopeRef.current = scopeKey;
@@ -76,6 +77,7 @@ export function ClientsPage() {
           page: requestedPage,
           limit: PAGE_SIZE,
           env: filters.envs.length === 1 ? filters.envs[0] : undefined,
+          status: filters.status || undefined,
           ...getEntityFilterParams(filters.entityRange),
         });
 
@@ -103,7 +105,7 @@ export function ClientsPage() {
     return () => {
       isActive = false;
     };
-  }, [filters.entityRange, filters.envs, page]);
+  }, [filters.entityRange, filters.envs, filters.status, page]);
 
   const clientRows = useMemo(() => {
     return apiClients.map((client, index) => {
