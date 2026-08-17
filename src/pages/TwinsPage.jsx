@@ -251,11 +251,11 @@ export function TwinsPage() {
               value={filters.entityRange === 'all' ? null : filters.entityRange}
               onChange={(value) => updateTableFilter('entityRange', value || 'all')}
               options={[
-                { value: '7days', label: 'LAST 7 DAYS' },
-                { value: '1month', label: 'LAST 1 MONTH' },
-                { value: '6months', label: 'LAST 6 MONTHS' },
-                { value: '1year', label: 'LAST 1 YEAR' },
-                { value: 'morethan1year', label: 'MORE THAN 1 YEAR' },
+                { value: '7days', label: 'Last 7 Days' },
+                { value: '1month', label: 'Last 1 Month' },
+                { value: '6months', label: 'Last 6 Months' },
+                { value: '1year', label: 'Last 1 Year' },
+                { value: 'morethan1year', label: 'More Than 1 Year' },
               ]}
               placeholder="All Dates"
               searchable={false}

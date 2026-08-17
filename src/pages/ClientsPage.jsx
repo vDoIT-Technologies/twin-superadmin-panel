@@ -296,11 +296,11 @@ export function ClientsPage() {
                 value={filters.entityRange === 'all' ? null : filters.entityRange}
                 onChange={(value) => updateTableFilter('entityRange', value || 'all')}
                 options={[
-                  { value: '7days', label: 'LAST 7 DAYS' },
-                  { value: '1month', label: 'LAST 1 MONTH' },
-                  { value: '6months', label: 'LAST 6 MONTHS' },
-                  { value: '1year', label: 'LAST 1 YEAR' },
-                  { value: 'morethan1year', label: 'MORE THAN 1 YEAR' },
+                  { value: '7days', label: 'Last 7 Days' },
+                  { value: '1month', label: 'Last 1 Month' },
+                  { value: '6months', label: 'Last 6 Months' },
+                  { value: '1year', label: 'Last 1 Year' },
+                  { value: 'morethan1year', label: 'More Than 1 Year' },
                 ]}
                 placeholder="All Dates"
                 searchable={false}
@@ -376,7 +376,7 @@ export function ClientsPage() {
                   <tr key={client.rowKey} className="cursor-pointer border-t border-slate-100 transition hover:bg-slate-50" onClick={() => navigate(`/clients/${client.id}`)}>
                     <td className="px-4 py-3.5 text-left">
                       <div className="flex items-center gap-3">
-                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-blue-100 text-xs font-bold text-blue-600">
+                        <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-bold ${isVault ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-600'}`}>
                           {getClientInitials(client.name)}
                         </span>
                         <div className="min-w-0">

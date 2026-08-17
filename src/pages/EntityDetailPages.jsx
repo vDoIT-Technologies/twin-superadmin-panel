@@ -56,6 +56,7 @@ const toneStyles = {
 
 const avatarTone = {
   client: 'bg-blue-100 text-blue-600',
+  vaultClient: 'bg-emerald-100 text-emerald-700',
   twin: 'bg-purple-100 text-purple-600',
   user: 'bg-indigo-100 text-indigo-600',
 };
@@ -388,7 +389,7 @@ export function ClientDetailPage() {
   return (
     <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       <DetailHeader
-        avatarClassName="client"
+        avatarClassName={adminProduct === 'vault' ? 'vaultClient' : 'client'}
         initials={getInitials(clientName)}
         title={clientName}
         subtitle={`${profile?.organizationName || ''} · ${plan} plan`}
