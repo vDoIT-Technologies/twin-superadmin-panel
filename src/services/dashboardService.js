@@ -60,6 +60,7 @@ export const dashboardService = {
         serviceId: params.serviceId,
         vendorId: params.vendorId,
         env: params.env,
+        status: params.status,
         filter: params.filter,
         from: params.from,
         to: params.to,
