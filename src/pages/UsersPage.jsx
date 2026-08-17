@@ -295,48 +295,10 @@ export function UsersPage() {
           ?? enrichment?.client?.name
           ?? clientNamesById[clientId]
           ?? '';
-        const balance = parseDecimal(
-          user?.points
-          ?? user?.balance
-          ?? user?.pointsBalance
-          ?? user?.pointBalance
-          ?? user?.availablePoints
-          ?? user?.points_balance
-          ?? user?.point_balance
-          ?? enrichment?.points
-          ?? enrichment?.balance
-          ?? enrichment?.pointsBalance
-          ?? enrichment?.pointBalance
-          ?? enrichment?.availablePoints
-          ?? enrichment?.points_balance
-          ?? enrichment?.point_balance,
-        );
-        const pointsSpent = parseDecimal(
-          user?.pointsSpent
-          ?? user?.spentPoints
-          ?? user?.totalPointsSpent
-          ?? user?.pointsUsed
-          ?? user?.points_spent
-          ?? user?.spent_points
-          ?? user?.total_points_spent
-          ?? enrichment?.pointsSpent
-          ?? enrichment?.spentPoints
-          ?? enrichment?.totalPointsSpent
-          ?? enrichment?.pointsUsed
-          ?? enrichment?.points_spent
-          ?? enrichment?.spent_points
-          ?? enrichment?.total_points_spent,
-        );
-        const cost = parseDecimal(
-          user?.cost ?? user?.totalCost ?? user?.usageCost ?? user?.cogs
-          ?? user?.usage?.cost ?? enrichment?.cost ?? enrichment?.totalCost
-          ?? enrichment?.usageCost ?? enrichment?.cogs ?? enrichment?.usage?.cost,
-        );
-        const revenue = parseDecimal(
-          user?.revenue ?? user?.totalRevenue ?? user?.revenueAmount
-          ?? user?.usage?.revenue ?? enrichment?.revenue ?? enrichment?.totalRevenue
-          ?? enrichment?.revenueAmount ?? enrichment?.usage?.revenue,
-        );
+        const totalPoints = parseDecimal(user?.totalPoints ?? enrichment?.totalPoints ?? 0);
+        const pointsSpent = parseDecimal(user?.pointsSpent ?? enrichment?.pointsSpent ?? 0);
+        const cost = parseDecimal(user?.cost?.totalAmount ?? enrichment?.cost?.totalAmount ?? 0, 2);
+        const revenue = parseDecimal(user?.revenue?.totalAmount ?? enrichment?.revenue?.totalAmount ?? 0, 2);
         const lastDaysAgo = user?.lastActiveDaysAgo;
         let lastActiveLabel = '';
         if (lastDaysAgo != null) {
@@ -361,7 +323,7 @@ export function UsersPage() {
           env,
           messages: user?.messages ?? 0,
           sessions: user?.sessions ?? 0,
-          balance,
+          totalPoints,
           cost,
           revenue,
           pointsSpent,
@@ -399,8 +361,8 @@ export function UsersPage() {
           return user.messages;
         case 'sessions':
           return user.sessions;
-        case 'balance':
-          return user.balance;
+        case 'totalPoints':
+          return user.totalPoints;
         case 'cost':
           return user.cost;
         case 'revenue':
@@ -453,7 +415,7 @@ export function UsersPage() {
         user.client || '---',
         formatOptionalCurrency(user.cost),
         formatOptionalCurrency(user.revenue),
-        formatOptionalNumber(user.balance),
+        formatOptionalNumber(user.totalPoints),
         formatOptionalNumber(user.pointsSpent),
         formatOptionalNumber(user.messages),
         formatOptionalNumber(user.sessions),
@@ -491,20 +453,12 @@ export function UsersPage() {
             />
           </label>
 
-          <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
             <FilterDropdown
               value={filters.envs.length === 1 ? filters.envs[0] : null}
               onChange={(value) => updateTableFilter('envs', value ? [value] : ['dev', 'staging', 'prod'])}
               options={[{ value: 'dev', label: 'Development' }, { value: 'staging', label: 'Staging' }, { value: 'prod', label: 'Production' }]}
               placeholder="All environments"
-              searchable={false}
-              tone={isVault ? 'vault' : 'twin'}
-            />
-            <FilterDropdown
-              value={statusFilter}
-              onChange={(value) => { setStatusFilter(value); setPage(1); }}
-              options={[{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]}
-              placeholder="All Status"
               searchable={false}
               tone={isVault ? 'vault' : 'twin'}
             />
@@ -545,7 +499,7 @@ export function UsersPage() {
                   ['client', 'Client'],
                   ['cost', 'Cost'],
                   ['revenue', 'Revenue'],
-                  ['balance', 'Total Points'],
+                  ['totalPoints', 'Total Points'],
                   ['pointsSpent', 'Points spent'],
                   ['messages', 'Messages'],
                   ['sessions', 'Sessions'],
@@ -588,8 +542,8 @@ export function UsersPage() {
                     <td className="px-4 py-3.5 text-slate-500"><TruncatedText value={user.client || '---'} /></td>
                     <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalCurrency(user.cost)}</td>
                     <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalCurrency(user.revenue)}</td>
-                    <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(user.balance)}</td>
-                    <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(user.pointsSpent)}</td>
+                    <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{user.totalPoints}</td>
+                    <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{user.pointsSpent}</td>
                     <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(user.messages)}</td>
                     <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(user.sessions)}</td>
                   </tr>
