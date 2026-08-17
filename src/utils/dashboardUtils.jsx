@@ -24,7 +24,16 @@ export function formatCurrency(value) {
 
 export function formatCurrencyFull(value) {
   if (value == null || Number.isNaN(value)) return '$0';
-  return '$' + Math.round(value).toLocaleString('en-US');
+  const amount = Number(value);
+  const truncated = amount < 0
+    ? Math.ceil(amount * 100) / 100
+    : Math.floor(amount * 100) / 100;
+  return truncated.toLocaleString('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
 export function formatNumber(value) {
@@ -35,6 +44,10 @@ export function formatNumber(value) {
   if (abs >= 1e6) return `${(n / 1e6).toFixed(2)}M`;
   if (abs >= 1e3) return `${(n / 1e3).toFixed(1)}k`;
   return Math.round(n).toLocaleString('en-US');
+}
+
+export function formatActualNumber(n) {
+  return new Intl.NumberFormat('en-US').format(n);
 }
 
 export function formatPercent(value, digits = 1) {
