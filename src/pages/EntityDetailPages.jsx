@@ -56,6 +56,7 @@ const toneStyles = {
 
 const avatarTone = {
   client: 'bg-blue-100 text-blue-600',
+  vaultClient: 'bg-emerald-100 text-emerald-700',
   twin: 'bg-purple-100 text-purple-600',
   user: 'bg-indigo-100 text-indigo-600',
 };
@@ -189,24 +190,16 @@ const serviceLabels = {
   polygon: 'Polygon gas', stripe: 'Stripe', moonpay: 'MoonPay',
 };
 
-// Frontend-only preview data shared by Client and Twin details. Remove this
-// fallback when their APIs return per-service usage and cost breakdowns.
-const demoServiceUsageRows = [
-  { key: 'elevenlabs', label: 'ElevenLabs', units: 8400, unitLabel: 'chars', cost: 1.43 },
-  { key: 'filebase', label: 'Filebase / IPFS', units: 50.02, unitLabel: 'GB', cost: 0.30 },
-  { key: 'openai', label: 'OpenAI', units: 31000, unitLabel: 'tokens', cost: 0.42 },
-  { key: 'did', label: 'D-ID', units: 12, unitLabel: 'min', cost: 3.36 },
-  { key: 'stripe', label: 'Stripe', units: 7, unitLabel: 'txn', cost: 1.05 },
-  { key: 's3ses', label: 'AWS S3 + SES', units: 3.8, unitLabel: 'GB', cost: 0.18 },
-];
-
 function getServiceUsageRows(clientData) {
   const usage = clientData?.usage || {};
   const costSources = [
     clientData?.serviceCosts, clientData?.vendorCost, clientData?.costs,
     usage?.serviceCosts, usage?.vendorCost, usage?.costs,
   ].filter((source) => source && typeof source === 'object' && !Array.isArray(source));
-  const usageSources = [usage?.byService, usage?.services, clientData?.serviceUsage]
+  const usageSources = [
+    usage?.byService, usage?.services, usage?.usageByService,
+    clientData?.serviceUsage, clientData?.usageByService, clientData?.servicesUsage,
+  ]
     .filter((source) => source && typeof source === 'object');
   const rows = new Map();
   const add = (rawKey, details = {}, explicitCost = null) => {
@@ -354,13 +347,10 @@ export function ClientDetailPage() {
   const totalCost = firstDecimal(kpis?.cost, kpis?.totalCost, usage?.cost, usage?.totalCost, clientData?.costs?.total)
     ?? (openAiCost != null || didCost != null ? (openAiCost ?? 0) + (didCost ?? 0) : null);
   const apiServiceUsageRows = getServiceUsageRows(clientData);
-  const isUsingDemoServiceUsage = apiServiceUsageRows.length === 0;
-  const serviceUsageRows = isUsingDemoServiceUsage ? demoServiceUsageRows : apiServiceUsageRows;
+  const serviceUsageRows = apiServiceUsageRows;
   if (openAiCost > 0 && !serviceUsageRows.some((row) => row.key === 'openai')) serviceUsageRows.push({ key: 'openai', label: 'OpenAI', cost: openAiCost });
   if (didCost > 0 && !serviceUsageRows.some((row) => row.key === 'did')) serviceUsageRows.push({ key: 'did', label: 'D-ID', cost: didCost });
-  const displayedTotalCost = isUsingDemoServiceUsage
-    ? serviceUsageRows.reduce((sum, service) => sum + (service.cost ?? 0), 0)
-    : totalCost;
+  const displayedTotalCost = totalCost;
   const twins = tabData.twins?.twins || [];
   const users = tabData.users?.users || [];
   const vault = tabData.vault?.vault || [];
@@ -399,7 +389,7 @@ export function ClientDetailPage() {
   return (
     <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       <DetailHeader
-        avatarClassName="client"
+        avatarClassName={adminProduct === 'vault' ? 'vaultClient' : 'client'}
         initials={getInitials(clientName)}
         title={clientName}
         subtitle={`${profile?.organizationName || ''} · ${plan} plan`}
@@ -466,6 +456,7 @@ export function ClientDetailPage() {
                       <strong className="w-20 text-right font-semibold tabular-nums text-slate-800">{formatOptionalCurrency(service.cost)}</strong>
                     </div>
                   ))}
+                  {serviceUsageRows.length === 0 ? <EmptyDetailState message="Service usage and cost data was not returned by the API." /> : null}
                   <div className="flex items-center justify-between bg-slate-50/70 px-5 py-3 text-xs"><span className="font-semibold text-slate-500">Total cost</span><strong className="font-bold text-slate-900">{formatOptionalCurrency(displayedTotalCost)}</strong></div>
                 </>
               )}
@@ -661,15 +652,14 @@ export function TwinDetailPage() {
 
   const { profile, kpis, usage } = twinData;
   const apiServiceUsageRows = getServiceUsageRows(twinData);
-  const serviceUsageRows = apiServiceUsageRows.length ? apiServiceUsageRows : demoServiceUsageRows;
+  const serviceUsageRows = apiServiceUsageRows;
   const totalServiceCost = firstDecimal(kpis?.cost, kpis?.totalCost, usage?.cost, usage?.totalCost, twinData?.costs?.total)
-    ?? serviceUsageRows.reduce((sum, service) => sum + (service.cost ?? 0), 0);
-  const associatedUsers = twinData?.associatedUsers ?? twinData?.users ?? twinData?.linkedUsers ?? profile?.associatedUsers ?? profile?.users;
-  const demoAssociatedUsers = ['Shreyash Gupta', 'Akshat Chadha', 'Rajendra Soni'];
-  const associatedUsersForDisplay = Array.isArray(associatedUsers) ? associatedUsers : demoAssociatedUsers.slice(0, 2 + (String(twinId).charCodeAt(String(twinId).length - 1) % 2));
+    ?? (serviceUsageRows.length ? serviceUsageRows.reduce((sum, service) => sum + (service.cost ?? 0), 0) : null);
+  const associatedUsers = twinData?.associatedUsers ?? twinData?.users ?? twinData?.associatedUserIds ?? twinData?.userIds ?? twinData?.linkedUsers ?? profile?.associatedUsers ?? profile?.users;
+  const associatedUsersForDisplay = Array.isArray(associatedUsers) ? associatedUsers : [];
   const associatedUserNames = associatedUsersForDisplay
     .map((user) => {
-      if (typeof user === 'string') return user;
+      if (typeof user === 'string') return '';
       const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim();
       return user?.name || user?.fullName || user?.profile?.name || fullName || user?.email || '';
     })
@@ -731,6 +721,7 @@ export function TwinDetailPage() {
                 <strong className="w-20 text-right font-semibold tabular-nums text-slate-800">{formatOptionalCurrency(service.cost)}</strong>
               </div>
             ))}
+            {serviceUsageRows.length === 0 ? <EmptyDetailState message="Service usage and cost data was not returned by the API." /> : null}
             <div className="flex items-center justify-between bg-slate-50/70 px-5 py-3 text-xs"><span className="font-semibold text-slate-500">Total cost</span><strong className="font-bold text-slate-900">{formatOptionalCurrency(totalServiceCost)}</strong></div>
           </div>
         </CardSection>
@@ -752,11 +743,46 @@ export function UserDetailPage() {
 
     async function load() {
       try {
-        const response = await dashboardService.getEntityUserById(userId);
+        let response;
+        if (adminProduct === 'vault') {
+          try {
+            response = await dashboardService.getEntityVaultUserById(userId);
+          } catch (vaultError) {
+            console.warn('GET /entities/vault-users/:id failed; trying shared user endpoint:', vaultError);
+            try {
+              response = await dashboardService.getEntityUserById(userId);
+            } catch (sharedError) {
+              console.warn('GET /entities/users/:id failed; finding user in Vault users:', sharedError);
+              const listResponse = await dashboardService.getEntityVaultUsers({ page: 1, limit: 100, userId });
+              const listPayload = listResponse?.data || listResponse;
+              const users = Array.isArray(listPayload)
+                ? listPayload
+                : listPayload?.users || listPayload?.items || listPayload?.data || [];
+              response = users.find((user) => String(user?._id ?? user?.id ?? user?.userId) === String(userId)) || null;
+            }
+          }
+        } else {
+          response = await dashboardService.getEntityUserById(userId);
+        }
         if (!active) return;
-        setUserData(response?.data || response);
+        const payload = response?.data || response;
+        if (!payload) {
+          setUserData(null);
+          return;
+        }
+        const fullName = [payload.firstName, payload.lastName].filter(Boolean).join(' ').trim();
+        setUserData(payload.profile ? payload : {
+          ...payload,
+          profile: {
+            ...payload,
+            name: payload.name || payload.fullName || fullName || payload.email || '',
+            clientName: payload.clientName || payload.client?.name || '',
+            env: payload.__env || payload.env || payload.environment || '',
+          },
+          kpis: payload.kpis || payload.metrics || payload.usage || payload,
+        });
       } catch (err) {
-        console.error('GET /entities/users/:id failed:', err);
+        console.error('GET user detail failed:', err);
         if (active) setUserData(null);
       } finally {
         if (active) setIsLoading(false);
@@ -765,7 +791,7 @@ export function UserDetailPage() {
 
     load();
     return () => { active = false; };
-  }, [userId]);
+  }, [adminProduct, userId]);
 
   if (isLoading) return <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8"><div className="rounded-2xl border border-slate-200 bg-white py-16 text-center text-sm text-slate-400 shadow-panel">Loading user...</div></section>;
   if (!userData) return <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8"><div className="rounded-2xl border border-slate-200 bg-white py-16 text-center text-sm text-slate-400 shadow-panel">User not found.</div></section>;
@@ -782,6 +808,10 @@ export function UserDetailPage() {
     : Array.isArray(associatedTwinsValue?.items)
       ? associatedTwinsValue.items
       : [];
+  const getTwinName = (twin) => {
+    if (!twin || typeof twin === 'string') return '';
+    return twin.name ?? twin.twinName ?? twin.label ?? twin.profile?.name ?? '';
+  };
   const userPackageValue = profile?.packages
     ?? profile?.package?.name
     ?? profile?.packageName
@@ -836,15 +866,15 @@ export function UserDetailPage() {
             <div className="flex items-center justify-between gap-6 px-5 py-3 text-xs"><span className="shrink-0 text-slate-400">Packages</span><strong className="min-w-0 truncate text-right font-semibold text-slate-700" title={userPackages || undefined}>{userPackages || '---'}</strong></div>
           </div>
         </CardSection>
-        {adminProduct !== 'vault' ? <CardSection title="Twins Used" subtitle={`${twins?.length || 0} linked twins`} flush>
+        <CardSection title="Twins Used" subtitle={`${twins?.length || 0} linked twins`} flush>
           {twins?.length ? (
             <div>
               {twins.map((twin) => (
                 <EntityListRow
                   key={twin._id ?? twin.id ?? twin.twinId ?? twin.name}
                   avatarClassName="twin"
-                  initials={getInitials(twin.name || '')}
-                  title={twin.name || 'Unnamed'}
+                  initials={getInitials(getTwinName(twin))}
+                  title={getTwinName(twin) || 'Name unavailable'}
                   subtitle={twin.role || ''}
                   onClick={() => navigate(`/twins/${twin._id ?? twin.id ?? twin.twinId}`)}
                 />
@@ -853,7 +883,7 @@ export function UserDetailPage() {
           ) : (
             <EmptyDetailState message="No twins used." />
           )}
-        </CardSection> : null}
+        </CardSection>
       </div>
     </section>
   );

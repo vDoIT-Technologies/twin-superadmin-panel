@@ -1,12 +1,14 @@
-import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Download, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { FilterContext } from "../app/FilterContext";
 import { useAuth } from "../app/AuthContext";
+import { useEntityFilters } from "../app/FilterContext";
 import { TruncatedText } from "../components/common/TruncatedText";
 import { FilterDropdown } from "../components/common/FilterDropdown";
 import { dashboardService } from "../services";
 import { envBadge } from "../utils/dashboardUtils";
+import { normalizeEntityStatus } from "../utils/status";
+import { getEntityFilterParams } from "../utils/entityFilters";
 import {
   formatOptionalNumber,
   getClientInitials,
@@ -20,14 +22,17 @@ function getClientId(client) {
   return id == null ? '' : String(id);
 }
 
+function formatOptionalCurrency(value) {
+  return value == null ? '---' : `$${formatOptionalNumber(value)}`;
+}
+
 export function ClientsPage() {
   const { adminProduct } = useAuth();
   const isVault = adminProduct === 'vault';
   const PAGE_SIZE = 10;
-  const { filters, setFilters } = useContext(FilterContext);
+  const [filters, setFilters] = useEntityFilters('clients');
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState(null);
   const [sortConfig, setSortConfig] = useState({
     key: "cost",
     direction: "desc",
@@ -55,11 +60,7 @@ export function ClientsPage() {
     let isActive = true;
     const scopeKey = JSON.stringify({
       envs: filters.envs,
-      gran: filters.gran,
-      range: filters.range,
-      user: filters.user,
-      service: filters.service,
-      vendor: filters.vendor,
+      range: filters.entityRange,
     });
     const scopeChanged = previousScopeRef.current !== scopeKey;
     previousScopeRef.current = scopeKey;
@@ -74,11 +75,8 @@ export function ClientsPage() {
         const data = await dashboardService.getEntityClients({
           page: requestedPage,
           limit: PAGE_SIZE,
-          userId: filters.user,
-          serviceId: filters.service,
-          vendorId: filters.vendor,
           env: filters.envs.length === 1 ? filters.envs[0] : undefined,
-          range: filters.entityRange === 'all' ? undefined : filters.entityRange,
+          ...getEntityFilterParams(filters.entityRange),
         });
 
         if (!isActive) return;
@@ -105,28 +103,30 @@ export function ClientsPage() {
     return () => {
       isActive = false;
     };
-  }, [filters.entityRange, filters.envs, filters.service, filters.user, filters.vendor, page]);
+  }, [filters.entityRange, filters.envs, page]);
 
   const clientRows = useMemo(() => {
     return apiClients.map((client, index) => {
       const name = client.name || client.organizationName || "";
       const plan = client.plan || "";
       const envs = getEnvList(client);
-      const twinsCount = client.twinsCount ?? 0;
-      const usersCount = client.usersCount ?? 0;
-      const messages = client.messages ?? 0;
+      const twinsCount = client.twinsCount ?? null;
+      const usersCount = client.usersCount ?? null;
+      const messages = client.messages ?? null;
       const pointsSpent = parseDecimal(client.pointsSpent);
       const revenue = parseDecimal(client.revenue);
-      const cost = parseDecimal(client.cost ?? client.usage?.cost);
+      const cost = parseDecimal(
+        client.totalCost ?? client.usageCost ?? client.cogs
+        ?? client.usage?.totalCost ?? client.usage?.cost
+        ?? client.kpis?.totalCost ?? client.kpis?.cost
+        ?? client.metrics?.totalCost ?? client.metrics?.cost
+        ?? client.cost,
+      );
       const margin = parseDecimal(client.margin);
       const lastActive = client.lastActive;
       const rawStatus = client.status ?? client.clientStatus ?? client.state;
       const explicitActive = client.isActive ?? client.active ?? client.enabled;
-      const apiStatus = typeof rawStatus === 'string'
-        ? (['active', 'enabled', 'online'].includes(rawStatus.toLowerCase()) ? 'active' : ['inactive', 'disabled', 'offline'].includes(rawStatus.toLowerCase()) ? 'inactive' : '')
-        : explicitActive === true ? 'active' : explicitActive === false ? 'inactive' : '';
-      // Frontend reference fallback until the clients API returns status.
-      const status = apiStatus || (index % 3 === 0 ? 'inactive' : 'active');
+      const status = normalizeEntityStatus(rawStatus, explicitActive);
 
       return {
         id: getClientId(client),
@@ -150,12 +150,12 @@ export function ClientsPage() {
   const filteredRows = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return clientRows.filter((client) => {
-      const matchesStatus = !statusFilter || client.status === statusFilter;
+      const matchesStatus = !filters.status || client.status === filters.status;
       const matchesQuery = !normalizedQuery || [client.name, client.plan, ...client.envs]
         .some((value) => String(value ?? '').toLowerCase().includes(normalizedQuery));
       return matchesStatus && matchesQuery;
     });
-  }, [clientRows, query, statusFilter]);
+  }, [clientRows, filters.status, query]);
 
   const sortedRows = useMemo(() => {
     const getSortValue = (client) => {
@@ -238,11 +238,11 @@ export function ClientsPage() {
       [
         client.name,
         client.envs.join(" | "),
-        client.status === 'active' ? 'Active' : 'Inactive',
+        client.status === 'active' ? 'Active' : client.status === 'inactive' ? 'Inactive' : '---',
         client.twins,
         client.users,
-        `$${formatOptionalNumber(client.cost)}`,
-        `$${formatOptionalNumber(client.revenue)}`,
+        formatOptionalCurrency(client.cost),
+        formatOptionalCurrency(client.revenue),
       ]
         .map((value) => `"${String(value).replaceAll('"', '""')}"`)
         .join(","),
@@ -285,27 +285,25 @@ export function ClientsPage() {
               tone={isVault ? 'vault' : 'twin'}
             />
               <FilterDropdown
-                value={statusFilter}
-                onChange={(value) => { setStatusFilter(value); setPage(1); }}
+                value={filters.status}
+                onChange={(value) => updateTableFilter('status', value)}
                 options={[{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]}
                 placeholder="All Status"
                 searchable={false}
                 tone={isVault ? 'vault' : 'twin'}
               />
               <FilterDropdown
-                value={filters.gran}
-                onChange={(value) => updateTableFilter('gran', value || 'day')}
+                value={filters.entityRange === 'all' ? null : filters.entityRange}
+                onChange={(value) => updateTableFilter('entityRange', value || 'all')}
                 options={[
-                  { value: 'week', label: '1 Week' },
-                  { value: 'month', label: '1 Month' },
-                  { value: '6months', label: '6 Months' },
-                  { value: 'year', label: '1 Year' },
-                  { value: 'over1year', label: 'More Than 1 Year' },
+                  { value: '7days', label: 'Last 7 Days' },
+                  { value: '1month', label: 'Last 1 Month' },
+                  { value: '6months', label: 'Last 6 Months' },
+                  { value: '1year', label: 'Last 1 Year' },
+                  { value: 'morethan1year', label: 'More Than 1 Year' },
                 ]}
-                placeholder="By Day"
+                placeholder="All Dates"
                 searchable={false}
-                showPlaceholderOption={false}
-                highlightWhenOpen={false}
                 align="right"
                 tone={isVault ? 'vault' : 'twin'}
               />
@@ -378,7 +376,7 @@ export function ClientsPage() {
                   <tr key={client.rowKey} className="cursor-pointer border-t border-slate-100 transition hover:bg-slate-50" onClick={() => navigate(`/clients/${client.id}`)}>
                     <td className="px-4 py-3.5 text-left">
                       <div className="flex items-center gap-3">
-                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-blue-100 text-xs font-bold text-blue-600">
+                        <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-bold ${isVault ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-600'}`}>
                           {getClientInitials(client.name)}
                         </span>
                         <div className="min-w-0">
@@ -397,14 +395,16 @@ export function ClientsPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3.5 text-slate-500">
-                      <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${client.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                        {client.status === 'active' ? 'Active' : 'Inactive'}
-                      </span>
+                      {client.status ? (
+                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${client.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                          {client.status === 'active' ? 'Active' : 'Inactive'}
+                        </span>
+                      ) : '---'}
                     </td>
                     <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(client.twins)}</td>
                     <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(client.users)}</td>
-                    <td className="px-4 py-3.5 text-right tabular-nums">${formatOptionalNumber(client.cost)}</td>
-                    <td className="px-4 py-3.5 text-right tabular-nums">${formatOptionalNumber(client.revenue)}</td>
+                    <td className="px-4 py-3.5 text-right tabular-nums">{formatOptionalCurrency(client.cost)}</td>
+                    <td className="px-4 py-3.5 text-right tabular-nums">{formatOptionalCurrency(client.revenue)}</td>
                   </tr>
                 ))
               )}
