@@ -1,13 +1,15 @@
-import { useContext, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Download, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { FilterContext } from '../app/FilterContext';
 import { useAuth } from '../app/AuthContext';
+import { useEntityFilters } from '../app/FilterContext';
 import { TruncatedText } from '../components/common/TruncatedText';
 import { FilterDropdown } from '../components/common/FilterDropdown';
 import { superadminDemoData } from '../demo-data/superadminDemoData';
 import { dashboardService, dropdownApiAvailable, getClientsDropdown, getUsersDropdown } from '../services';
 import { envBadge, formatCurrencyFull, formatNumber } from '../utils/dashboardUtils';
+import { normalizeEntityStatus } from '../utils/status';
+import { getEntityFilterParams } from '../utils/entityFilters';
 
 function getUserInitials(name) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -59,6 +61,13 @@ function getUsersPayload(response) {
     };
   }
 
+  if (Array.isArray(response?.items)) {
+    return {
+      users: response.items,
+      pagination: response?.pagination ?? null,
+    };
+  }
+
   if (Array.isArray(response?.data)) {
     return {
       users: response.data,
@@ -69,6 +78,20 @@ function getUsersPayload(response) {
   if (Array.isArray(response?.data?.data)) {
     return {
       users: response.data.data,
+      pagination: response?.data?.pagination ?? response?.pagination ?? null,
+    };
+  }
+
+  if (Array.isArray(response?.data?.users)) {
+    return {
+      users: response.data.users,
+      pagination: response?.data?.pagination ?? response?.pagination ?? null,
+    };
+  }
+
+  if (Array.isArray(response?.data?.items)) {
+    return {
+      users: response.data.items,
       pagination: response?.data?.pagination ?? response?.pagination ?? null,
     };
   }
@@ -95,10 +118,9 @@ export function UsersPage() {
   const { adminProduct } = useAuth();
   const isVault = adminProduct === 'vault';
   const PAGE_SIZE = 10;
-  const { filters, setFilters } = useContext(FilterContext);
+  const [filters, setFilters] = useEntityFilters('users');
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState(null);
   const [sortConfig, setSortConfig] = useState({ key: 'pointsSpent', direction: 'desc' });
   const [page, setPage] = useState(1);
   const [apiUsers, setApiUsers] = useState([]);
@@ -118,10 +140,12 @@ export function UsersPage() {
     const env = filters.envs.length === 1 ? filters.envs[0] : undefined;
     getClientsDropdown({ env }).then((clients) => {
       if (!active) return;
-      setClientFilterOptions(clients.map((client) => ({
-        value: client.id ?? client._id ?? client.clientId,
+      const options = clients.map((client) => ({
+        value: getId(client.id ?? client._id ?? client.clientId),
         label: client.name ?? client.clientName ?? client.label ?? 'Unnamed client',
-      })));
+      })).filter((option) => option.value);
+      setClientFilterOptions(options);
+      setClientNamesById(Object.fromEntries(options.map((option) => [option.value, option.label])));
     }).catch((error) => console.error('User table filters failed to load:', error));
     return () => { active = false; };
   }, [filters.envs]);
@@ -170,8 +194,7 @@ export function UsersPage() {
           limit: PAGE_SIZE,
           clientId: filters.client,
           env: filters.envs.length === 1 ? filters.envs[0] : undefined,
-          range: filters.range,
-          granularity: filters.gran,
+          ...getEntityFilterParams(filters.entityRange),
         });
 
         if (!isActive) {
@@ -217,11 +240,10 @@ export function UsersPage() {
     return () => {
       isActive = false;
     };
-  }, [filters.client, filters.envs, filters.gran, filters.range, page]);
+  }, [filters.client, filters.entityRange, filters.envs, page]);
 
   useEffect(() => {
     if (!isVault) {
-      setClientNamesById({});
       setUserEnrichmentByKey({});
       return undefined;
     }
@@ -275,7 +297,7 @@ export function UsersPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [filters.client, filters.envs, filters.gran, filters.range]);
+  }, [filters.client, filters.entityRange, filters.envs]);
 
   const userRows = useMemo(() => {
     return apiUsers
@@ -286,7 +308,10 @@ export function UsersPage() {
         const firstName = user?.firstName?.trim?.() ?? '';
         const lastName = user?.lastName?.trim?.() ?? '';
         const fullName = [firstName, lastName].filter(Boolean).join(' ');
-        const env = user?.__env ?? '';
+        const environment = user?.__env ?? user?.env ?? user?.environment ?? user?.environmentName ?? enrichment?.__env ?? enrichment?.env ?? enrichment?.environment;
+        const env = typeof environment === 'string'
+          ? environment.toLowerCase()
+          : environment?.id ?? environment?.name ?? environment?.slug ?? '';
         const clientId = getId(user?.clientId ?? user?.client?._id ?? user?.client?.id ?? enrichment?.clientId);
         const clientName = user?.clientName
           ?? user?.client?.name
@@ -311,9 +336,7 @@ export function UsersPage() {
         const suppliedName = typeof user?.name === 'string' ? user.name.trim() : '';
         const rawStatus = user?.status ?? user?.userStatus ?? user?.state;
         const explicitActive = user?.isActive ?? user?.active ?? user?.enabled;
-        const status = typeof rawStatus === 'string'
-          ? (['active', 'enabled', 'online'].includes(rawStatus.toLowerCase()) ? 'active' : ['inactive', 'disabled', 'offline'].includes(rawStatus.toLowerCase()) ? 'inactive' : '')
-          : explicitActive === true ? 'active' : explicitActive === false ? 'inactive' : '';
+        const status = normalizeEntityStatus(rawStatus, explicitActive);
 
         return {
           id: getId(user?._id ?? user?.id) || user?.email || `user-row-${index}`,
@@ -321,8 +344,8 @@ export function UsersPage() {
           client: clientName,
           clientId,
           env,
-          messages: user?.messages ?? 0,
-          sessions: user?.sessions ?? 0,
+          messages: parseDecimal(user?.messages),
+          sessions: parseDecimal(user?.sessions),
           totalPoints,
           cost,
           revenue,
@@ -337,16 +360,23 @@ export function UsersPage() {
 
   const filteredRows = useMemo(() => {
     const q = query.trim().toLowerCase();
+    const selectedClientId = getId(filters.client);
+    const selectedClientName = selectedClientId
+      ? clientNamesById[selectedClientId]?.trim().toLowerCase()
+      : '';
 
     return userRows.filter((user) => {
-      const matchesStatus = !statusFilter || user.status === statusFilter;
+      const matchesClient = !selectedClientId
+        || user.clientId === selectedClientId
+        || (selectedClientName && user.client.trim().toLowerCase() === selectedClientName);
+      const matchesStatus = !filters.status || user.status === filters.status;
       const matchesQuery = !q
         || user.name.toLowerCase().includes(q)
         || user.client.toLowerCase().includes(q)
         || getEnvLabel(user.env).toLowerCase().includes(q);
-      return matchesStatus && matchesQuery;
+      return matchesClient && matchesStatus && matchesQuery;
     });
-  }, [query, statusFilter, userRows]);
+  }, [clientNamesById, filters.client, filters.status, query, userRows]);
 
   const sortedRows = useMemo(() => {
     const getSortValue = (user) => {
@@ -462,20 +492,19 @@ export function UsersPage() {
               searchable={false}
               tone={isVault ? 'vault' : 'twin'}
             />
+            
             <FilterDropdown
-              value={filters.gran}
-              onChange={(value) => updateTableFilter('gran', value || 'day')}
-              options={[
-                { value: 'week', label: '1 Week' },
-                { value: 'month', label: '1 Month' },
-                { value: '6months', label: '6 Months' },
-                { value: 'year', label: '1 Year' },
-                { value: 'over1year', label: 'More Than 1 Year' },
+                value={filters.entityRange === 'all' ? null : filters.entityRange}
+                onChange={(value) => updateTableFilter('entityRange', value || 'all')}
+                options={[
+                  { value: '7days', label: 'Last 7 Days' },
+                  { value: '1month', label: 'Last 1 Month' },
+                  { value: '6months', label: 'Last 6 Months' },
+                  { value: '1year', label: 'Last 1 Year' },
+                  { value: 'morethan1year', label: 'More Than 1 Year' },
               ]}
-              placeholder="By Day"
+              placeholder="All Dates"
               searchable={false}
-              showPlaceholderOption={false}
-              highlightWhenOpen={false}
               align="right"
               tone={isVault ? 'vault' : 'twin'}
             />
