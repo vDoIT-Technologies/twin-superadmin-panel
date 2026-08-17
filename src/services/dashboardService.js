@@ -60,7 +60,9 @@ export const dashboardService = {
         serviceId: params.serviceId,
         vendorId: params.vendorId,
         env: params.env,
-        range: params.range,
+        filter: params.filter,
+        from: params.from,
+        to: params.to,
       },
     });
     return response.data;
@@ -91,6 +93,9 @@ export const dashboardService = {
         clientId: params.clientId,
         twinId: params.twinId,
         env: params.env,
+        filter: params.filter,
+        from: params.from,
+        to: params.to,
       },
     });
     return response.data;
@@ -110,7 +115,9 @@ export const dashboardService = {
         twinId: params.twinId,
         userId: params.userId,
         env: params.env,
-        range: params.range,
+        filter: params.filter,
+        from: params.from,
+        to: params.to,
       },
     });
     return response.data;
@@ -123,8 +130,12 @@ export const dashboardService = {
   // ---- Vault APIs ----
   async getEntityVaultUsers(params = {}) {
     const response = await api.get('/api/v1/entities/vault-users', {
-      params: { page: params.page, limit: params.limit, env: params.env },
+      params: { page: params.page, limit: params.limit, userId: params.userId, env: params.env },
     });
+    return response.data;
+  },
+  async getEntityVaultUserById(userId) {
+    const response = await api.get(`/api/v1/entities/vault-users/${userId}`);
     return response.data;
   },
   async getEntityVaultStats(params = {}) {

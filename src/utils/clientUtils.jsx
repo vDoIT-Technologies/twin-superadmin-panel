@@ -11,21 +11,21 @@ export function getClientInitials(name) {
 }
 
 export function parseDecimal(value) {
-  if (value == null) return 0;
+  if (value == null || value === '') return null;
   if (typeof value === 'number') return value;
   if (typeof value === 'string') {
     const parsed = Number(value);
-    return Number.isNaN(parsed) ? 0 : parsed;
+    return Number.isNaN(parsed) ? null : parsed;
   }
   if (typeof value === 'object' && '$numberDecimal' in value) {
     const parsed = Number(value.$numberDecimal);
-    return Number.isNaN(parsed) ? 0 : parsed;
+    return Number.isNaN(parsed) ? null : parsed;
   }
-  return 0;
+  return null;
 }
 
 export function formatOptionalNumber(value) {
-  if (value == null) return '';
+  if (value == null) return '---';
   return formatNumber(value);
 }
 
@@ -40,13 +40,30 @@ export function formatLastActive(value) {
 }
 
 export function getEnvList(client) {
-  // Try envs array first, then fall back to __env
-  if (Array.isArray(client.envs) && client.envs.length > 0) return client.envs;
-  if (client.__env) return [client.__env];
+  const normalizeEnv = (value) => {
+    if (typeof value === 'string') return value.toLowerCase();
+    return value?.id ?? value?.name ?? value?.slug ?? '';
+  };
+  const envs = client.envs ?? client.environments;
+  if (Array.isArray(envs) && envs.length > 0) return envs.map(normalizeEnv).filter(Boolean);
+  const env = client.__env ?? client.env ?? client.environment ?? client.environmentName;
+  if (env) return [normalizeEnv(env)].filter(Boolean);
   return [];
 }
 
 export function getClientsPayload(response) {
+  if (Array.isArray(response)) {
+    return { clients: response, pagination: null };
+  }
+
+  if (Array.isArray(response?.clients)) {
+    return { clients: response.clients, pagination: response?.pagination ?? null };
+  }
+
+  if (Array.isArray(response?.items)) {
+    return { clients: response.items, pagination: response?.pagination ?? null };
+  }
+
   if (Array.isArray(response?.data)) {
     return {
       clients: response.data,
@@ -57,6 +74,20 @@ export function getClientsPayload(response) {
   if (Array.isArray(response?.data?.data)) {
     return {
       clients: response.data.data,
+      pagination: response?.data?.pagination ?? response?.pagination ?? null,
+    };
+  }
+
+  if (Array.isArray(response?.data?.clients)) {
+    return {
+      clients: response.data.clients,
+      pagination: response?.data?.pagination ?? response?.pagination ?? null,
+    };
+  }
+
+  if (Array.isArray(response?.data?.items)) {
+    return {
+      clients: response.data.items,
       pagination: response?.data?.pagination ?? response?.pagination ?? null,
     };
   }
