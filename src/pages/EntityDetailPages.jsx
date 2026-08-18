@@ -17,7 +17,7 @@ import { useLocation, useNavigate, useParams, useSearchParams } from 'react-rout
 import { dashboardService } from '../services';
 import { useAuth } from '../app/AuthContext';
 import { FilterContext } from '../app/FilterContext';
-import { envBadge, formatCurrency, formatNumber, ServiceUsageRow } from '../utils/dashboardUtils';
+import { envBadge, formatCurrency, formatCurrencyUpToFourDecimals, formatNumber, ServiceUsageRow } from '../utils/dashboardUtils';
 import { formatCurrencyUpToTwoDecimals } from '../utils/formatters';
 
 const DETAIL_PAGE_SIZE = 10;
@@ -679,9 +679,6 @@ export function TwinDetailPage() {
 
   const { profile, kpis, usage } = twinData;
   const apiServiceUsageRows = getServiceUsageRows(twinData);
-  const serviceUsageRows = apiServiceUsageRows;
-  const totalServiceCost = firstDecimal(kpis?.cost, kpis?.totalCost, usage?.cost, usage?.totalCost, twinData?.costs?.total)
-    ?? (serviceUsageRows.length ? serviceUsageRows.reduce((sum, service) => sum + (service.cost ?? 0), 0) : null);
   const associatedUsers = twinData?.associatedUsers ?? twinData?.users ?? twinData?.associatedUserIds ?? twinData?.userIds ?? twinData?.linkedUsers ?? profile?.associatedUsers ?? profile?.users;
   const associatedUsersForDisplay = Array.isArray(associatedUsers) ? associatedUsers : [];
   const associatedUserNames = associatedUsersForDisplay
@@ -790,8 +787,7 @@ export function UserDetailPage() {
   if (!userData) return <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8"><div className="rounded-2xl border border-slate-200 bg-white py-16 text-center text-sm text-slate-400 shadow-panel">User not found.</div></section>;
 
   const { profile, kpis, revenue, usage } = userData;
-  const openAiCost = kpis?.cost ?? usage?.totals?.cost ?? 0;
-  const totalServiceCost = firstDecimal(kpis?.cost ?? usage?.totals?.cost); //calcute total cost here
+  const totalServiceCost = firstDecimal(kpis?.cost, usage?.totals?.cost); //calcute total cost here
   const associatedTwinsValue = userData?.twins
     ?? profile?.associatedTwins
     ?? [];
@@ -831,7 +827,7 @@ export function UserDetailPage() {
       />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={Wallet} label="Cost" value={formatCurrency(totalServiceCost ?? 0)} tone="rose" />
+        <MetricCard icon={Wallet} label="Cost" value={formatCurrencyUpToFourDecimals(kpis?.cost ?? 0)} tone="rose" />
         <MetricCard icon={TrendingUp} label="Revenue" value={formatCurrencyUpToTwoDecimals(revenue?.totalAmount)} tone="emerald" />
         <MetricCard icon={Coins} label="Total Points" value={formatOptionalNumber(firstDecimal(kpis?.totalPoints, kpis?.pointsBalance, kpis?.balance))} tone="amber" />
         <MetricCard icon={Activity} label="Points Spent" value={formatOptionalNumber(firstDecimal(kpis?.pointsSpent ?? 0))} tone="indigo" />
@@ -871,13 +867,15 @@ export function UserDetailPage() {
           <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-4 bg-slate-50 px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
             <span>Service used</span><span className="text-right">Usage</span><span className="w-20 text-right">Cost</span>
           </div>
-          <ServiceUsageRow label="OpenAI" cost={openAiCost ?? 0} />
+          <ServiceUsageRow label="OpenAI" cost={kpis?.cost ?? usage?.totals?.cost ?? 0} />
           <ServiceUsageRow label="ElevenLabs" cost={0} />
           <ServiceUsageRow label="D-ID" cost={0} />
           <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-4 bg-slate-50/70 px-5 py-3 text-xs whitespace-nowrap">
             <span className="font-semibold text-slate-500 whitespace-nowrap">Total cost</span>
             <span />
-            <strong className="w-20 whitespace-nowrap text-right font-bold tabular-nums text-slate-900">{formatOptionalCurrency(totalServiceCost)}</strong>
+            <strong className="w-20 whitespace-nowrap text-right font-bold tabular-nums text-slate-900">
+              {totalServiceCost == null ? '---' : formatCurrencyUpToFourDecimals(totalServiceCost)}
+            </strong>
           </div>
         </div>
       </CardSection>

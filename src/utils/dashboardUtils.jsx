@@ -144,7 +144,20 @@ export function ServiceUsageRow({ label, cost }) {
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-4 px-5 py-3 text-xs">
       <strong className="truncate font-semibold text-slate-700">{label}</strong>
-      <strong className="w-20 text-right font-semibold tabular-nums text-slate-800">{formatOptionalCurrency(cost)}</strong>
+      <strong className="w-20 text-right font-semibold tabular-nums text-slate-800">
+        {cost == null ? '---' : formatCurrencyUpToFourDecimals(cost)}
+      </strong>
     </div>
   );
 }
+
+export function formatCurrencyUpToFourDecimals(value) {
+  if (value == null || Number.isNaN(value)) return '$0';
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 4,
+  }).format(value);
+}
+
