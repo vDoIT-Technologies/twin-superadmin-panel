@@ -18,6 +18,7 @@ import { dashboardService } from '../services';
 import { useAuth } from '../app/AuthContext';
 import { FilterContext } from '../app/FilterContext';
 import { envBadge, formatCurrency, formatNumber } from '../utils/dashboardUtils';
+import { formatCurrencyUpToTwoDecimals } from '../utils/formatters';
 
 const DETAIL_PAGE_SIZE = 10;
 
@@ -189,6 +190,17 @@ const serviceLabels = {
   apify: 'Apify', filebase: 'Filebase / IPFS', s3ses: 'AWS S3 + SES', aws: 'AWS S3 + SES', blockchain: 'Polygon gas',
   polygon: 'Polygon gas', stripe: 'Stripe', moonpay: 'MoonPay',
 };
+
+// Frontend-only preview data shared by Client and Twin details. Remove this
+// fallback when their APIs return per-service usage and cost breakdowns.
+const demoServiceUsageRows = [
+  { key: 'elevenlabs', label: 'ElevenLabs', units: 8400, unitLabel: 'chars', cost: 1.43 },
+  // { key: 'filebase', label: 'Filebase / IPFS', units: 50.02, unitLabel: 'GB', cost: 0.30 },
+  { key: 'openai', label: 'OpenAI', units: 31000, unitLabel: 'tokens', cost: 0.42 },
+  { key: 'did', label: 'D-ID', units: 12, unitLabel: 'min', cost: 3.36 },
+  // { key: 'stripe', label: 'Stripe', units: 7, unitLabel: 'txn', cost: 1.05 },
+  // { key: 's3ses', label: 'AWS S3 + SES', units: 3.8, unitLabel: 'GB', cost: 0.18 },
+];
 
 function getServiceUsageRows(clientData) {
   const usage = clientData?.usage || {};
@@ -665,23 +677,6 @@ export function TwinDetailPage() {
     })
     .filter(Boolean)
     .join(', ');
-  const twinPackageValue = profile?.package?.name
-    ?? profile?.packageName
-    ?? profile?.package
-    ?? profile?.plan?.name
-    ?? profile?.plan?.id
-    ?? profile?.plan
-    ?? twinData?.package?.name
-    ?? twinData?.packageName
-    ?? twinData?.package
-    ?? twinData?.plan?.name
-    ?? twinData?.plan?.id
-    ?? twinData?.plan
-    ?? '';
-  const twinPackage = typeof twinPackageValue === 'object'
-    ? twinPackageValue?.name ?? twinPackageValue?.label ?? twinPackageValue?.id ?? twinPackageValue?._id ?? ''
-    : twinPackageValue;
-
   return (
     <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       <DetailHeader
@@ -699,30 +694,13 @@ export function TwinDetailPage() {
         <MetricCard icon={BookOpen} label="Knowledge Files" value={formatNumber(kpis?.knowledgeFiles || kpis?.knowledgeSources || kpis?.sourcesCount || 0)} tone="amber" />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4">
         <CardSection title="Twin Info" flush>
           <div className="divide-y divide-slate-100">
             <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Name</span><strong className="font-semibold text-slate-700">{profile?.name || '-'}</strong></div>
             <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Role</span><strong className="font-semibold text-slate-700">{profile?.role || '-'}</strong></div>
             <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Client</span><strong className="font-semibold text-slate-700">{profile?.clientName || '-'}</strong></div>
-            <div className="flex items-center justify-between gap-6 px-5 py-3 text-xs"><span className="shrink-0 text-slate-400">Package</span><strong className="min-w-0 truncate text-right font-semibold text-slate-700" title={twinPackage ? String(twinPackage) : undefined}>{twinPackage || '---'}</strong></div>
             <div className="flex items-center justify-between gap-6 px-5 py-3 text-xs"><span className="shrink-0 text-slate-400">Associated Users</span><strong className="min-w-0 truncate text-right font-semibold text-slate-700" title={associatedUserNames || undefined}>{associatedUserNames || '---'}</strong></div>
-          </div>
-        </CardSection>
-        <CardSection title="All-service usage & cost" flush>
-          <div className="divide-y divide-slate-100">
-            <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-4 bg-slate-50 px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              <span>Service used</span><span className="text-right">Usage</span><span className="w-20 text-right">Cost</span>
-            </div>
-            {serviceUsageRows.map((service) => (
-              <div key={service.key} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-4 px-5 py-3 text-xs">
-                <strong className="truncate font-semibold text-slate-700">{service.label}</strong>
-                <span className="text-right tabular-nums text-slate-500">{service.units == null ? '---' : `${formatNumber(service.units)}${service.unitLabel ? ` ${service.unitLabel}` : ''}`}</span>
-                <strong className="w-20 text-right font-semibold tabular-nums text-slate-800">{formatOptionalCurrency(service.cost)}</strong>
-              </div>
-            ))}
-            {serviceUsageRows.length === 0 ? <EmptyDetailState message="Service usage and cost data was not returned by the API." /> : null}
-            <div className="flex items-center justify-between bg-slate-50/70 px-5 py-3 text-xs"><span className="font-semibold text-slate-500">Total cost</span><strong className="font-bold text-slate-900">{formatOptionalCurrency(totalServiceCost)}</strong></div>
           </div>
         </CardSection>
       </div>
@@ -796,11 +774,12 @@ export function UserDetailPage() {
   if (isLoading) return <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8"><div className="rounded-2xl border border-slate-200 bg-white py-16 text-center text-sm text-slate-400 shadow-panel">Loading user...</div></section>;
   if (!userData) return <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8"><div className="rounded-2xl border border-slate-200 bg-white py-16 text-center text-sm text-slate-400 shadow-panel">User not found.</div></section>;
 
-  const { profile, kpis } = userData;
+  const { profile, kpis, revenue, usage } = userData;
+  const apiServiceUsageRows = getServiceUsageRows(userData);
+  const serviceUsageRows = apiServiceUsageRows.length ? apiServiceUsageRows : demoServiceUsageRows;
+  const totalServiceCost = firstDecimal(kpis?.cost, kpis?.totalCost, kpis?.spendValue, usage?.cost, usage?.totalCost, userData?.costs?.total)
+    ?? serviceUsageRows.reduce((sum, service) => sum + (service.cost ?? 0), 0);
   const associatedTwinsValue = userData?.twins
-    ?? userData?.associatedTwins
-    ?? userData?.linkedTwins
-    ?? profile?.twins
     ?? profile?.associatedTwins
     ?? [];
   const twins = Array.isArray(associatedTwinsValue)
@@ -814,18 +793,6 @@ export function UserDetailPage() {
   };
   const userPackageValue = profile?.packages
     ?? profile?.package?.name
-    ?? profile?.packageName
-    ?? profile?.package
-    ?? profile?.plan?.name
-    ?? profile?.plan?.id
-    ?? profile?.plan
-    ?? userData?.packages
-    ?? userData?.package?.name
-    ?? userData?.packageName
-    ?? userData?.package
-    ?? userData?.plan?.name
-    ?? userData?.plan?.id
-    ?? userData?.plan
     ?? '';
   const userPackages = (Array.isArray(userPackageValue) ? userPackageValue : [userPackageValue])
     .map((item) => (typeof item === 'object'
@@ -852,7 +819,7 @@ export function UserDetailPage() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard icon={Wallet} label="Cost" value={formatCurrency(kpis?.cost || kpis?.totalCost || kpis?.spendValue || 0)} tone="rose" />
-        <MetricCard icon={TrendingUp} label="Revenue" value={formatOptionalCurrency(firstDecimal(kpis?.revenue, kpis?.totalRevenue))} tone="emerald" />
+        <MetricCard icon={TrendingUp} label="Revenue" value={formatCurrencyUpToTwoDecimals(revenue?.totalAmount)} tone="emerald" />
         <MetricCard icon={Coins} label="Total Points" value={formatOptionalNumber(firstDecimal(kpis?.totalPoints, kpis?.pointsBalance, kpis?.balance))} tone="amber" />
         <MetricCard icon={Activity} label="Points Spent" value={formatOptionalNumber(firstDecimal(kpis?.pointsSpent, kpis?.spentPoints, kpis?.totalPointsSpent))} tone="indigo" />
       </div>
@@ -885,6 +852,22 @@ export function UserDetailPage() {
           )}
         </CardSection>
       </div>
+
+      <CardSection title="All-service usage & cost" flush>
+        <div className="divide-y divide-slate-100">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-4 bg-slate-50 px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            <span>Service used</span><span className="text-right">Usage</span><span className="w-20 text-right">Cost</span>
+          </div>
+          {serviceUsageRows.map((service) => (
+            <div key={service.key} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-4 px-5 py-3 text-xs">
+              <strong className="truncate font-semibold text-slate-700">{service.label}</strong>
+              <span className="text-right tabular-nums text-slate-500">{service.units == null ? '---' : `${formatNumber(service.units)}${service.unitLabel ? ` ${service.unitLabel}` : ''}`}</span>
+              <strong className="w-20 text-right font-semibold tabular-nums text-slate-800">{formatOptionalCurrency(service.cost)}</strong>
+            </div>
+          ))}
+          <div className="flex items-center justify-between bg-slate-50/70 px-5 py-3 text-xs"><span className="font-semibold text-slate-500">Total cost</span><strong className="font-bold text-slate-900">{formatOptionalCurrency(totalServiceCost)}</strong></div>
+        </div>
+      </CardSection>
     </section>
   );
 }

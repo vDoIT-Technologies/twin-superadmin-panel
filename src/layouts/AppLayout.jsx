@@ -95,6 +95,13 @@ export function AppLayout() {
     : adminProduct === 'vault' && location.pathname === '/usage'
       ? 'Vault Usage Analytics'
       : baseTitle;
+  const browserPageTitle = location.pathname.startsWith('/clients/')
+    ? 'Client Details'
+    : location.pathname.startsWith('/twins/')
+      ? 'Twin Details'
+      : location.pathname.startsWith('/users/')
+        ? 'User Details'
+        : currentTitle;
   const profileName = profile.name || user?.name || 'Super Admin';
   const profileEmail = profile.email || user?.email || 'No email';
   const initials =
@@ -110,6 +117,13 @@ export function AppLayout() {
   };
 
   const selectedEnv = filters.envs.length === 1 ? filters.envs[0] : undefined;
+
+  useEffect(() => {
+    const productTitle = adminProduct === 'vault'
+      ? 'Vault Superadmin Panel'
+      : 'Twin Superadmin Panel';
+    document.title = `${browserPageTitle} | ${productTitle}`;
+  }, [adminProduct, browserPageTitle]);
 
   useEffect(() => {
     const invalidService = filters.service && !isServiceForProduct(adminProduct, filters.service);
