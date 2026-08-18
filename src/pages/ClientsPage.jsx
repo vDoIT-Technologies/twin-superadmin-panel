@@ -322,7 +322,8 @@ export function ClientsPage() {
           </div>
         </div>
 
-        <div className="max-h-[65vh] overflow-auto">
+        <div className="relative">
+          <div className="max-h-[65vh] overflow-auto">
           <table key="clients-seven-column-layout" className="w-full min-w-[960px] border-collapse text-sm [&_td]:!text-left [&_td>div]:justify-start [&_th]:!text-left">
             <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_0_0_rgba(226,232,240,1)]">
               <tr>
@@ -359,12 +360,8 @@ export function ClientsPage() {
             <tbody>
               {isTableLoading ? (
                 <tr>
-                  <td
-                    colSpan={7}
-                    className="px-5 py-12 text-center text-sm text-slate-400"
-                  >
-                    <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-indigo-100 border-t-indigo-600 align-[-2px]" aria-hidden="true" />
-                    Loading clients...
+                  <td colSpan={7} className="p-0 text-sm text-slate-400">
+                    <div className="min-h-40" />
                   </td>
                 </tr>
               ) : sortedRows.length === 0 ? (
@@ -412,6 +409,13 @@ export function ClientsPage() {
               )}
             </tbody>
           </table>
+          </div>
+          {isTableLoading ? (
+            <div className="pointer-events-none absolute inset-x-0 top-14 flex h-40 items-center justify-center gap-2 text-sm text-slate-400">
+              <span className={`inline-block h-4 w-4 animate-spin rounded-full border-2 ${isVault ? 'border-emerald-100 border-t-emerald-600' : 'border-indigo-100 border-t-indigo-600'}`} aria-hidden="true" />
+              <span>Loading clients...</span>
+            </div>
+          ) : null}
         </div>
 
         <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-5 py-3 text-sm text-slate-400">
