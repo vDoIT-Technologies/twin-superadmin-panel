@@ -17,7 +17,7 @@ import { useLocation, useNavigate, useParams, useSearchParams } from 'react-rout
 import { dashboardService } from '../services';
 import { useAuth } from '../app/AuthContext';
 import { FilterContext } from '../app/FilterContext';
-import { envBadge, formatCurrency, formatNumber } from '../utils/dashboardUtils';
+import { envBadge, formatCurrency, formatNumber, ServiceUsageRow } from '../utils/dashboardUtils';
 import { formatCurrencyUpToTwoDecimals } from '../utils/formatters';
 
 const DETAIL_PAGE_SIZE = 10;
@@ -182,8 +182,8 @@ function firstDecimal(...values) {
   return null;
 }
 
-const formatOptionalCurrency = (value) => value == null ? '---' : formatCurrency(value);
-const formatOptionalNumber = (value) => value == null ? '---' : formatNumber(value);
+export const formatOptionalCurrency = (value) => value == null ? '---' : formatCurrency(value);
+export const formatOptionalNumber = (value) => value == null ? '---' : formatNumber(value);
 
 const serviceLabels = {
   openai: 'OpenAI', elevenlabs: 'ElevenLabs', did: 'D-ID', heygen: 'HeyGen',
@@ -457,19 +457,34 @@ export function ClientDetailPage() {
                   <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Storage used</span><strong className="font-semibold text-slate-700">{formatBytes(kpis?.storedOnIpfsBytes || 0)}</strong></div>
                 </>
               ) : (
+                // <>
+                //   <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-4 bg-slate-50 px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                //     <span>Service used</span><span className="text-right">Usage</span><span className="w-20 text-right">Cost</span>
+                //   </div>
+                //   {serviceUsageRows.map((service) => (
+                //     <div key={service.key} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-4 px-5 py-3 text-xs">
+                //       <strong className="truncate font-semibold text-slate-700">{service.label}</strong>
+                //       <span className="text-right tabular-nums text-slate-500">{service.units == null ? '---' : `${formatNumber(service.units)}${service.unitLabel ? ` ${service.unitLabel}` : ''}`}</span>
+                //       <strong className="w-20 text-right font-semibold tabular-nums text-slate-800">{formatOptionalCurrency(service.cost)}</strong>
+                //     </div>
+                //   ))}
+                //   {serviceUsageRows.length === 0 ? <EmptyDetailState message="Service usage and cost data was not returned by the API." /> : null}
+                //   <div className="flex items-center justify-between bg-slate-50/70 px-5 py-3 text-xs"><span className="font-semibold text-slate-500">Total cost</span><strong className="font-bold text-slate-900">{formatOptionalCurrency(displayedTotalCost)}</strong></div>
+                // </>
                 <>
-                  <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-4 bg-slate-50 px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    <span>Service used</span><span className="text-right">Usage</span><span className="w-20 text-right">Cost</span>
-                  </div>
-                  {serviceUsageRows.map((service) => (
-                    <div key={service.key} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-4 px-5 py-3 text-xs">
-                      <strong className="truncate font-semibold text-slate-700">{service.label}</strong>
-                      <span className="text-right tabular-nums text-slate-500">{service.units == null ? '---' : `${formatNumber(service.units)}${service.unitLabel ? ` ${service.unitLabel}` : ''}`}</span>
-                      <strong className="w-20 text-right font-semibold tabular-nums text-slate-800">{formatOptionalCurrency(service.cost)}</strong>
+                  <div className="divide-y divide-slate-100">
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-4 bg-slate-50 px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      <span>Service used</span><span className="text-right">Usage</span><span className="w-20 text-right">Cost</span>
                     </div>
-                  ))}
-                  {serviceUsageRows.length === 0 ? <EmptyDetailState message="Service usage and cost data was not returned by the API." /> : null}
-                  <div className="flex items-center justify-between bg-slate-50/70 px-5 py-3 text-xs"><span className="font-semibold text-slate-500">Total cost</span><strong className="font-bold text-slate-900">{formatOptionalCurrency(displayedTotalCost)}</strong></div>
+                    <ServiceUsageRow label="OpenAI" cost={ 0} />
+                    <ServiceUsageRow label="ElevenLabs" cost={0} />
+                    <ServiceUsageRow label="D-ID" cost={0} />
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-4 bg-slate-50/70 px-5 py-3 text-xs">
+                      <span className="font-semibold text-slate-500">Total cost</span>
+                      <span />
+                      <strong className="w-20 text-right font-bold tabular-nums text-slate-900">{formatOptionalCurrency(0)}</strong>
+                    </div>
+                  </div>
                 </>
               )}
             </div>
@@ -775,10 +790,8 @@ export function UserDetailPage() {
   if (!userData) return <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8"><div className="rounded-2xl border border-slate-200 bg-white py-16 text-center text-sm text-slate-400 shadow-panel">User not found.</div></section>;
 
   const { profile, kpis, revenue, usage } = userData;
-  const apiServiceUsageRows = getServiceUsageRows(userData);
-  const serviceUsageRows = apiServiceUsageRows.length ? apiServiceUsageRows : demoServiceUsageRows;
-  const totalServiceCost = firstDecimal(kpis?.cost, kpis?.totalCost, kpis?.spendValue, usage?.cost, usage?.totalCost, userData?.costs?.total)
-    ?? serviceUsageRows.reduce((sum, service) => sum + (service.cost ?? 0), 0);
+  const openAiCost = kpis?.cost ?? usage?.totals?.cost ?? 0;
+  const totalServiceCost = firstDecimal(kpis?.cost ?? usage?.totals?.cost); //calcute total cost here
   const associatedTwinsValue = userData?.twins
     ?? profile?.associatedTwins
     ?? [];
@@ -818,10 +831,10 @@ export function UserDetailPage() {
       />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={Wallet} label="Cost" value={formatCurrency(kpis?.cost || kpis?.totalCost || kpis?.spendValue || 0)} tone="rose" />
+        <MetricCard icon={Wallet} label="Cost" value={formatCurrency(totalServiceCost ?? 0)} tone="rose" />
         <MetricCard icon={TrendingUp} label="Revenue" value={formatCurrencyUpToTwoDecimals(revenue?.totalAmount)} tone="emerald" />
         <MetricCard icon={Coins} label="Total Points" value={formatOptionalNumber(firstDecimal(kpis?.totalPoints, kpis?.pointsBalance, kpis?.balance))} tone="amber" />
-        <MetricCard icon={Activity} label="Points Spent" value={formatOptionalNumber(firstDecimal(kpis?.pointsSpent, kpis?.spentPoints, kpis?.totalPointsSpent))} tone="indigo" />
+        <MetricCard icon={Activity} label="Points Spent" value={formatOptionalNumber(firstDecimal(kpis?.pointsSpent ?? 0))} tone="indigo" />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
@@ -858,14 +871,14 @@ export function UserDetailPage() {
           <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-4 bg-slate-50 px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
             <span>Service used</span><span className="text-right">Usage</span><span className="w-20 text-right">Cost</span>
           </div>
-          {serviceUsageRows.map((service) => (
-            <div key={service.key} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-4 px-5 py-3 text-xs">
-              <strong className="truncate font-semibold text-slate-700">{service.label}</strong>
-              <span className="text-right tabular-nums text-slate-500">{service.units == null ? '---' : `${formatNumber(service.units)}${service.unitLabel ? ` ${service.unitLabel}` : ''}`}</span>
-              <strong className="w-20 text-right font-semibold tabular-nums text-slate-800">{formatOptionalCurrency(service.cost)}</strong>
-            </div>
-          ))}
-          <div className="flex items-center justify-between bg-slate-50/70 px-5 py-3 text-xs"><span className="font-semibold text-slate-500">Total cost</span><strong className="font-bold text-slate-900">{formatOptionalCurrency(totalServiceCost)}</strong></div>
+          <ServiceUsageRow label="OpenAI" cost={openAiCost ?? 0} />
+          <ServiceUsageRow label="ElevenLabs" cost={0} />
+          <ServiceUsageRow label="D-ID" cost={0} />
+          <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-4 bg-slate-50/70 px-5 py-3 text-xs whitespace-nowrap">
+            <span className="font-semibold text-slate-500 whitespace-nowrap">Total cost</span>
+            <span />
+            <strong className="w-20 whitespace-nowrap text-right font-bold tabular-nums text-slate-900">{formatOptionalCurrency(totalServiceCost)}</strong>
+          </div>
         </div>
       </CardSection>
     </section>

@@ -196,7 +196,7 @@ export function UsersPage() {
           env: filters.envs.length === 1 ? filters.envs[0] : undefined,
           range: filters.range,
           granularity: filters.gran,
-          // userId:'691c24054f2211e4baa7d5fb',
+          userId:'691c24054f2211e4baa7d5fb',
           // userId:'6a71c9b32ae93520d98c72eb',
           ...getEntityFilterParams(filters.entityRange),
         });
