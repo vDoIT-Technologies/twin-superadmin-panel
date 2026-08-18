@@ -1,6 +1,7 @@
 import { superadminDemoData } from '../demo-data/superadminDemoData';
 import { isServiceForProduct } from './productAccess';
 import { selectFacts, sumMetric, RANGE_DAYS } from '../demo-data/superadminSelectors';
+import { formatOptionalCurrency } from '../pages/EntityDetailPages';
 
 const compactFormatter = new Intl.NumberFormat('en-US', {
   notation: 'compact',
@@ -137,4 +138,13 @@ export function getEnvOptions() {
 export function normalizeRoleName(role) {
   const rawRole = typeof role === 'string' ? role : role?.name ?? role?.label ?? '';
   return rawRole.trim().toLowerCase();
+}
+
+export function ServiceUsageRow({ label, cost }) {
+  return (
+    <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-4 px-5 py-3 text-xs">
+      <strong className="truncate font-semibold text-slate-700">{label}</strong>
+      <strong className="w-20 text-right font-semibold tabular-nums text-slate-800">{formatOptionalCurrency(cost)}</strong>
+    </div>
+  );
 }
