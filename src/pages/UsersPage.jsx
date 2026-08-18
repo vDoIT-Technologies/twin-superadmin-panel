@@ -194,6 +194,10 @@ export function UsersPage() {
           limit: PAGE_SIZE,
           clientId: filters.client,
           env: filters.envs.length === 1 ? filters.envs[0] : undefined,
+          range: filters.range,
+          granularity: filters.gran,
+          // userId:'691c24054f2211e4baa7d5fb',
+          // userId:'6a71c9b32ae93520d98c72eb',
           ...getEntityFilterParams(filters.entityRange),
         });
 
@@ -322,7 +326,7 @@ export function UsersPage() {
           ?? '';
         const totalPoints = parseDecimal(user?.totalPoints ?? enrichment?.totalPoints ?? 0);
         const pointsSpent = parseDecimal(user?.pointsSpent ?? enrichment?.pointsSpent ?? 0);
-        const cost = parseDecimal(user?.cost?.totalAmount ?? enrichment?.cost?.totalAmount ?? 0, 2);
+        const cost = parseDecimal(user?.usage?.cost ?? enrichment?.usage?.cost ?? 0, 2);
         const revenue = parseDecimal(user?.revenue?.totalAmount ?? enrichment?.revenue?.totalAmount ?? 0, 2);
         const lastDaysAgo = user?.lastActiveDaysAgo;
         let lastActiveLabel = '';

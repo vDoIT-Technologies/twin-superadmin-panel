@@ -214,7 +214,7 @@ export function TwinsPage() {
   };
 
   const exportCsv = () => {
-    const header = ['Twin', 'Env', 'Client', 'Users', 'Status', 'Cost', 'Revenue', 'Total Points', 'Points Spent'];
+    const header = ['Twin', 'Env', 'Client', 'Users', 'Status', 'Revenue', 'Points Spent'];
     const lines = sortedRows.map((t) =>
       [t.name, t.env, t.client, formatOptionalNumber(t.usersCount), t.status || '---', formatOptionalCurrency(t.cost), formatOptionalCurrency(t.revenue), formatOptionalNumber(t.totalPoints), formatOptionalNumber(t.pointsSpent)]
         .map((v) => `"${String(v).replaceAll('"', '""')}"`).join(','));
@@ -288,7 +288,7 @@ export function TwinsPage() {
           <table key="twins-nine-column-layout" className="w-full min-w-[1120px] border-collapse text-sm [&_td]:!text-left [&_td>div]:justify-start [&_th]:!text-left">
             <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_0_0_rgba(226,232,240,1)]">
               <tr>
-                {[['twin','Twin'],['env','Env'],['client','Client'],['users','Users'],['status','Status'],['cost','Cost'],['revenue','Revenue'],['totalPoints','Total Points'],['pointsSpent','Points Spent']].map(([key,label]) => (
+                {[['twin','Twin'],['env','Env'],['client','Client'],['users','Users'],['status','Status'],['revenue','Revenue'],['pointsSpent','Points Spent']].map(([key,label]) => (
                   <th key={key} className={`px-4 py-4 text-xs font-bold uppercase tracking-wide text-slate-400 ${key === 'twin' || key === 'client' || key === 'status' ? 'text-left' : key === 'env' ? 'text-center' : 'text-right'}`}>
                     <button type="button" className="inline-flex items-center gap-1 transition hover:text-slate-700" onClick={() => toggleSort(key)}>
                       <span>{label}</span>
@@ -302,13 +302,9 @@ export function TwinsPage() {
             </thead>
             <tbody>
               {isLoading ? (
-                <tr>
-                  <td colSpan={9} className="p-0 text-sm text-slate-400">
-                    <div className="min-h-40" />
-                  </td>
-                </tr>
+                <tr><td colSpan={7} className="px-5 py-12 text-center text-sm text-slate-400"><span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-indigo-100 border-t-indigo-600 align-[-2px]" aria-hidden="true" />Loading twins...</td></tr>
               ) : sortedRows.length === 0 ? (
-                <tr><td colSpan={9} className="px-5 py-12 text-center text-sm text-slate-400">No twins found</td></tr>
+                <tr><td colSpan={7} className="px-5 py-12 text-center text-sm text-slate-400">No twins found</td></tr>
               ) : sortedRows.map((twin) => (
                 <tr key={twin.rowKey} className="cursor-pointer border-t border-slate-100 transition hover:bg-slate-50" onClick={() => navigate(`/twins/${twin.id}`)}>
                   <td className="px-4 py-3.5">
@@ -323,9 +319,7 @@ export function TwinsPage() {
                   <td className="px-4 py-3.5 text-slate-500">
                     {twin.status ? <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${twin.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{twin.status === 'active' ? 'Active' : 'Inactive'}</span> : '---'}
                   </td>
-                  <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalCurrency(twin.cost)}</td>
                   <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalCurrency(twin.revenue)}</td>
-                  <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(twin.totalPoints)}</td>
                   <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(twin.pointsSpent)}</td>
                 </tr>
               ))}
