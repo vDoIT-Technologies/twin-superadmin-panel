@@ -1,11 +1,13 @@
-import { useContext, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Download, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { dashboardService, getClientsDropdown } from '../services';
-import { FilterContext } from '../app/FilterContext';
+import { useEntityFilters } from '../app/FilterContext';
 import { TruncatedText } from '../components/common/TruncatedText';
 import { FilterDropdown } from '../components/common/FilterDropdown';
 import { envBadge, formatNumber } from '../utils/dashboardUtils';
+import { normalizeEntityStatus } from '../utils/status';
+import { getEntityFilterParams } from '../utils/entityFilters';
 import { superadminDemoData } from '../demo-data/superadminDemoData';
 
 function getTwinInitials(name) {
@@ -16,7 +18,12 @@ function getTwinInitials(name) {
 }
 
 function getPayload(response) {
+  if (Array.isArray(response)) return { items: response, pagination: null };
+  if (Array.isArray(response?.twins)) return { items: response.twins, pagination: response?.pagination ?? null };
+  if (Array.isArray(response?.items)) return { items: response.items, pagination: response?.pagination ?? null };
   if (Array.isArray(response?.data)) return { items: response.data, pagination: response?.pagination ?? null };
+  if (Array.isArray(response?.data?.twins)) return { items: response.data.twins, pagination: response?.data?.pagination ?? response?.pagination ?? null };
+  if (Array.isArray(response?.data?.items)) return { items: response.data.items, pagination: response?.data?.pagination ?? response?.pagination ?? null };
   if (Array.isArray(response?.data?.data)) return { items: response.data.data, pagination: response?.data?.pagination ?? response?.pagination ?? null };
   if (Array.isArray(response?.data?.data?.data)) {
     return {
@@ -49,14 +56,14 @@ function formatOptionalCurrency(value) {
 
 export function TwinsPage() {
   const PAGE_SIZE = 10;
-  const { filters, setFilters } = useContext(FilterContext);
+  const [filters, setFilters] = useEntityFilters('twins');
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState(null);
   const [sortConfig, setSortConfig] = useState({ key: 'pointsSpent', direction: 'desc' });
   const [page, setPage] = useState(1);
   const [apiTwins, setApiTwins] = useState([]);
   const [clientFilterOptions, setClientFilterOptions] = useState([]);
+  const [clientNamesById, setClientNamesById] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [pagination, setPagination] = useState({ total: 0, page: 1, limit: PAGE_SIZE, totalPages: 1 });
 
@@ -65,10 +72,12 @@ export function TwinsPage() {
     const env = filters.envs.length === 1 ? filters.envs[0] : undefined;
     getClientsDropdown({ env }).then((clients) => {
       if (!active) return;
-      setClientFilterOptions(clients.map((client) => ({
-        value: client.id ?? client._id ?? client.clientId,
+      const options = clients.map((client) => ({
+        value: getId(client.id ?? client._id ?? client.clientId),
         label: client.name ?? client.clientName ?? client.label ?? 'Unnamed client',
-      })));
+      })).filter((option) => option.value);
+      setClientFilterOptions(options);
+      setClientNamesById(Object.fromEntries(options.map((option) => [option.value, option.label])));
     }).catch((error) => console.error('Twin table filters failed to load:', error));
     return () => { active = false; };
   }, [filters.client, filters.envs]);
@@ -93,7 +102,7 @@ export function TwinsPage() {
           limit: PAGE_SIZE,
           clientId: filters.client,
           env: filters.envs.length === 1 ? filters.envs[0] : undefined,
-          granularity: filters.gran,
+          ...getEntityFilterParams(filters.entityRange),
         });
         if (!active) return;
         const payload = getPayload(data);
@@ -114,11 +123,11 @@ export function TwinsPage() {
 
     load();
     return () => { active = false; };
-  }, [filters.client, filters.envs, filters.gran, page]);
+  }, [filters.client, filters.entityRange, filters.envs, page]);
 
   useEffect(() => {
     setPage(1);
-  }, [filters.client, filters.envs, filters.gran]);
+  }, [filters.client, filters.entityRange, filters.envs]);
 
   const twinRows = useMemo(() => apiTwins.map((t, i) => {
     const clientId = getId(t.clientId ?? t.client?._id ?? t.client?.id);
@@ -126,44 +135,50 @@ export function TwinsPage() {
     const environment = t.__env ?? t.env ?? t.environment ?? '';
     const rawStatus = t.status ?? t.twinStatus ?? t.state;
     const explicitActive = t.isActive ?? t.active ?? t.enabled;
-    const apiStatus = typeof rawStatus === 'string'
-      ? (['active', 'enabled', 'online'].includes(rawStatus.toLowerCase()) ? 'active' : ['inactive', 'disabled', 'offline'].includes(rawStatus.toLowerCase()) ? 'inactive' : '')
-      : explicitActive === true ? 'active' : explicitActive === false ? 'inactive' : '';
-    // Frontend reference fallback until the twins API returns status.
-    const status = apiStatus || (i % 3 === 0 ? 'inactive' : 'active');
-    const associatedUsers = t.associatedUsers ?? t.users ?? t.userIds ?? t.linkedUsers;
+    const status = normalizeEntityStatus(rawStatus, explicitActive);
+    const associatedUsers = t.associatedUsers ?? t.users ?? t.userIds ?? t.associatedUserIds ?? t.linkedUsers;
     const apiUsersCount = parseOptionalNumber(t.usersCount ?? t.userCount ?? t.associatedUsersCount ?? t.linkedUsersCount)
       ?? (Array.isArray(associatedUsers) ? associatedUsers.length : null);
-    // Frontend reference fallback until the twins API returns associations.
-    const usersCount = apiUsersCount ?? [2, 3, 1][i % 3];
+    const usersCount = apiUsersCount;
+
+    const id = getId(t._id ?? t.id) || `twin-${i}`;
+    const env = typeof environment === 'string' ? environment.toLowerCase() : environment?.id ?? environment?.name ?? '';
 
     return {
-      id: getId(t._id ?? t.id) || `twin-${i}`,
+      id,
+      rowKey: `${id}-${env || 'unknown'}-${i}`,
       clientId,
       name: t.name || '',
       role: t.role || '',
-      env: typeof environment === 'string' ? environment.toLowerCase() : environment?.id ?? environment?.name ?? '',
-      client: clientName || '---', //clientId ||
+      env,
+      client: clientName || clientNamesById[clientId] || '---',
       clientName,
       usersCount,
-      cost: parseOptionalNumber(t.cost ?? t.totalCost ?? t.usageCost ?? t.cogs ?? t.usage?.cost),
-      revenue: parseOptionalNumber(t.revenue ?? t.totalRevenue ?? t.revenueAmount ?? t.usage?.revenue),
-      totalPoints: parseOptionalNumber(t.totalPoints ?? t.points ?? t.pointsBalance ?? t.pointBalance ?? t.balance),
-      pointsSpent: parseOptionalNumber(t.pointsSpent ?? t.spentPoints ?? t.totalPointsSpent ?? t.pointsUsed ?? t.points_spent),
+      cost: parseOptionalNumber(t.totalCost ?? t.usageCost ?? t.cogs ?? t.cost ?? t.usage?.totalCost ?? t.usage?.cost ?? t.kpis?.totalCost ?? t.kpis?.cost),
+      revenue: parseOptionalNumber(t.totalRevenue ?? t.revenueAmount ?? t.revenue ?? t.usage?.totalRevenue ?? t.usage?.revenue ?? t.kpis?.totalRevenue ?? t.kpis?.revenue),
+      totalPoints: parseOptionalNumber(t.totalPoints ?? t.points ?? t.pointsBalance ?? t.pointBalance ?? t.balance ?? t.kpis?.totalPoints ?? t.kpis?.pointsBalance),
+      pointsSpent: parseOptionalNumber(t.pointsSpent ?? t.spentPoints ?? t.totalPointsSpent ?? t.pointsUsed ?? t.points_spent ?? t.kpis?.pointsSpent ?? t.kpis?.totalPointsSpent),
       status,
     };
-  }), [apiTwins]);
+  }), [apiTwins, clientNamesById]);
  
 
   const filteredRows = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
+    const selectedClientId = getId(filters.client);
+    const selectedClientName = selectedClientId
+      ? clientNamesById[selectedClientId]?.trim().toLowerCase()
+      : '';
     return twinRows.filter((twin) => {
-      const matchesStatus = !statusFilter || twin.status === statusFilter;
+      const matchesClient = !selectedClientId
+        || twin.clientId === selectedClientId
+        || (selectedClientName && twin.clientName.trim().toLowerCase() === selectedClientName);
+      const matchesStatus = !filters.status || twin.status === filters.status;
       const matchesQuery = !normalizedQuery || [twin.name, twin.role, twin.client, twin.env, twin.status]
         .some((value) => String(value ?? '').toLowerCase().includes(normalizedQuery));
-      return matchesStatus && matchesQuery;
+      return matchesClient && matchesStatus && matchesQuery;
     });
-  }, [query, statusFilter, twinRows]);
+  }, [clientNamesById, filters.client, filters.status, query, twinRows]);
 
   const sortedRows = useMemo(() => {
     const getVal = (t) => {
@@ -229,27 +244,25 @@ export function TwinsPage() {
               tone="twin"
             />
             <FilterDropdown
-              value={statusFilter}
-              onChange={(value) => { setStatusFilter(value); setPage(1); }}
+              value={filters.status}
+              onChange={(value) => updateTableFilter('status', value)}
               options={[{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]}
               placeholder="All Status"
               searchable={false}
               tone="twin"
             />
             <FilterDropdown
-              value={filters.gran}
-              onChange={(value) => updateTableFilter('gran', value || 'day')}
+              value={filters.entityRange === 'all' ? null : filters.entityRange}
+              onChange={(value) => updateTableFilter('entityRange', value || 'all')}
               options={[
-                { value: 'week', label: '1 Week' },
-                { value: 'month', label: '1 Month' },
-                { value: '6months', label: '6 Months' },
-                { value: 'year', label: '1 Year' },
-                { value: 'over1year', label: 'More Than 1 Year' },
+                { value: '7days', label: 'Last 7 Days' },
+                { value: '1month', label: 'Last 1 Month' },
+                { value: '6months', label: 'Last 6 Months' },
+                { value: '1year', label: 'Last 1 Year' },
+                { value: 'morethan1year', label: 'More Than 1 Year' },
               ]}
-              placeholder="By Day"
+              placeholder="All Dates"
               searchable={false}
-              showPlaceholderOption={false}
-              highlightWhenOpen={false}
               align="right"
               tone="twin"
             />
@@ -270,7 +283,8 @@ export function TwinsPage() {
           </div>
         </div>
 
-        <div className="max-h-[65vh] overflow-auto">
+        <div className="relative">
+          <div className="max-h-[65vh] overflow-auto">
           <table key="twins-nine-column-layout" className="w-full min-w-[1120px] border-collapse text-sm [&_td]:!text-left [&_td>div]:justify-start [&_th]:!text-left">
             <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_0_0_rgba(226,232,240,1)]">
               <tr>
@@ -292,7 +306,7 @@ export function TwinsPage() {
               ) : sortedRows.length === 0 ? (
                 <tr><td colSpan={7} className="px-5 py-12 text-center text-sm text-slate-400">No twins found</td></tr>
               ) : sortedRows.map((twin) => (
-                <tr key={twin.id} className="cursor-pointer border-t border-slate-100 transition hover:bg-slate-50" onClick={() => navigate(`/twins/${twin.id}`)}>
+                <tr key={twin.rowKey} className="cursor-pointer border-t border-slate-100 transition hover:bg-slate-50" onClick={() => navigate(`/twins/${twin.id}`)}>
                   <td className="px-4 py-3.5">
                     <div className="flex items-center gap-3">
                       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-violet-100 text-xs font-bold text-violet-600">{getTwinInitials(twin.name)}</span>
@@ -311,6 +325,13 @@ export function TwinsPage() {
               ))}
             </tbody>
           </table>
+          </div>
+          {isLoading ? (
+            <div className="pointer-events-none absolute inset-x-0 top-14 flex h-40 items-center justify-center gap-2 text-sm text-slate-400">
+              <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-indigo-100 border-t-indigo-600" aria-hidden="true" />
+              <span>Loading twins...</span>
+            </div>
+          ) : null}
         </div>
 
         <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-5 py-3 text-sm text-slate-400">

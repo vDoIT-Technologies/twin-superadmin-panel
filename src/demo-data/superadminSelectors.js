@@ -5,6 +5,7 @@ export const RANGE_DAYS = { '24h': 2, '7d': 7, '30d': 30, '90d': 90 };
 export const defaultDemoFilters = {
   envs: ['dev', 'staging', 'prod'],
   range: '30d',
+  entityRange: 'all',
   gran: 'day',
   lens: 'cost',
   compare: false,
