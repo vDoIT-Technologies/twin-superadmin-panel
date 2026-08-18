@@ -13,6 +13,15 @@ export function formatCurrency(value) {
   }).format(value);
 }
 
+export function formatCurrencyUpToTwoDecimals(value) {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
 export function formatMetricValue(value, suffix = '') {
   if (typeof value === 'number' && value >= 1000 && !suffix) {
     return formatCompactNumber(value);
