@@ -338,8 +338,11 @@ export function UsersPage() {
         const explicitActive = user?.isActive ?? user?.active ?? user?.enabled;
         const status = normalizeEntityStatus(rawStatus, explicitActive);
 
+        const id = getId(user?._id ?? user?.id) || user?.email || `user-row-${index}`;
+
         return {
-          id: getId(user?._id ?? user?.id) || user?.email || `user-row-${index}`,
+          id,
+          rowKey: `${id}-${env || 'unknown'}-${index}`,
           name: fullName || suppliedName || user?.email || '',
           client: clientName,
           clientId,
@@ -518,7 +521,8 @@ export function UsersPage() {
           </div>
         </div>
 
-        <div className="max-h-[65vh] overflow-auto">
+        <div className="relative">
+          <div className="max-h-[65vh] overflow-auto">
           <table className="min-w-[1380px] w-full border-collapse text-sm [&_td]:!text-left [&_td>div]:justify-start [&_th]:!text-left">
             <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_0_0_rgba(226,232,240,1)]">
               <tr>
@@ -547,9 +551,8 @@ export function UsersPage() {
             <tbody>
               {isTableLoading ? (
                 <tr>
-                  <td colSpan={9} className="px-5 py-12 text-center text-sm text-slate-400">
-                    <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-indigo-100 border-t-indigo-600 align-[-2px]" aria-hidden="true" />
-                    Loading users...
+                  <td colSpan={9} className="p-0 text-sm text-slate-400">
+                    <div className="min-h-40" />
                   </td>
                 </tr>
               ) : paginatedRows.length === 0 ? (
@@ -560,7 +563,7 @@ export function UsersPage() {
                 </tr>
               ) : (
                 paginatedRows.map((user) => (
-                  <tr key={user.id} className="cursor-pointer border-t border-slate-100 transition hover:bg-slate-50" onClick={() => navigate(`/users/${user.id}`)}>
+                  <tr key={user.rowKey} className="cursor-pointer border-t border-slate-100 transition hover:bg-slate-50" onClick={() => navigate(`/users/${user.id}`)}>
                     <td className="px-4 py-3.5">
                       <div className="flex min-w-0 items-center gap-3">
                         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-amber-100 text-xs font-bold text-amber-600">{getUserInitials(user.name || '?')}</span>
@@ -580,6 +583,13 @@ export function UsersPage() {
               )}
             </tbody>
           </table>
+          </div>
+          {isTableLoading ? (
+            <div className="pointer-events-none absolute inset-x-0 top-14 flex h-40 items-center justify-center gap-2 text-sm text-slate-400">
+              <span className={`inline-block h-4 w-4 animate-spin rounded-full border-2 ${isVault ? 'border-emerald-100 border-t-emerald-600' : 'border-indigo-100 border-t-indigo-600'}`} aria-hidden="true" />
+              <span>Loading users...</span>
+            </div>
+          ) : null}
         </div>
 
         <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-5 py-3 text-sm text-slate-400">
