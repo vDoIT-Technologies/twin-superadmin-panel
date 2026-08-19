@@ -734,115 +734,239 @@ export function UserDetailPage() {
     async function load() {
       try {
         let response;
-        if (adminProduct === 'vault') {
+
+        if (adminProduct === "vault") {
           try {
             response = await dashboardService.getEntityVaultUserById(userId);
           } catch (vaultError) {
-            console.warn('GET /entities/vault-users/:id failed; trying shared user endpoint:', vaultError);
+            console.warn(
+              "GET /entities/vault-users/:id failed; trying shared user endpoint:",
+              vaultError,
+            );
+
             try {
               response = await dashboardService.getEntityUserById(userId);
             } catch (sharedError) {
-              console.warn('GET /entities/users/:id failed; finding user in Vault users:', sharedError);
-              const listResponse = await dashboardService.getEntityVaultUsers({ page: 1, limit: 100, userId });
+              console.warn(
+                "GET /entities/users/:id failed; finding user in Vault users:",
+                sharedError,
+              );
+
+              const listResponse = await dashboardService.getEntityVaultUsers({
+                page: 1,
+                limit: 100,
+                userId,
+              });
+
               const listPayload = listResponse?.data || listResponse;
+
               const users = Array.isArray(listPayload)
                 ? listPayload
-                : listPayload?.users || listPayload?.items || listPayload?.data || [];
-              response = users.find((user) => String(user?._id ?? user?.id ?? user?.userId) === String(userId)) || null;
+                : listPayload?.users ||
+                  listPayload?.items ||
+                  listPayload?.data ||
+                  [];
+
+              response =
+                users.find(
+                  (user) =>
+                    String(user?._id ?? user?.id ?? user?.userId) ===
+                    String(userId),
+                ) || null;
             }
           }
         } else {
           response = await dashboardService.getEntityUserById(userId);
         }
+
         if (!active) return;
+
         const payload = response?.data || response;
+
         if (!payload) {
           setUserData(null);
           return;
         }
-        const fullName = [payload.firstName, payload.lastName].filter(Boolean).join(' ').trim();
-        setUserData(payload.profile ? payload : {
-          ...payload,
-          profile: {
-            ...payload,
-            name: payload.name || payload.fullName || fullName || payload.email || '',
-            clientName: payload.clientName || payload.client?.name || '',
-            env: payload.__env || payload.env || payload.environment || '',
-          },
-          kpis: payload.kpis || payload.metrics || payload.usage || payload,
-        });
+
+        const fullName = [payload.firstName, payload.lastName]
+          .filter(Boolean)
+          .join(" ")
+          .trim();
+
+        setUserData(
+          payload.profile
+            ? payload
+            : {
+                ...payload,
+
+                profile: {
+                  ...payload,
+                  name:
+                    payload.name ||
+                    payload.fullName ||
+                    fullName ||
+                    payload.email ||
+                    "",
+                  clientName: payload.clientName || payload.client?.name || "",
+                  env:
+                    payload.__env || payload.env || payload.environment || "",
+                },
+
+                kpis:
+                  payload.kpis || payload.metrics || payload.usage || payload,
+              },
+        );
       } catch (err) {
-        console.error('GET user detail failed:', err);
-        if (active) setUserData(null);
+        console.error("GET user detail failed:", err);
+
+        if (active) {
+          setUserData(null);
+        }
       } finally {
-        if (active) setIsLoading(false);
+        if (active) {
+          setIsLoading(false);
+        }
       }
     }
 
     load();
-    return () => { active = false; };
+
+    return () => {
+      active = false;
+    };
   }, [adminProduct, userId]);
 
-  if (isLoading) return <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8"><div className="rounded-2xl border border-slate-200 bg-white py-16 text-center text-sm text-slate-400 shadow-panel">Loading user...</div></section>;
-  if (!userData) return <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8"><div className="rounded-2xl border border-slate-200 bg-white py-16 text-center text-sm text-slate-400 shadow-panel">User not found.</div></section>;
+  if (isLoading) {
+    return (
+      <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+        <div className="rounded-2xl border border-slate-200 bg-white py-16 text-center text-sm text-slate-400 shadow-panel">
+          Loading user...
+        </div>
+      </section>
+    );
+  }
+
+  if (!userData) {
+    return (
+      <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+        <div className="rounded-2xl border border-slate-200 bg-white py-16 text-center text-sm text-slate-400 shadow-panel">
+          User not found.
+        </div>
+      </section>
+    );
+  }
 
   const { profile, kpis, revenue, usage } = userData;
-  const totalServiceCost = firstDecimal(kpis?.cost, usage?.totals?.cost); //calcute total cost here
-  const associatedTwinsValue = userData?.twins
-    ?? profile?.associatedTwins
-    ?? [];
+
+  const totalServiceCost = firstDecimal(kpis?.cost, usage?.totals?.cost);
+
+  const twinPackage = profile?.packageDetails?.twinPackage || null;
+
+  const subscriptionPackages = Array.isArray(
+    profile?.packageDetails?.subscriptionPackages,
+  )
+    ? profile?.packageDetails.subscriptionPackages
+    : [];
+
+  const associatedTwinsValue =
+    userData?.twins ?? profile?.associatedTwins ?? [];
+
   const twins = Array.isArray(associatedTwinsValue)
     ? associatedTwinsValue
     : Array.isArray(associatedTwinsValue?.items)
       ? associatedTwinsValue.items
       : [];
+
   const getTwinName = (twin) => {
-    if (!twin || typeof twin === 'string') return '';
-    return twin.name ?? twin.twinName ?? twin.label ?? twin.profile?.name ?? '';
+    if (!twin || typeof twin === "string") return "";
+
+    return twin.name ?? twin.twinName ?? twin.label ?? twin.profile?.name ?? "";
   };
-  const userPackageValue = profile?.packages
-    ?? profile?.package?.name
-    ?? '';
-  const userPackages = (Array.isArray(userPackageValue) ? userPackageValue : [userPackageValue])
-    .map((item) => (typeof item === 'object'
-      ? item?.name ?? item?.label ?? item?.id ?? item?._id ?? ''
-      : item))
-    .filter((item) => item != null && String(item).trim())
-    .join(', ');
 
   return (
     <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       <DetailHeader
         avatarClassName="user"
-        initials={getInitials(profile?.name || '')}
-        title={profile?.name || 'Unnamed'}
+        initials={getInitials(profile?.name || "")}
+        title={profile?.name || "Unnamed"}
         subtitle={
           <>
-            <span>{profile?.clientName || ''}</span>
+            <span>{profile?.clientName || ""}</span>
             <span>·</span>
-            <span>{profile?.env || ''}</span>
+            <span>{profile?.env || ""}</span>
           </>
         }
-        onBack={() => navigate('/users')}
+        onBack={() => navigate("/users")}
       />
 
+      {/* KPI Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={Wallet} label="Cost" value={formatCurrencyUpToFourDecimals(kpis?.cost ?? 0)} tone="rose" />
-        <MetricCard icon={TrendingUp} label="Revenue" value={formatCurrencyUpToTwoDecimals(revenue?.totalAmount)} tone="emerald" />
-        <MetricCard icon={Coins} label="Balance Points" value={formatOptionalNumber(firstDecimal(kpis?.totalPoints, kpis?.pointsBalance, kpis?.balance))} tone="amber" />
-        <MetricCard icon={Activity} label="Points Spent" value={formatOptionalNumber(firstDecimal(kpis?.pointsSpent ?? 0))} tone="indigo" />
+        <MetricCard
+          icon={Wallet}
+          label="Cost"
+          value={formatCurrencyUpToFourDecimals(kpis?.cost ?? 0)}
+          tone="rose"
+        />
+
+        <MetricCard
+          icon={TrendingUp}
+          label="Revenue"
+          value={formatCurrencyUpToTwoDecimals(revenue?.totalAmount)}
+          tone="emerald"
+        />
+
+        <MetricCard
+          icon={Coins}
+          label="Balance Points"
+          value={formatOptionalNumber(
+            firstDecimal(kpis?.totalPoints, kpis?.pointsBalance, kpis?.balance),
+          )}
+          tone="amber"
+        />
+
+        <MetricCard
+          icon={Activity}
+          label="Points Spent"
+          value={formatOptionalNumber(firstDecimal(kpis?.pointsSpent ?? 0))}
+          tone="indigo"
+        />
       </div>
 
+      {/* User Info + Twins */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <CardSection title="User Info" flush>
           <div className="divide-y divide-slate-100">
-            <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Email</span><strong className="font-semibold text-slate-700">{profile?.email || '-'}</strong></div>
-            <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Client</span><strong className="font-semibold text-slate-700">{profile?.clientName || '-'}</strong></div>
-            <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Environment</span><strong className="font-semibold text-slate-700">{profile?.env || '-'}</strong></div>
-            <div className="flex items-center justify-between gap-6 px-5 py-3 text-xs"><span className="shrink-0 text-slate-400">Packages</span><strong className="min-w-0 truncate text-right font-semibold text-slate-700" title={userPackages || undefined}>{userPackages || '---'}</strong></div>
+            <div className="flex items-center justify-between px-5 py-3 text-xs">
+              <span className="text-slate-400">Email</span>
+
+              <strong className="font-semibold text-slate-700">
+                {profile?.email || "-"}
+              </strong>
+            </div>
+
+            <div className="flex items-center justify-between px-5 py-3 text-xs">
+              <span className="text-slate-400">Client</span>
+
+              <strong className="font-semibold text-slate-700">
+                {profile?.clientName || "-"}
+              </strong>
+            </div>
+
+            <div className="flex items-center justify-between px-5 py-3 text-xs">
+              <span className="text-slate-400">Environment</span>
+
+              <strong className="font-semibold text-slate-700">
+                {profile?.env || "-"}
+              </strong>
+            </div>
           </div>
         </CardSection>
-        <CardSection title="Twins Used" subtitle={`${twins?.length || 0} linked twins`} flush>
+
+        <CardSection
+          title="Twins Used"
+          subtitle={`${twins?.length || 0} linked twins`}
+          flush
+        >
           {twins?.length ? (
             <div>
               {twins.map((twin) => (
@@ -850,9 +974,11 @@ export function UserDetailPage() {
                   key={twin._id ?? twin.id ?? twin.twinId ?? twin.name}
                   avatarClassName="twin"
                   initials={getInitials(getTwinName(twin))}
-                  title={getTwinName(twin) || 'Name unavailable'}
-                  subtitle={twin.role || ''}
-                  onClick={() => navigate(`/twins/${twin._id ?? twin.id ?? twin.twinId}`)}
+                  title={getTwinName(twin) || "Name unavailable"}
+                  subtitle={twin.role || ""}
+                  onClick={() =>
+                    navigate(`/twins/${twin._id ?? twin.id ?? twin.twinId}`)
+                  }
                 />
               ))}
             </div>
@@ -862,23 +988,96 @@ export function UserDetailPage() {
         </CardSection>
       </div>
 
-      <CardSection title="All-service usage & cost" flush>
-        <div className="divide-y divide-slate-100">
-          <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-4 bg-slate-50 px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-            <span>Service used</span><span className="text-right">Usage</span><span className="w-20 text-right">Cost</span>
+      {/* Packages + All-service usage */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {/* Packages */}
+        <CardSection title="Packages" flush>
+          {twinPackage || subscriptionPackages.length ? (
+            <div className="divide-y divide-slate-100">
+              {/* Twin Package */}
+              {twinPackage && (
+                <div className="flex items-center justify-between gap-4 px-5 py-3">
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold text-slate-700">
+                      {twinPackage.packagename || "---"}
+                    </div>
+
+                    <div className="mt-0.5 text-[11px] text-slate-400">
+                      Twin Package
+                    </div>
+                  </div>
+
+                  <strong className="shrink-0 text-xs font-semibold tabular-nums text-slate-700">
+                    {twinPackage.price != null
+                      ? `$${twinPackage.price}`
+                      : "---"}
+                  </strong>
+                </div>
+              )}
+
+              {/* Subscription Packages */}
+              {subscriptionPackages.map((pkg, index) => (
+                <div
+                  key={`${pkg?.packagename || "package"}-${index}`}
+                  className="flex items-center justify-between gap-4 px-5 py-3"
+                >
+                  <div className="min-w-0">
+                    <div className="truncate text-xs font-semibold text-slate-700">
+                      {pkg?.packagename || "---"}
+                    </div>
+
+                    <div className="mt-0.5 text-[11px] text-slate-400">
+                      {pkg?.validity || "Subscription"}
+                    </div>
+                  </div>
+
+                  <strong className="shrink-0 text-xs font-semibold tabular-nums text-slate-700">
+                    {pkg?.price != null ? `$${pkg.price}` : "---"}
+                  </strong>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyDetailState message="No packages assigned." />
+          )}
+        </CardSection>
+
+        {/* All-service usage & cost */}
+        <CardSection title="All-service usage & cost" flush>
+          <div className="divide-y divide-slate-100">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-4 bg-slate-50 px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              <span>Service used</span>
+
+              <span className="text-right">Usage</span>
+
+              <span className="w-20 text-right">Cost</span>
+            </div>
+
+            <ServiceUsageRow
+              label="OpenAI"
+              cost={kpis?.cost ?? usage?.totals?.cost ?? 0}
+            />
+
+            <ServiceUsageRow label="ElevenLabs" cost={0} />
+
+            <ServiceUsageRow label="D-ID" cost={0} />
+
+            <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-4 bg-slate-50/70 px-5 py-3 text-xs whitespace-nowrap">
+              <span className="font-semibold text-slate-500 whitespace-nowrap">
+                Total cost
+              </span>
+
+              <span />
+
+              <strong className="w-20 whitespace-nowrap text-right font-bold tabular-nums text-slate-900">
+                {totalServiceCost == null
+                  ? "---"
+                  : formatCurrencyUpToFourDecimals(totalServiceCost)}
+              </strong>
+            </div>
           </div>
-          <ServiceUsageRow label="OpenAI" cost={kpis?.cost ?? usage?.totals?.cost ?? 0} />
-          <ServiceUsageRow label="ElevenLabs" cost={0} />
-          <ServiceUsageRow label="D-ID" cost={0} />
-          <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-4 bg-slate-50/70 px-5 py-3 text-xs whitespace-nowrap">
-            <span className="font-semibold text-slate-500 whitespace-nowrap">Total cost</span>
-            <span />
-            <strong className="w-20 whitespace-nowrap text-right font-bold tabular-nums text-slate-900">
-              {totalServiceCost == null ? '---' : formatCurrencyUpToFourDecimals(totalServiceCost)}
-            </strong>
-          </div>
-        </div>
-      </CardSection>
+        </CardSection>
+      </div>
     </section>
   );
 }
