@@ -444,7 +444,7 @@ export function UsersPage() {
   };
 
   const exportCsv = () => {
-    const header = ['User', 'Env', 'Client', 'Cost', 'Revenue', 'Total Points', 'Points Spent', 'Messages', 'Sessions'];
+    const header = ['User', 'Env', 'Client', 'Cost', 'Revenue', 'Balance Points', 'Points Spent', 'Messages', 'Sessions'];
     const lines = sortedRows.map((user) =>
       [
         user.name,
@@ -536,7 +536,7 @@ export function UsersPage() {
                   ['client', 'Client'],
                   ['cost', 'Cost'],
                   ['revenue', 'Revenue'],
-                  ['totalPoints', 'Total Points'],
+                  ['totalPoints', 'Balance Points'],
                   ['pointsSpent', 'Points spent'],
                   ['messages', 'Messages'],
                   ['sessions', 'Sessions'],
