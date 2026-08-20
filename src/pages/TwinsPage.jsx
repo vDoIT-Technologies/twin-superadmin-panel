@@ -302,7 +302,11 @@ export function TwinsPage() {
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={7} className="px-5 py-12 text-center text-sm text-slate-400"><span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-indigo-100 border-t-indigo-600 align-[-2px]" aria-hidden="true" />Loading twins...</td></tr>
+                <tr>
+                  <td colSpan={7} className="p-0 text-sm text-slate-400">
+                    <div className="min-h-40" />
+                  </td>
+                </tr>
               ) : sortedRows.length === 0 ? (
                 <tr><td colSpan={7} className="px-5 py-12 text-center text-sm text-slate-400">No twins found</td></tr>
               ) : sortedRows.map((twin) => (
