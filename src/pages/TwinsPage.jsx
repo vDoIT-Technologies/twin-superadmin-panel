@@ -143,10 +143,13 @@ export function TwinsPage() {
 
     const id = getId(t._id ?? t.id) || `twin-${i}`;
     const env = typeof environment === 'string' ? environment.toLowerCase() : environment?.id ?? environment?.name ?? '';
+    const detailRoute = env ? `/twins/${id}?env=${encodeURIComponent(env)}` : `/twins/${id}`;
+
 
     return {
       id,
       rowKey: `${id}-${env || 'unknown'}-${i}`,
+      detailRoute,
       clientId,
       name: t.name || '',
       role: t.role || '',
@@ -302,11 +305,15 @@ export function TwinsPage() {
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={7} className="px-5 py-12 text-center text-sm text-slate-400"><span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-indigo-100 border-t-indigo-600 align-[-2px]" aria-hidden="true" />Loading twins...</td></tr>
+                <tr>
+                  <td colSpan={7} className="p-0 text-sm text-slate-400">
+                    <div className="min-h-40" />
+                  </td>
+                </tr>
               ) : sortedRows.length === 0 ? (
                 <tr><td colSpan={7} className="px-5 py-12 text-center text-sm text-slate-400">No twins found</td></tr>
               ) : sortedRows.map((twin) => (
-                <tr key={twin.rowKey} className="cursor-pointer border-t border-slate-100 transition hover:bg-slate-50" onClick={() => navigate(`/twins/${twin.id}`)}>
+                <tr key={twin.rowKey} className="cursor-pointer border-t border-slate-100 transition hover:bg-slate-50" onClick={() => navigate(twin.detailRoute)}>
                   <td className="px-4 py-3.5">
                     <div className="flex items-center gap-3">
                       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-violet-100 text-xs font-bold text-violet-600">{getTwinInitials(twin.name)}</span>

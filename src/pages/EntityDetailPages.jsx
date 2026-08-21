@@ -252,6 +252,7 @@ export function ClientDetailPage() {
   const [clientData, setClientData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const requestedTab = searchParams.get('tab');
+  const selectedEnv = searchParams.get('env') || '';
   const clientTabs = ['overview'];
   const initialTab = clientTabs.includes(requestedTab) ? requestedTab : 'overview';
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -275,7 +276,9 @@ export function ClientDetailPage() {
       setIsLoading(true);
       setClientData(null);
       try {
-        const response = await dashboardService.getEntityClientById(clientId);
+        const response = await dashboardService.getEntityClientById(clientId, {
+          env: selectedEnv || undefined,
+        });
         if (!isActive) return;
         const payload = response?.data || response;
         setClientData(payload);
@@ -291,7 +294,7 @@ export function ClientDetailPage() {
     setTabData({ twins: null, users: null, vault: null });
     setTabPages({ twins: 1, users: 1, vault: 1 });
     return () => { isActive = false; };
-  }, [clientId]);
+  }, [clientId, selectedEnv]);
 
   useEffect(() => {
     setActiveTab(initialTab);
@@ -299,7 +302,11 @@ export function ClientDetailPage() {
 
   const selectTab = (tab) => {
     setActiveTab(tab);
-    setSearchParams({ tab });
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.set('tab', tab);
+      return next;
+    });
   };
 
   useEffect(() => {
@@ -312,9 +319,9 @@ export function ClientDetailPage() {
     setTabLoading(activeTab);
 
     const fetchers = {
-      twins: () => dashboardService.getEntityClientTwins(clientId),
-      users: () => dashboardService.getEntityClientUsers(clientId),
-      vault: () => dashboardService.getEntityClientVault(clientId),
+      twins: () => dashboardService.getEntityClientTwins(clientId, { env: selectedEnv || undefined }),
+      users: () => dashboardService.getEntityClientUsers(clientId, { env: selectedEnv || undefined }),
+      vault: () => dashboardService.getEntityClientVault(clientId, { env: selectedEnv || undefined }),
     };
 
     const fetcher = fetchers[activeTab];
@@ -335,7 +342,7 @@ export function ClientDetailPage() {
       });
 
     return () => { isActive = false; };
-  }, [activeTab, clientId, tabData]);
+  }, [activeTab, clientId, selectedEnv, tabData]);
 
   if (isLoading) {
     return (
@@ -650,6 +657,8 @@ export function ClientDetailPage() {
 export function TwinDetailPage() {
   const navigate = useNavigate();
   const { twinId } = useParams();
+  const [searchParams] = useSearchParams();
+  const selectedEnv = searchParams.get('env') || '';
   const [twinData, setTwinData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -659,7 +668,9 @@ export function TwinDetailPage() {
 
     async function load() {
       try {
-        const response = await dashboardService.getEntityTwinById(twinId);
+        const response = await dashboardService.getEntityTwinById(twinId, {
+          env: selectedEnv || undefined,
+        });
         if (!active) return;
         setTwinData(response?.data || response);
       } catch (err) {
@@ -672,21 +683,18 @@ export function TwinDetailPage() {
 
     load();
     return () => { active = false; };
-  }, [twinId]);
+  }, [selectedEnv, twinId]);
 
   if (isLoading) return <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8"><div className="rounded-2xl border border-slate-200 bg-white py-16 text-center text-sm text-slate-400 shadow-panel">Loading twin...</div></section>;
   if (!twinData) return <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8"><div className="rounded-2xl border border-slate-200 bg-white py-16 text-center text-sm text-slate-400 shadow-panel">Twin not found.</div></section>;
 
   const { profile, kpis, usage } = twinData;
   const apiServiceUsageRows = getServiceUsageRows(twinData);
-  const associatedUsers = twinData?.associatedUsers ?? twinData?.users ?? twinData?.associatedUserIds ?? twinData?.userIds ?? twinData?.linkedUsers ?? profile?.associatedUsers ?? profile?.users;
-  const associatedUsersForDisplay = Array.isArray(associatedUsers) ? associatedUsers : [];
-  const associatedUserNames = associatedUsersForDisplay
-    .map((user) => {
-      if (typeof user === 'string') return '';
-      const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim();
-      return user?.name || user?.fullName || user?.profile?.name || fullName || user?.email || '';
-    })
+  const associatedUserNames = (Array.isArray(profile?.associatedUsers)
+    ? profile.associatedUsers
+    : []
+  )
+    .map((user) => user?.name)
     .filter(Boolean)
     .join(', ');
   return (
@@ -712,7 +720,15 @@ export function TwinDetailPage() {
             <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Name</span><strong className="font-semibold text-slate-700">{profile?.name || '-'}</strong></div>
             <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Role</span><strong className="font-semibold text-slate-700">{profile?.role || '-'}</strong></div>
             <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Client</span><strong className="font-semibold text-slate-700">{profile?.clientName || '-'}</strong></div>
-            <div className="flex items-center justify-between gap-6 px-5 py-3 text-xs"><span className="shrink-0 text-slate-400">Associated Users</span><strong className="min-w-0 truncate text-right font-semibold text-slate-700" title={associatedUserNames || undefined}>{associatedUserNames || '---'}</strong></div>
+            <div className="flex items-start justify-between gap-6 px-5 py-3 text-xs">
+              <span className="shrink-0 text-slate-400">Associated Users</span>
+              <strong
+                className="min-w-0 max-w-[70%] text-right font-semibold text-slate-700 break-words"
+                title={associatedUserNames || undefined}
+              >
+                {associatedUserNames || '---'}
+              </strong>
+            </div>
           </div>
         </CardSection>
       </div>
@@ -724,6 +740,8 @@ export function UserDetailPage() {
   const { adminProduct } = useAuth();
   const navigate = useNavigate();
   const { userId } = useParams();
+  const [searchParams] = useSearchParams();
+  const selectedEnv = searchParams.get('env') || '';
   const [userData, setUserData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -745,7 +763,9 @@ export function UserDetailPage() {
             );
 
             try {
-              response = await dashboardService.getEntityUserById(userId);
+              response = await dashboardService.getEntityUserById(userId, {
+                env: selectedEnv || undefined,
+              });
             } catch (sharedError) {
               console.warn(
                 "GET /entities/users/:id failed; finding user in Vault users:",
@@ -776,7 +796,9 @@ export function UserDetailPage() {
             }
           }
         } else {
-          response = await dashboardService.getEntityUserById(userId);
+          response = await dashboardService.getEntityUserById(userId, {
+            env: selectedEnv || undefined,
+          });
         }
 
         if (!active) return;
@@ -834,7 +856,7 @@ export function UserDetailPage() {
     return () => {
       active = false;
     };
-  }, [adminProduct, userId]);
+  }, [adminProduct, selectedEnv, userId]);
 
   if (isLoading) {
     return (

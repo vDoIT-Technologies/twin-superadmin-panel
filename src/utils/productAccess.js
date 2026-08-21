@@ -5,7 +5,7 @@ const PRODUCT_ACCESS = {
   },
   vault: {
     label: 'Vault',
-    paths: ['/', '/profile', '/clients', '/users', '/services', '/vault', '/financial', '/usage', '/telemetry'],
+    paths: ['/', '/profile', '/clients', '/users', '/services', '/vault', '/plans', '/financial', '/usage', '/telemetry'],
   },
 };
 
