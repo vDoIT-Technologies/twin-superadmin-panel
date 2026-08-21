@@ -129,13 +129,18 @@ export function ClientsPage() {
       const rawStatus = client.status ?? client.clientStatus ?? client.state;
       const explicitActive = client.isActive ?? client.active ?? client.enabled;
       const status = normalizeEntityStatus(rawStatus, explicitActive);
+      const id = getClientId(client);
+      const primaryEnv = envs[0] ?? '';
+      const detailRoute = primaryEnv ? `/clients/${id}?env=${encodeURIComponent(primaryEnv)}` : `/clients/${id}`;
 
       return {
-        id: getClientId(client),
-        rowKey: `${getClientId(client) || 'client-row'}-${client.__env || client.env || 'unknown'}-${index}`,
+        id,
+        rowKey: `${id || 'client-row'}-${client.__env || client.env || 'unknown'}-${index}`,
+        detailRoute,
         name,
         plan,
         envs,
+        primaryEnv,
         twins: twinsCount,
         users: usersCount,
         messages,
@@ -372,7 +377,11 @@ export function ClientsPage() {
                 </tr>
               ) : (
                 sortedRows.map((client) => (
-                  <tr key={client.rowKey} className="cursor-pointer border-t border-slate-100 transition hover:bg-slate-50" onClick={() => navigate(`/clients/${client.id}`)}>
+                  <tr
+                    key={client.rowKey}
+                    className="cursor-pointer border-t border-slate-100 transition hover:bg-slate-50"
+                    onClick={() => navigate(client.detailRoute)}
+                  >
                     <td className="px-4 py-3.5 text-left">
                       <div className="flex items-center gap-3">
                         <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-bold ${isVault ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-600'}`}>

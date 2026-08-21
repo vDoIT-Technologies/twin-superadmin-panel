@@ -1,4 +1,4 @@
-import { Activity, Bot, Boxes, Building2, Database, LayoutDashboard, ScrollText, Users, Wallet } from "lucide-react";
+import { Activity, Bot, Boxes, Building2, Database, LayoutDashboard, Package, ScrollText, Users, Wallet } from "lucide-react";
 
 export function BrandMark() {
   return (
@@ -39,6 +39,9 @@ export const NAV_GROUPS_BY_ROLE = {
     { label: 'Entities', items: [
       { to: '/clients', label: 'Clients', icon: Building2 },
       { to: '/users', label: 'Users', icon: Users },
+    ] },
+    { label: 'Plans', items: [
+      { to: '/plans', label: 'Plans', icon: Package },
     ] },
     { label: 'Financials', items: [
       { to: '/financial', label: 'Vault Billing', icon: Wallet },
