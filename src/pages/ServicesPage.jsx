@@ -34,7 +34,29 @@ function StatusBadge({ status, isVault }) {
 
 function formatKeyName(key) {
   if (!key) return '';
+  const stripeKeyLabels = {
+    available: 'Ready to Transfer',
+    instant_available: 'Available Instantly',
+    pending: 'Still Processing',
+  };
+
+  if (stripeKeyLabels[key]) return stripeKeyLabels[key];
   return key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function getServiceDataEntries(service) {
+  if (!service?.data) return [];
+
+  const entries = Object.entries(service.data);
+
+  if (service.key === 'stripe') {
+    const stripeKeyOrder = ['livemode', 'available', 'instant_available', 'pending'];
+    return stripeKeyOrder
+      .map((key) => entries.find(([entryKey]) => entryKey === key))
+      .filter(Boolean);
+  }
+
+  return entries.slice(0, 4);
 }
 
 function formatSimpleValue(v) {
@@ -53,8 +75,7 @@ function formatSimpleValue(v) {
       }
       if ('amount' in first) {
         const currency = (first.currency || 'usd').toUpperCase();
-        const amt = (Number(first.amount || 0) / 100).toLocaleString('en-US', { style: 'currency', currency });
-        return `${amt} ${currency}`;
+        return (Number(first.amount || 0) / 100).toLocaleString('en-US', { style: 'currency', currency });
       }
       if (first.name) return first.name;
       if (first.label) return first.label;
@@ -169,7 +190,7 @@ export function ServicesPage() {
                 ) : null}
                 {service.data ? (
                   <div className="mt-4 space-y-2 border-t border-slate-200 pt-4">
-                    {Object.entries(service.data).slice(0, 4).map(([k, v]) => (
+                    {getServiceDataEntries(service).map(([k, v]) => (
                       <div key={k} className="flex items-start justify-between gap-4 text-sm">
                         <span className="shrink-0 font-medium text-slate-500">{formatKeyName(k)}</span>
                         <strong className="max-w-[65%] break-words text-right font-semibold text-slate-800">

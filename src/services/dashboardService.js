@@ -68,20 +68,36 @@ export const dashboardService = {
     });
     return response.data;
   },
-  async getEntityClientById(clientId) {
-    const response = await api.get(`/api/v1/entities/clients/${clientId}`);
+  async getEntityClientById(clientId, params = {}) {
+    const response = await api.get(`/api/v1/entities/clients/${clientId}`, {
+      params: {
+        env: params.env,
+      },
+    });
     return response.data;
   },
-  async getEntityClientTwins(clientId) {
-    const response = await api.get(`/api/v1/entities/clients/${clientId}/twins`);
+  async getEntityClientTwins(clientId, params = {}) {
+    const response = await api.get(`/api/v1/entities/clients/${clientId}/twins`, {
+      params: {
+        env: params?.env,
+      },
+    });
     return response.data;
   },
-  async getEntityClientUsers(clientId) {
-    const response = await api.get(`/api/v1/entities/clients/${clientId}/users`);
+  async getEntityClientUsers(clientId, params = {}) {
+    const response = await api.get(`/api/v1/entities/clients/${clientId}/users`, {
+      params: {
+        env: params?.env,
+      },
+    });
     return response.data;
   },
-  async getEntityClientVault(clientId) {
-    const response = await api.get(`/api/v1/entities/clients/${clientId}/vault`);
+  async getEntityClientVault(clientId, params = {}) {
+    const response = await api.get(`/api/v1/entities/clients/${clientId}/vault`, {
+      params: {
+        env: params?.env,
+      },
+    });
     return response.data;
   },
 
@@ -101,8 +117,12 @@ export const dashboardService = {
     });
     return response.data;
   },
-  async getEntityTwinById(twinId) {
-    const response = await api.get(`/api/v1/entities/twins/${twinId}`);
+  async getEntityTwinById(twinId, params = {}) {
+    const response = await api.get(`/api/v1/entities/twins/${twinId}`,{
+      params: {
+        env: params?.env,
+      },
+    });
     return response.data;
   },
 
@@ -123,8 +143,12 @@ export const dashboardService = {
     });
     return response.data;
   },
-  async getEntityUserById(userId) {
-    const response = await api.get(`/api/v1/entities/users/${userId}`);
+  async getEntityUserById(userId, params = {}) {
+    const response = await api.get(`/api/v1/entities/users/${userId}`,{
+      params: {
+        env: params?.env,
+      },
+    });
     return response.data;
   },
 
@@ -135,13 +159,17 @@ export const dashboardService = {
     });
     return response.data;
   },
-  async getEntityVaultUserById(userId) {
-    const response = await api.get(`/api/v1/entities/vault-users/${userId}`);
+  async getEntityVaultUserById(userId, params = {}) {
+    const response = await api.get(`/api/v1/entities/vault-users/${userId}`,{
+      params: {
+        env: params?.env,
+      },
+    });
     return response.data;
   },
   async getEntityVaultStats(params = {}) {
     const response = await api.get('/api/v1/entities/vault-stats', {
-      params: { env: params.env },
+      params: { env: params?.env },
     });
     return response.data;
   },

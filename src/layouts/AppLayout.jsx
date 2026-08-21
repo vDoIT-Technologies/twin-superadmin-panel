@@ -33,6 +33,7 @@ const breadcrumbTitles = {
   '/users': 'Users',
   '/services': 'Services',
   '/vault': 'Vault',
+  '/plans': 'Plans',
   '/financial': 'Cost & Billing',
   '/usage': 'Usage Analytics',
   '/telemetry': 'Telemetry / Logs',
@@ -75,7 +76,7 @@ export function AppLayout() {
   const isEntityRoute = ['/clients', '/twins', '/users'].some((route) =>
     location.pathname === route || location.pathname.startsWith(`${route}/`),
   );
-  const isStandalonePage = ['/financial', '/usage', '/telemetry'].some((route) =>
+  const isStandalonePage = ['/plans', '/financial', '/usage', '/telemetry'].some((route) =>
     location.pathname === route || location.pathname.startsWith(`${route}/`),
   );
   const showFilterBar = location.pathname !== '/profile' && !isEntityRoute && !isStandalonePage;

@@ -343,10 +343,12 @@ export function UsersPage() {
         const status = normalizeEntityStatus(rawStatus, explicitActive);
 
         const id = getId(user?._id ?? user?.id) || user?.email || `user-row-${index}`;
+        const detailRoute = env ? `/users/${id}?env=${encodeURIComponent(env)}` : `/users/${id}`;
 
         return {
           id,
           rowKey: `${id}-${env || 'unknown'}-${index}`,
+          detailRoute,
           name: fullName || suppliedName || user?.email || '',
           client: clientName,
           clientId,
@@ -567,7 +569,7 @@ export function UsersPage() {
                 </tr>
               ) : (
                 paginatedRows.map((user) => (
-                  <tr key={user.rowKey} className="cursor-pointer border-t border-slate-100 transition hover:bg-slate-50" onClick={() => navigate(`/users/${user.id}`)}>
+                  <tr key={user.rowKey} className="cursor-pointer border-t border-slate-100 transition hover:bg-slate-50" onClick={() => navigate(user.detailRoute)}>
                     <td className="px-4 py-3.5">
                       <div className="flex min-w-0 items-center gap-3">
                         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-amber-100 text-xs font-bold text-amber-600">{getUserInitials(user.name || '?')}</span>
