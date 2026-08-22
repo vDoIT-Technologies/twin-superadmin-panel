@@ -2,6 +2,7 @@ import { useContext, useEffect, useMemo, useState } from 'react';
 import { AlertCircle, Bot, Database, Gauge, Package, RefreshCw, TrendingUp, Users } from 'lucide-react';
 import { TopUsersTable } from '../components/vault/TopUsersTable';
 import { FilterContext } from '../app/FilterContext';
+import { FilterDropdown } from '../components/common/FilterDropdown';
 import { StorageByClientCard } from '../components/vault/StorageByClientCard';
 import { VaultQuotaCard } from '../components/vault/VaultQuotaCard';
 import { dashboardService, getFilebaseTopUsers, getStorageByClient, getStorageUsage } from '../services';
@@ -17,7 +18,7 @@ import {
 } from '../utils/vaultFormatters';
 
 export function VaultPage() {
-  const { filters } = useContext(FilterContext);
+  const { filters, setFilters } = useContext(FilterContext);
   const [stats, setStats] = useState(null);
   const [filebaseQuota, setFilebaseQuota] = useState(null);
   const [storageClients, setStorageClients] = useState([]);
@@ -27,28 +28,24 @@ export function VaultPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [sortConfig, setSortConfig] = useState({ key: 'storage', direction: 'desc' });
 
+  const vaultRequestParams = useMemo(() => (
+    filters.envs.length === 1
+      ? { env: filters.envs[0] }
+      : {}
+  ), [filters.envs]);
+
   useEffect(() => {
     let active = true;
     setIsLoading(true);
     setLoadError(false);
 
     async function load() {
-      const env = filters.envs.length === 1 ? filters.envs[0] : undefined;
-      const params = {
-        env,
-        clientId: filters.client || undefined,
-        userId: filters.user || undefined,
-        range: filters.range,
-        granularity: filters.gran,
-        lens: filters.lens,
-        compare: filters.compare || undefined,
-      };
       const [statsResult, usersResult, quotaResult, clientsResult] =
         await Promise.allSettled([
-          dashboardService.getEntityVaultStats(params),
-          getFilebaseTopUsers(params),
-          getStorageUsage(params),
-          getStorageByClient(params),
+          dashboardService.getEntityVaultStats(vaultRequestParams),
+          getFilebaseTopUsers(vaultRequestParams),
+          getStorageUsage(vaultRequestParams),
+          getStorageByClient(vaultRequestParams),
         ]);
 
       if (!active) return;
@@ -71,7 +68,7 @@ export function VaultPage() {
       }
 
       if (quotaResult.status === 'fulfilled') {
-        setFilebaseQuota(normalizeStorageUsage(quotaResult.value));
+        setFilebaseQuota(quotaResult.value);
       } else {
         console.error('Storage usage load failed:', quotaResult.reason);
       }
@@ -87,68 +84,30 @@ export function VaultPage() {
 
     load();
     return () => { active = false; };
-  }, [filters.client, filters.compare, filters.envs, filters.gran, filters.lens, filters.range, filters.user, reloadKey]);
+  }, [reloadKey, vaultRequestParams]);
 
   const kpis = stats?.kpis || {};
-  const scopedStorageClients = useMemo(
-    () => filters.client ? storageClients.filter((client) => String(client.id) === String(filters.client)) : storageClients,
-    [filters.client, storageClients],
-  );
-  const scopedTopUsers = useMemo(
-    () => filters.client ? topUsers.filter((user) => String(user.clientId) === String(filters.client)) : topUsers,
-    [filters.client, topUsers],
-  );
-  const sortedUsers = sortTopUsers(scopedTopUsers, sortConfig);
+  const sortedUsers = sortTopUsers(topUsers, sortConfig);
 
   const toggleSort = (key) => {
     setSortConfig((prev) => prev.key === key
       ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' }
       : { key, direction: key === 'user' ? 'asc' : 'desc' });
   };
-
-  const storageUsed =
-    filebaseQuota?.totalUsage ??
-    firstNumber(kpis.storedOnIpfsBytes) ??
-    0;
-  const storageLimit =
-    filebaseQuota?.totalQuota ??
-    firstNumber(kpis.storageLimitBytes) ??
-    0;
-  const quotaPercent =
-    filebaseQuota?.usagePercent ??
-    firstNumber(kpis.quotaPercent) ??
-    0;
+  const storageUsed = kpis.storedOnIpfsGB ?? 0;
+  const storageLimit = kpis.storageLimitGB ?? 0;
+  const quotaPercent = filebaseQuota?.data?.percentage ?? 0;
   const activeDrives = Number(kpis.activeDrives || 0);
   const totalFiles = Number(kpis.totalFiles || 0);
   const totalBots = firstNumber(kpis.totalBots, kpis.bots, stats?.totalBots, stats?.bots) ?? 0;
-  const modeCopy = {
-    cost: {
-      title: 'Vault Overview',
-      description: 'Storage health, capacity, files, and active drives across the Vault platform',
-    },
-    usage: {
-      title: 'Vault Usage',
-      description: 'Client and user storage consumption for the selected period',
-    },
-    economy: {
-      title: 'Vault Economy',
-      description: 'Capacity efficiency, quota utilization, and storage unit metrics',
-    },
-  }[filters.lens] || {};
-
-  const overviewMetrics = filters.lens === 'economy'
-    ? [
-      { label: 'Quota utilization', value: `${Number(quotaPercent || 0).toFixed(1)}%`, icon: Gauge, tone: 'indigo' },
-      { label: 'Available capacity', value: formatBytes(Math.max(0, storageLimit - storageUsed)), icon: Database, tone: 'sky' },
-      { label: 'Storage per active drive', value: formatBytes(activeDrives ? storageUsed / activeDrives : 0), icon: TrendingUp, tone: 'violet' },
-      { label: 'Files per active drive', value: formatNumber(activeDrives ? totalFiles / activeDrives : 0), icon: Package, tone: 'rose' },
-    ]
-    : [
-      { label: 'Stored on IPFS', value: formatBytes(storageUsed), icon: Database, tone: 'indigo' },
-      { label: 'Total bots', value: formatNumber(totalBots), icon: Bot, tone: 'sky' },
-      { label: 'Total files', value: formatNumber(totalFiles), icon: Package, tone: 'violet' },
-      { label: 'Active drives · users', value: String(activeDrives), icon: Users, tone: 'rose' },
-    ];
+  const overviewMetrics = [
+    { label: 'Stored on IPFS', value: `${storageUsed} GB`, icon: Database, tone: 'indigo' },
+    { label: 'Total bots', value: formatNumber(totalBots), icon: Bot, tone: 'sky' },
+    { label: 'Total files', value: formatNumber(totalFiles), icon: Package, tone: 'violet' },
+    { label: 'Active drives · users', value: String(activeDrives), icon: Users, tone: 'rose' },
+    { label: 'Quota utilization', value: `${Number(quotaPercent || 0).toFixed(1)}%`, icon: Gauge, tone: 'indigo' },
+    { label: 'Available capacity', value: `${formatNumber(Math.max(0, storageLimit - storageUsed))} GB`, icon: Database, tone: 'sky' },
+  ];
 
   if (isLoading) {
     return (
@@ -182,13 +141,26 @@ export function VaultPage() {
   return (
     <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       <header>
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">{modeCopy.title}</h1>
-          <p className="mt-1 text-sm text-slate-400 sm:text-base">{modeCopy.description}</p>
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">Vault Overview</h1>
+            <p className="mt-1 text-sm text-slate-400 sm:text-base">Storage health, capacity, files, active drives, and top users across the Vault platform.</p>
+          </div>
+          <div className="w-full xl:w-64">
+            <FilterDropdown
+              value={filters.envs.length === 1 ? filters.envs[0] : null}
+              onChange={(value) => setFilters((current) => ({ ...current, envs: value ? [value] : ['dev', 'staging', 'prod'] }))}
+              options={[{ value: 'dev', label: 'Development' }, { value: 'staging', label: 'Staging' }, { value: 'prod', label: 'Production' }]}
+              placeholder="All environments"
+              searchPlaceholder="Search environment..."
+              searchable={false}
+              tone="vault"
+            />
+          </div>
         </div>
       </header>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {overviewMetrics.map((metric) => {
           const Icon = metric.icon;
           return (
@@ -205,23 +177,19 @@ export function VaultPage() {
         })}
       </div>
 
-      {filters.lens !== 'usage' ? <div className="grid gap-4 xl:grid-cols-3">
-        <VaultQuotaCard percentage={quotaPercent} storageUsed={storageUsed} storageLimit={storageLimit} />
-        <StorageByClientCard clients={scopedStorageClients} />
-      </div> : null}
+      <div className="grid gap-4 xl:grid-cols-3">
+        <VaultQuotaCard percentage={filebaseQuota?.data?.percentage} storageUsed={filebaseQuota?.data?.usedGB ?? 0} storageLimit={filebaseQuota?.quotaTB ?? 0} />
+        <StorageByClientCard clients={storageClients} />
+      </div>
 
-      {filters.lens === 'usage' ? <div className="grid gap-4 xl:grid-cols-3">
-        <StorageByClientCard clients={scopedStorageClients} />
-      </div> : null}
-
-      {filters.lens !== 'economy' ? <div>
+      <div>
         <TopUsersTable
           users={sortedUsers}
           sortConfig={sortConfig}
           onSort={toggleSort}
           onExport={() => exportTopUsersCsv(sortedUsers)}
         />
-      </div> : null}
+      </div>
     </section>
   );
 }

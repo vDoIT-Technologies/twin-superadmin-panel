@@ -47,6 +47,15 @@ export function ClientsPage() {
     totalPages: 1,
   });
   const previousScopeRef = useRef('');
+  const clientTableColumns = useMemo(() => [
+    ["client", "Client"],
+    ["env", "Env"],
+    ...(!isVault ? [["status", "Status"]] : []),
+    ...(!isVault ? [["twins", "Twins"]] : []),
+    ["users", "Users"],
+    ["cost", "Cost"],
+    ["revenue", "Revenue"],
+  ], [isVault]);
 
   const updateTableFilter = (key, value) => {
     setPage(1);
@@ -57,11 +66,16 @@ export function ClientsPage() {
   };
 
   useEffect(() => {
+    if (!isVault || !filters.status) return;
+    setFilters((current) => ({ ...current, status: null }));
+  }, [filters.status, isVault, setFilters]);
+
+  useEffect(() => {
     let isActive = true;
     const scopeKey = JSON.stringify({
       envs: filters.envs,
       range: filters.entityRange,
-      status: filters.status,
+      status: isVault ? null : filters.status,
     });
     const scopeChanged = previousScopeRef.current !== scopeKey;
     previousScopeRef.current = scopeKey;
@@ -77,7 +91,7 @@ export function ClientsPage() {
           page: requestedPage,
           limit: PAGE_SIZE,
           env: filters.envs.length === 1 ? filters.envs[0] : undefined,
-          status: filters.status || undefined,
+          status: isVault ? undefined : filters.status || undefined,
           ...getEntityFilterParams(filters.entityRange),
         });
 
@@ -105,7 +119,7 @@ export function ClientsPage() {
     return () => {
       isActive = false;
     };
-  }, [filters.entityRange, filters.envs, filters.status, page]);
+  }, [filters.entityRange, filters.envs, filters.status, isVault, page]);
 
   const clientRows = useMemo(() => {
     return apiClients.map((client, index) => {
@@ -157,12 +171,12 @@ export function ClientsPage() {
   const filteredRows = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return clientRows.filter((client) => {
-      const matchesStatus = !filters.status || client.status === filters.status;
+      const matchesStatus = isVault || !filters.status || client.status === filters.status;
       const matchesQuery = !normalizedQuery || [client.name, client.plan, ...client.envs]
         .some((value) => String(value ?? '').toLowerCase().includes(normalizedQuery));
       return matchesStatus && matchesQuery;
     });
-  }, [clientRows, filters.status, query]);
+  }, [clientRows, filters.status, isVault, query]);
 
   const sortedRows = useMemo(() => {
     const getSortValue = (client) => {
@@ -235,8 +249,8 @@ export function ClientsPage() {
     const header = [
       "Client",
       "Env",
-      "Status",
-      "Twins",
+      ...(!isVault ? ["Status"] : []),
+      ...(!isVault ? ["Twins"] : []),
       "Users",
       "Cost",
       "Revenue",
@@ -245,8 +259,8 @@ export function ClientsPage() {
       [
         client.name,
         client.envs.join(" | "),
-        client.status === 'active' ? 'Active' : client.status === 'inactive' ? 'Inactive' : '---',
-        client.twins,
+        ...(!isVault ? [client.status === 'active' ? 'Active' : client.status === 'inactive' ? 'Inactive' : '---'] : []),
+        ...(!isVault ? [client.twins] : []),
         client.users,
         formatOptionalCurrency(client.cost),
         formatOptionalCurrency(client.revenue),
@@ -291,14 +305,16 @@ export function ClientsPage() {
               searchable={false}
               tone={isVault ? 'vault' : 'twin'}
             />
-              <FilterDropdown
-                value={filters.status}
-                onChange={(value) => updateTableFilter('status', value)}
-                options={[{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]}
-                placeholder="All Status"
-                searchable={false}
-                tone={isVault ? 'vault' : 'twin'}
-              />
+              {!isVault ? (
+                <FilterDropdown
+                  value={filters.status}
+                  onChange={(value) => updateTableFilter('status', value)}
+                  options={[{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]}
+                  placeholder="All Status"
+                  searchable={false}
+                  tone="twin"
+                />
+              ) : null}
               <FilterDropdown
                 value={filters.entityRange === 'all' ? null : filters.entityRange}
                 onChange={(value) => updateTableFilter('entityRange', value || 'all')}
@@ -329,18 +345,10 @@ export function ClientsPage() {
 
         <div className="relative">
           <div className="max-h-[65vh] overflow-auto">
-          <table key="clients-seven-column-layout" className="w-full min-w-[960px] border-collapse text-sm [&_td]:!text-left [&_td>div]:justify-start [&_th]:!text-left">
+          <table key={isVault ? "clients-vault-layout" : "clients-twin-layout"} className="w-full min-w-[960px] border-collapse text-sm [&_td]:!text-left [&_td>div]:justify-start [&_th]:!text-left">
             <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_0_0_rgba(226,232,240,1)]">
               <tr>
-                {[
-                  ["client", "Client"],
-                  ["env", "Env"],
-                  ["status", "Status"],
-                  ["twins", "Twins"],
-                  ["users", "Users"],
-                  ["cost", "Cost"],
-                  ["revenue", "Revenue"],
-                ].map(([key, label]) => (
+                {clientTableColumns.map(([key, label]) => (
                   <th key={key} className={`px-4 py-4 text-xs font-bold uppercase tracking-wide text-slate-400 ${key === 'client' ? 'text-left' : key === 'env' ? 'text-center' : 'text-right'}`}>
                     <button
                       type="button"
@@ -365,13 +373,13 @@ export function ClientsPage() {
             <tbody>
               {isTableLoading ? (
                 <tr>
-                  <td colSpan={7} className="p-0 text-sm text-slate-400">
+                  <td colSpan={clientTableColumns.length} className="p-0 text-sm text-slate-400">
                     <div className="min-h-40" />
                   </td>
                 </tr>
               ) : sortedRows.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center text-sm text-slate-400">
+                  <td colSpan={clientTableColumns.length} className="px-5 py-12 text-center text-sm text-slate-400">
                     No clients found
                   </td>
                 </tr>
@@ -402,14 +410,16 @@ export function ClientsPage() {
                         ))}
                       </div>
                     </td>
-                    <td className="px-4 py-3.5 text-slate-500">
-                      {client.status ? (
-                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${client.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                          {client.status === 'active' ? 'Active' : 'Inactive'}
-                        </span>
-                      ) : '---'}
-                    </td>
-                    <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(client.twins)}</td>
+                    {!isVault ? (
+                      <td className="px-4 py-3.5 text-slate-500">
+                        {client.status ? (
+                          <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${client.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                            {client.status === 'active' ? 'Active' : 'Inactive'}
+                          </span>
+                        ) : '---'}
+                      </td>
+                    ) : null}
+                    {!isVault ? <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(client.twins)}</td> : null}
                     <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(client.users)}</td>
                     <td className="px-4 py-3.5 text-right tabular-nums">{formatOptionalCurrency(client.cost)}</td>
                     <td className="px-4 py-3.5 text-right tabular-nums">{formatOptionalCurrency(client.revenue)}</td>

@@ -107,9 +107,10 @@ export function normalizeTopUser(user) {
     clientId: user.clientId ?? client?.id ?? client?._id ?? null,
     name: user.name?.trim() || user.userName?.trim() || user.email || 'Unknown user',
     email: user.email ?? '',
-    client: typeof clientName === 'string' ? clientName.trim() : clientName,
+    client: typeof clientName === 'string' && clientName != 'Unassigned' ? clientName.trim() : '---',
     env: rawEnv === 'development' ? 'dev' : rawEnv === 'production' ? 'prod' : rawEnv,
     storageBytes: getTopUserStorageBytes(user),
+    storageMB: user.storageMB ?? 0,
     files: firstNumber(user.files, user.fileCount, user.filesCount, user.totalFiles, user.twinPoints) ?? 0,
     lastActive: user.lastActive ?? user.lastActiveAt ?? user.lastActiveDate ?? user.updatedAt,
   };

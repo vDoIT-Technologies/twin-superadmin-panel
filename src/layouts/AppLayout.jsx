@@ -79,7 +79,7 @@ export function AppLayout() {
   const isStandalonePage = ['/plans', '/financial', '/usage', '/telemetry'].some((route) =>
     location.pathname === route || location.pathname.startsWith(`${route}/`),
   );
-  const showFilterBar = location.pathname !== '/profile' && !isEntityRoute && !isStandalonePage;
+  const showFilterBar = location.pathname !== '/profile' && location.pathname !== '/vault' && !isEntityRoute && !isStandalonePage;
   const showOverviewControls = location.pathname === '/';
   const visibleScopes = ['granularity', 'client', 'twin', 'user', 'service', 'vendor'];
   const baseTitle =
@@ -139,7 +139,7 @@ export function AppLayout() {
   }, [adminProduct, filters.service, filters.twin, filters.vendor]);
 
   useEffect(() => {
-    if (!isAuthenticated || !dropdownApiAvailable()) {
+    if (!isAuthenticated || !dropdownApiAvailable() || !showFilterBar) {
       return undefined;
     }
 
@@ -157,10 +157,10 @@ export function AppLayout() {
     return () => {
       active = false;
     };
-  }, [isAuthenticated, selectedEnv]);
+  }, [isAuthenticated, selectedEnv, showFilterBar]);
 
   useEffect(() => {
-    if (!isAuthenticated || !dropdownApiAvailable()) {
+    if (!isAuthenticated || !dropdownApiAvailable() || !showFilterBar) {
       return undefined;
     }
 
@@ -181,10 +181,10 @@ export function AppLayout() {
     return () => {
       active = false;
     };
-  }, [filters.client, isAuthenticated, selectedEnv]);
+  }, [filters.client, isAuthenticated, selectedEnv, showFilterBar]);
 
   useEffect(() => {
-    if (!isAuthenticated || !dropdownApiAvailable()) {
+    if (!isAuthenticated || !dropdownApiAvailable() || !showFilterBar) {
       return undefined;
     }
 
@@ -206,10 +206,10 @@ export function AppLayout() {
     return () => {
       active = false;
     };
-  }, [filters.client, filters.twin, isAuthenticated, selectedEnv]);
+  }, [filters.client, filters.twin, isAuthenticated, selectedEnv, showFilterBar]);
 
   useEffect(() => {
-    if (!isAuthenticated) return undefined;
+    if (!isAuthenticated || !showFilterBar) return undefined;
     let active = true;
     const labels = {
       openai: 'OpenAI',
@@ -250,7 +250,7 @@ export function AppLayout() {
       });
 
     return () => { active = false; };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, showFilterBar]);
   const clientDropdownOptions = useMemo(
     () =>
       clients.map((client) => ({
