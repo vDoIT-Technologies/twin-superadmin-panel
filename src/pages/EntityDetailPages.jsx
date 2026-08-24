@@ -744,6 +744,7 @@ export function UserDetailPage() {
   const selectedEnv = searchParams.get('env') || '';
   const [userData, setUserData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isBotsModalOpen, setIsBotsModalOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -879,9 +880,23 @@ export function UserDetailPage() {
   }
 
   const { profile, kpis, revenue, usage } = userData;
+  const isVault = adminProduct === 'vault';
 
   const totalServiceCost = firstDecimal(kpis?.cost, usage?.totals?.cost);
+  const openAiCost = firstDecimal(
+    usage?.openaiCost,
+    usage?.openAICost,
+    kpis?.openaiCost,
+    userData?.openaiCost,
+  );
+  const elevenLabsCost = firstDecimal(
+    usage?.elevenlabsCost,
+    usage?.elevenLabsCost,
+    kpis?.elevenlabsCost,
+    userData?.elevenlabsCost,
+  );
 
+  const primaryPackage = profile?.packageDetails?.vaultPackage ?? profile?.packageDetails?.twinPackage ?? null;
   const twinPackage = profile?.packageDetails?.twinPackage || null;
 
   const subscriptionPackages = Array.isArray(
@@ -898,11 +913,65 @@ export function UserDetailPage() {
     : Array.isArray(associatedTwinsValue?.items)
       ? associatedTwinsValue.items
       : [];
+  const botsCount = firstDecimal(
+    userData?.botsCount,
+    profile?.botsCount,
+    kpis?.botsCount,
+  );
+  const associatedBotsValue =
+    userData?.bots ?? profile?.bots ?? profile?.associatedBots ?? userData?.botDetails ?? [];
+  const bots = Array.isArray(associatedBotsValue)
+    ? associatedBotsValue
+    : Array.isArray(associatedBotsValue?.items)
+      ? associatedBotsValue.items
+      : [];
+  const displayedBotsCount = botsCount ?? bots.length;
+  const revenueValue = firstDecimal(
+    revenue?.totalAmount,
+    revenue,
+    kpis?.revenue,
+    userData?.totalRevenue,
+  );
 
   const getTwinName = (twin) => {
     if (!twin || typeof twin === "string") return "";
 
     return twin.name ?? twin.twinName ?? twin.label ?? twin.profile?.name ?? "";
+  };
+
+  const getBotName = (bot) => {
+    if (!bot || typeof bot === 'string') return bot || '';
+    return bot.name ?? bot.botName ?? bot.label ?? bot.title ?? '';
+  };
+
+  const getBotDetail = (bot) => {
+    if (!bot || typeof bot === 'string') return '';
+    return [bot.profession ?? bot.type ?? bot.botType ?? bot.role, bot.status]
+      .filter(Boolean)
+      .join(' · ');
+  };
+
+  const formatBotCreatedAt = (bot) => {
+    const createdAt = bot?.createdAt;
+    if (!createdAt) return '';
+    const date = new Date(createdAt);
+    return Number.isNaN(date.getTime())
+      ? ''
+      : date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  };
+
+  const formatPackageDate = (value) => {
+    if (!value) return 'Not provided';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime())
+      ? 'Not provided'
+      : date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  };
+
+  const formatStorageAllowance = (storageGB) => {
+    const value = Number(storageGB);
+    if (!Number.isFinite(value)) return 'Not provided';
+    return value >= 1024 && value % 1024 === 0 ? `${value / 1024} TB` : `${formatNumber(value)} GB`;
   };
 
   return (
@@ -933,7 +1002,7 @@ export function UserDetailPage() {
         <MetricCard
           icon={TrendingUp}
           label="Revenue"
-          value={formatCurrencyUpToTwoDecimals(revenue?.totalAmount)}
+          value={isVault ? (revenueValue == null ? '---' : formatCurrencyUpToTwoDecimals(revenueValue)) : formatCurrencyUpToTwoDecimals(revenue?.totalAmount)}
           tone="emerald"
         />
 
@@ -954,7 +1023,7 @@ export function UserDetailPage() {
         />
       </div>
 
-      {/* User Info + Twins */}
+      {/* User Info + linked product usage */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <CardSection title="User Info" flush>
           <div className="divide-y divide-slate-100">
@@ -984,85 +1053,206 @@ export function UserDetailPage() {
           </div>
         </CardSection>
 
-        <CardSection
-          title="Twins Used"
-          subtitle={`${twins?.length || 0} linked twins`}
-          flush
+        {isVault ? (
+          <CardSection
+            title="Bots Used"
+            subtitle="Usage across this Vault account"
+            flush
+          >
+            <div className="flex items-center justify-between gap-4 px-5 py-5">
+              <div className="flex min-w-0 items-center gap-3.5">
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-sky-50 text-sky-600 ring-1 ring-inset ring-sky-100">
+                  <Bot size={19} strokeWidth={2.25} />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-slate-500">Total bots used</p>
+                  <strong className="mt-0.5 block text-2xl font-bold tracking-tight text-slate-900">
+                    {formatOptionalNumber(displayedBotsCount)}
+                  </strong>
+                </div>
+              </div>
+              <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-500">
+                Vault
+              </span>
+            </div>
+            {bots.length ? (
+              <div className="border-t border-slate-100 px-5 py-3">
+                <button
+                  type="button"
+                  onClick={() => setIsBotsModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-sky-700 transition hover:text-sky-800"
+                >
+                  View {formatNumber(bots.length)} bots
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            ) : displayedBotsCount === 0 ? (
+              <div className="flex items-center gap-3 border-t border-slate-100 px-5 py-4">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-slate-50 text-slate-400">
+                  <Bot size={16} />
+                </span>
+                <div>
+                  <p className="text-sm font-semibold text-slate-600">No bots used yet</p>
+                  <p className="mt-0.5 text-xs text-slate-400">This user has not used any Vault bots.</p>
+                </div>
+              </div>
+            ) : botsCount == null ? (
+              <p className="border-t border-slate-100 px-5 py-3 text-xs text-slate-400">Bot usage is unavailable.</p>
+            ) : (
+              <p className="border-t border-slate-100 px-5 py-3 text-xs text-slate-400">Individual bot details are currently unavailable.</p>
+            )}
+          </CardSection>
+        ) : (
+          <CardSection
+            title="Twins Used"
+            subtitle={`${twins?.length || 0} linked twins`}
+            flush
+          >
+            {twins?.length ? (
+              <div>
+                {twins.map((twin) => (
+                  <EntityListRow
+                    key={twin._id ?? twin.id ?? twin.twinId ?? twin.name}
+                    avatarClassName="twin"
+                    initials={getInitials(getTwinName(twin))}
+                    title={getTwinName(twin) || "Name unavailable"}
+                    subtitle={twin.role || ""}
+                    onClick={() =>
+                      navigate(`/twins/${twin._id ?? twin.id ?? twin.twinId}`)
+                    }
+                  />
+                ))}
+              </div>
+            ) : (
+              <EmptyDetailState message="No twins used." />
+            )}
+          </CardSection>
+        )}
+      </div>
+
+      {isVault && isBotsModalOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm"
+          role="presentation"
+          onMouseDown={() => setIsBotsModalOpen(false)}
         >
-          {twins?.length ? (
-            <div>
-              {twins.map((twin) => (
-                <EntityListRow
-                  key={twin._id ?? twin.id ?? twin.twinId ?? twin.name}
-                  avatarClassName="twin"
-                  initials={getInitials(getTwinName(twin))}
-                  title={getTwinName(twin) || "Name unavailable"}
-                  subtitle={twin.role || ""}
-                  onClick={() =>
-                    navigate(`/twins/${twin._id ?? twin.id ?? twin.twinId}`)
-                  }
-                />
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="bots-modal-title"
+            className="flex max-h-[80vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header className="flex items-start justify-between border-b border-slate-100 px-5 py-4">
+              <div>
+                <h2 id="bots-modal-title" className="text-lg font-bold tracking-tight text-slate-900">Bots Used</h2>
+                <p className="mt-0.5 text-sm text-slate-500">{formatNumber(bots.length)} bots associated with this Vault user</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsBotsModalOpen(false)}
+                className="grid h-8 w-8 place-items-center rounded-lg text-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                aria-label="Close bots dialog"
+              >
+                ×
+              </button>
+            </header>
+            <div className="overflow-y-auto px-5 py-2">
+              {bots.map((bot, index) => (
+                <div key={bot?._id ?? bot?.id ?? bot?.botId ?? `${getBotName(bot)}-${index}`} className="flex items-center gap-3 border-b border-slate-100 py-3.5 last:border-b-0">
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-sky-50 text-sky-600">
+                    <Bot size={16} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <strong className="block truncate text-sm font-semibold text-slate-800">{getBotName(bot) || 'Unnamed bot'}</strong>
+                    {getBotDetail(bot) ? <span className="mt-0.5 block truncate text-xs text-slate-500">{getBotDetail(bot)}</span> : null}
+                  </div>
+                  {formatBotCreatedAt(bot) ? <span className="shrink-0 text-xs text-slate-400">Created {formatBotCreatedAt(bot)}</span> : null}
+                </div>
               ))}
             </div>
-          ) : (
-            <EmptyDetailState message="No twins used." />
-          )}
-        </CardSection>
-      </div>
+          </section>
+        </div>
+      ) : null}
 
       {/* Packages + All-service usage */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* Packages */}
+        {isVault ? (
         <CardSection title="Packages" flush>
-          {twinPackage || subscriptionPackages.length ? (
+          {primaryPackage || subscriptionPackages.length ? (
             <div className="divide-y divide-slate-100">
-              {/* Twin Package */}
-              {twinPackage && (
+              {primaryPackage ? (
                 <div className="flex items-center justify-between gap-4 px-5 py-3">
                   <div className="min-w-0">
-                    <div className="text-xs font-semibold text-slate-700">
-                      {twinPackage.packagename || "---"}
+                    <div className="truncate text-xs font-semibold text-slate-700">{primaryPackage.planName ?? primaryPackage.packagename ?? 'Vault package'}</div>
+                    <div className="mt-0.5 text-[11px] text-slate-400">Vault package</div>
+                  </div>
+                  <strong className="shrink-0 text-xs font-semibold tabular-nums text-slate-700">{primaryPackage.price != null ? `$${formatNumber(primaryPackage.price)}` : '---'}</strong>
+                </div>
+              ) : null}
+              {subscriptionPackages.map((pkg, index) => {
+                const status = pkg?.status ?? 'unknown';
+                const isActive = String(status).toLowerCase() === 'active';
+                return (
+                  <div key={pkg?.id ?? `${pkg?.planName ?? pkg?.packagename ?? 'package'}-${index}`} className="flex items-center justify-between gap-4 px-5 py-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-xs font-semibold text-slate-700">{pkg?.planName ?? pkg?.packagename ?? 'Unnamed subscription'}</div>
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-600">Storage package</span>
+                        {pkg?.currentPeriodEnd ? <span className="text-[11px] text-slate-400">Ends on {formatPackageDate(pkg.currentPeriodEnd)}</span> : null}
+                      </div>
                     </div>
-
-                    <div className="mt-0.5 text-[11px] text-slate-400">
-                      Twin Package
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{String(status).charAt(0).toUpperCase() + String(status).slice(1)}</span>
+                      <strong className="text-xs font-semibold tabular-nums text-slate-700">{pkg?.price != null ? `$${formatNumber(pkg.price)}` : '---'}</strong>
                     </div>
                   </div>
-
-                  <strong className="shrink-0 text-xs font-semibold tabular-nums text-slate-700">
-                    {twinPackage.price != null
-                      ? `$${twinPackage.price}`
-                      : "---"}
-                  </strong>
-                </div>
-              )}
-
-              {/* Subscription Packages */}
-              {subscriptionPackages.map((pkg, index) => (
-                <div
-                  key={`${pkg?.packagename || "package"}-${index}`}
-                  className="flex items-center justify-between gap-4 px-5 py-3"
-                >
-                  <div className="min-w-0">
-                    <div className="truncate text-xs font-semibold text-slate-700">
-                      {pkg?.packagename || "---"}
-                    </div>
-
-                    <div className="mt-0.5 text-[11px] text-slate-400">
-                      {pkg?.validity || "Subscription"}
-                    </div>
-                  </div>
-
-                  <strong className="shrink-0 text-xs font-semibold tabular-nums text-slate-700">
-                    {pkg?.price != null ? `$${pkg.price}` : "---"}
-                  </strong>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
-            <EmptyDetailState message="No packages assigned." />
+            <div className="flex min-h-36 items-center justify-center px-5 py-8">
+              <div className="flex items-center gap-3.5 text-left">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-50 text-slate-400">
+                  <BookOpen size={18} />
+                </span>
+                <div>
+                  <p className="text-sm font-semibold text-slate-600">No packages assigned</p>
+                  <p className="mt-0.5 text-xs text-slate-400">This user does not have an active Vault package or subscription.</p>
+                </div>
+              </div>
+            </div>
           )}
         </CardSection>
+        ) : (
+          <CardSection title="Packages" flush>
+            {twinPackage || subscriptionPackages.length ? (
+              <div className="divide-y divide-slate-100">
+                {twinPackage ? (
+                  <div className="flex items-center justify-between gap-4 px-5 py-3">
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold text-slate-700">{twinPackage.packagename || '---'}</div>
+                      <div className="mt-0.5 text-[11px] text-slate-400">Twin Package</div>
+                    </div>
+                    <strong className="shrink-0 text-xs font-semibold tabular-nums text-slate-700">{twinPackage.price != null ? `$${twinPackage.price}` : '---'}</strong>
+                  </div>
+                ) : null}
+                {subscriptionPackages.map((pkg, index) => (
+                  <div key={`${pkg?.packagename || 'package'}-${index}`} className="flex items-center justify-between gap-4 px-5 py-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-xs font-semibold text-slate-700">{pkg?.packagename || '---'}</div>
+                      <div className="mt-0.5 text-[11px] text-slate-400">{pkg?.validity || 'Subscription'}</div>
+                    </div>
+                    <strong className="shrink-0 text-xs font-semibold tabular-nums text-slate-700">{pkg?.price != null ? `$${pkg.price}` : '---'}</strong>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <EmptyDetailState message="No packages assigned." />
+            )}
+          </CardSection>
+        )}
 
         {/* All-service usage & cost */}
         <CardSection title="All-service usage & cost" flush>
@@ -1075,14 +1265,18 @@ export function UserDetailPage() {
               <span className="w-20 text-right">Cost</span>
             </div>
 
-            <ServiceUsageRow
-              label="OpenAI"
-              cost={kpis?.cost ?? usage?.totals?.cost ?? 0}
-            />
-
-            <ServiceUsageRow label="ElevenLabs" cost={0} />
-
-            <ServiceUsageRow label="D-ID" cost={0} />
+            {isVault ? (
+              <>
+                <ServiceUsageRow label="OpenAI" cost={openAiCost ?? kpis?.cost ?? usage?.totals?.cost ?? 0} />
+                <ServiceUsageRow label="ElevenLabs" cost={elevenLabsCost ?? 0} />
+              </>
+            ) : (
+              <>
+                <ServiceUsageRow label="OpenAI" cost={kpis?.cost ?? usage?.totals?.cost ?? 0} />
+                <ServiceUsageRow label="ElevenLabs" cost={0} />
+                <ServiceUsageRow label="D-ID" cost={0} />
+              </>
+            )}
 
             <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-4 bg-slate-50/70 px-5 py-3 text-xs whitespace-nowrap">
               <span className="font-semibold text-slate-500 whitespace-nowrap">

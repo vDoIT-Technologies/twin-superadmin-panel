@@ -201,6 +201,8 @@ export function UsersPage() {
           ...getEntityFilterParams(filters.entityRange),
         });
 
+        console.log('GET /api/v1/entities/users response:', data);
+
         if (!isActive) {
           return;
         }
@@ -303,12 +305,16 @@ export function UsersPage() {
     setPage(1);
   }, [filters.client, filters.entityRange, filters.envs]);
 
-  const userRows = useMemo(() => {
-    return apiUsers
+    const userRows = useMemo(() => {
+    console.log("API", apiUsers);
+      
+      return apiUsers
+          
       .map((user, index) => {
         const userKey = getId(user?._id ?? user?.id ?? user?.userId);
         const emailKey = typeof user?.email === 'string' ? user.email.toLowerCase() : '';
-        const enrichment = userEnrichmentByKey[userKey] ?? userEnrichmentByKey[emailKey] ?? {};
+          const enrichment = userEnrichmentByKey[userKey] ?? userEnrichmentByKey[emailKey] ?? {};
+          console.log("Enrichment", enrichment);
         const firstName = user?.firstName?.trim?.() ?? '';
         const lastName = user?.lastName?.trim?.() ?? '';
         const fullName = [firstName, lastName].filter(Boolean).join(' ');
@@ -318,16 +324,22 @@ export function UsersPage() {
           : environment?.id ?? environment?.name ?? environment?.slug ?? '';
         const clientId = getId(user?.clientId ?? user?.client?._id ?? user?.client?.id ?? enrichment?.clientId);
         const clientName = user?.clientName
-          ?? user?.client?.name
-          ?? user?.client?.clientName
-          ?? enrichment?.clientName
-          ?? enrichment?.client?.name
-          ?? clientNamesById[clientId]
+        //   ?? user?.client?.name
+        //   ?? user?.client?.clientName
+        //   ?? enrichment?.clientName
+        //   ?? enrichment?.client?.name
+        //   ?? clientNamesById[clientId]
           ?? '';
         const totalPoints = parseDecimal(user?.totalPoints ?? enrichment?.totalPoints ?? 0);
         const pointsSpent = parseDecimal(user?.pointsSpent ?? enrichment?.pointsSpent ?? 0);
         const cost = parseDecimal(user?.usage?.cost ?? enrichment?.usage?.cost ?? 0, 2);
-        const revenue = parseDecimal(user?.revenue?.totalAmount ?? enrichment?.revenue?.totalAmount ?? 0, 2);
+        const revenue = parseDecimal(
+          user?.revenue?.totalAmount
+          ?? user?.revenue
+          ?? enrichment?.revenue?.totalAmount
+          ?? enrichment?.revenue
+          ?? 0,
+        );
         const lastDaysAgo = user?.lastActiveDaysAgo;
         let lastActiveLabel = '';
         if (lastDaysAgo != null) {
@@ -364,7 +376,8 @@ export function UsersPage() {
           lastActiveLabel,
         };
       })
-      .filter((user) => (user.env ? filters.envs.includes(user.env) : true));
+          .filter((user) => (user.env ? filters.envs.includes(user.env) : true));
+      
   }, [apiUsers, clientNamesById, filters.envs, userEnrichmentByKey]);
 
   const filteredRows = useMemo(() => {
