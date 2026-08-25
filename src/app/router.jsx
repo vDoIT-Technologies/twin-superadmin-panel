@@ -48,11 +48,11 @@ function AuthScreenMessage({ message }) {
 }
 
 function RequireAuth() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, isLoggingOut } = useAuth();
   const location = useLocation();
 
   if (isLoading) {
-    return <AuthScreenMessage message="Signing you in..." />;
+    return <AuthScreenMessage message={isLoggingOut ? 'Signing you out...' : 'Signing you in...'} />;
   }
 
   if (!isAuthenticated) {

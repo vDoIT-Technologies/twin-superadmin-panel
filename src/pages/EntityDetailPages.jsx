@@ -379,6 +379,15 @@ export function ClientDetailPage() {
   const setTabPage = (tab, page) => setTabPages((current) => ({ ...current, [tab]: page }));
   const clientName = profile?.name || profile?.organizationName || '';
   const plan = profile?.plan || '';
+  const clientRevenue = firstDecimal(kpis?.revenue, kpis?.totalRevenue, clientData?.revenue, clientData?.totalRevenue);
+  const costsBreakdown = kpis?.costs ?? clientData?.costs;
+  const costsTotal = costsBreakdown && typeof costsBreakdown === 'object'
+    ? Object.values(costsBreakdown).reduce((sum, value) => sum + (firstDecimal(value) ?? 0), 0)
+    : null;
+  const clientCost = firstDecimal(kpis?.cost, kpis?.totalCost, clientData?.cost, clientData?.totalCost, usage?.cost, usage?.totalCost) ?? costsTotal;
+  const clientUsersCount = firstDecimal(kpis?.vaultUsers, kpis?.userCount, kpis?.usersCount, clientData?.userCount, clientData?.usersCount);
+  const vaultFilesCount = firstDecimal(kpis?.filesStored, kpis?.totalFiles);
+  const vaultStorageGB = firstDecimal(kpis?.storageUsedGB);
 
   const formatBytes = (bytes) => {
     if (!bytes) return '0 B';
@@ -389,6 +398,12 @@ export function ClientDetailPage() {
     if (num >= 1024) return `${(num / 1024).toFixed(0)} KB`;
     return `${num} B`;
   };
+
+  const vaultStorageLabel = vaultStorageGB == null
+    ? formatBytes(kpis?.storedOnIpfsBytes || 0)
+    : vaultStorageGB >= 1024
+      ? `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(vaultStorageGB / 1024)} TB`
+      : `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(vaultStorageGB)} GB`;
 
   const formatDateShort = (val) => {
     if (!val) return '-';
@@ -411,16 +426,15 @@ export function ClientDetailPage() {
         avatarClassName={adminProduct === 'vault' ? 'vaultClient' : 'client'}
         initials={getInitials(clientName)}
         title={clientName}
-        subtitle={`${profile?.organizationName || ''} · ${plan} plan`}
+        subtitle={adminProduct === 'vault' ? 'Vault client' : `${profile?.organizationName || ''} · ${plan} plan`}
         onBack={() => navigate(location.state?.from || '/clients')}
       />
 
       {adminProduct === 'vault' ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <MetricCard icon={Users} label="Vault users" value={String(kpis?.usersCount || kpis?.activeDrives || 0)} tone="indigo" />
-          <MetricCard icon={Activity} label="Active drives" value={String(kpis?.activeDrives || 0)} tone="emerald" />
-          <MetricCard icon={BookOpen} label="Files stored" value={formatNumber(kpis?.totalFiles || 0)} tone="sky" />
-          <MetricCard icon={TrendingUp} label="Storage used" value={formatBytes(kpis?.storedOnIpfsBytes || 0)} tone="violet" />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <MetricCard icon={TrendingUp} label="Revenue" value={formatOptionalCurrency(clientRevenue)} tone="emerald" />
+          <MetricCard icon={Wallet} label="Cost" value={formatOptionalCurrency(clientCost)} tone="rose" />
+          <MetricCard icon={Users} label="Users" value={formatOptionalNumber(clientUsersCount)} tone="indigo" />
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -449,9 +463,9 @@ export function ClientDetailPage() {
           <CardSection title="Client info" flush>
             <div className="divide-y divide-slate-100">
               <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Name</span><strong className="font-semibold text-slate-700">{clientName || '-'}</strong></div>
-              <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Organization</span><strong className="font-semibold text-slate-700">{profile?.organizationName || '-'}</strong></div>
-              <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Email</span><strong className="font-semibold text-slate-700">{profile?.email || '-'}</strong></div>
-              <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Plan</span><strong className="font-semibold text-slate-700">{plan || '-'}</strong></div>
+              {adminProduct !== 'vault' ? <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Organization</span><strong className="font-semibold text-slate-700">{profile?.organizationName || '-'}</strong></div> : null}
+              {adminProduct !== 'vault' ? <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Email</span><strong className="font-semibold text-slate-700">{profile?.email || '-'}</strong></div> : null}
+              {adminProduct !== 'vault' ? <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Plan</span><strong className="font-semibold text-slate-700">{plan || '-'}</strong></div> : null}
               <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Environment</span><strong className="font-semibold text-slate-700">{profile?.env || '-'}</strong></div>
             </div>
           </CardSection>
@@ -460,8 +474,8 @@ export function ClientDetailPage() {
               {adminProduct === 'vault' ? (
                 <>
                   <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Active drives</span><strong className="font-semibold text-slate-700">{formatNumber(kpis?.activeDrives || 0)}</strong></div>
-                  <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Files stored</span><strong className="font-semibold text-slate-700">{formatNumber(kpis?.totalFiles || 0)}</strong></div>
-                  <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Storage used</span><strong className="font-semibold text-slate-700">{formatBytes(kpis?.storedOnIpfsBytes || 0)}</strong></div>
+                  <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Files stored</span><strong className="font-semibold text-slate-700">{formatOptionalNumber(vaultFilesCount)}</strong></div>
+                  <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Storage used</span><strong className="font-semibold text-slate-700">{vaultStorageLabel}</strong></div>
                 </>
               ) : (
                 // <>

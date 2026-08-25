@@ -43,6 +43,7 @@ export function AuthProvider({ children }) {
 
     return {
       isLoading: false,
+      isLoggingOut: false,
       session: storedSession,
       profile: defaultProfileFromSession(storedSession),
     };
@@ -106,6 +107,7 @@ export function AuthProvider({ children }) {
     () => ({
       isAuthenticated: Boolean(authState.session?.token),
       isLoading: authState.isLoading,
+      isLoggingOut: authState.isLoggingOut,
       session: authState.session,
       token: authState.session?.token ?? null,
       user: authState.session?.user ?? null,
@@ -178,7 +180,7 @@ export function AuthProvider({ children }) {
         }
       },
       async logout() {
-        setAuthState((prev) => ({ ...prev, isLoading: true }));
+        setAuthState((prev) => ({ ...prev, isLoading: true, isLoggingOut: true }));
         const refreshToken = readStoredSession()?.refreshToken ?? authState.session?.refreshToken ?? null;
 
         try {
@@ -187,6 +189,7 @@ export function AuthProvider({ children }) {
           clearAuthToken();
           setAuthState({
             isLoading: false,
+            isLoggingOut: false,
             session: null,
             profile: defaultProfileFromSession(null),
           });
