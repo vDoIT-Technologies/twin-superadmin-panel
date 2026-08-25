@@ -98,7 +98,12 @@ export function ClientsPage() {
         if (!isActive) return;
 
         const payload = getClientsPayload(data);
-        setApiClients(payload.clients);
+        const scopedClients = payload.clients.filter((client) => {
+          const source = String(client?.source ?? client?.type ?? '').toLowerCase();
+          if (!source) return true;
+          return isVault ? source === 'vault' : source !== 'vault';
+        });
+        setApiClients(scopedClients);
         setPagination({
           total: Number(payload.pagination?.total) || 0,
           page: Number(payload.pagination?.page) || requestedPage,
@@ -127,7 +132,7 @@ export function ClientsPage() {
       const plan = client.plan || "";
       const envs = getEnvList(client);
       const twinsCount = client.twinsCount ?? null;
-      const usersCount = client.usersCount ?? null;
+      const usersCount = client.userCount ?? client.usersCount ?? null;
       const messages = client.messages ?? null;
       const pointsSpent = parseDecimal(client.pointsSpent);
       const revenue = parseDecimal(client.revenue);
