@@ -128,6 +128,31 @@ export function ClientsPage() {
 
   const clientRows = useMemo(() => {
     return apiClients.map((client, index) => {
+      if (!isVault) {
+        const id = String(client._id);
+        const envs = client.__env ? [client.__env] : [];
+        const primaryEnv = envs[0] ?? '';
+
+        return {
+          id,
+          rowKey: `${id}-${primaryEnv || 'unknown'}-${index}`,
+          detailRoute: primaryEnv ? `/clients/${id}?env=${encodeURIComponent(primaryEnv)}` : `/clients/${id}`,
+          name: client.name,
+          plan: client.clientUniqueId,
+          envs,
+          primaryEnv,
+          twins: client.twinsCount,
+          users: client.usersCount,
+          messages: client.messages,
+          pointsSpent: client.pointsSpent,
+          revenue: client.revenue,
+          cost: client.cost,
+          margin: client.margin,
+          lastActive: client.updatedAt,
+          status: client.status,
+        };
+      }
+
       const name = client.name || client.organizationName || "";
       const plan = client.plan || "";
       const envs = getEnvList(client);
@@ -171,7 +196,7 @@ export function ClientsPage() {
         status,
       };
     });
-  }, [apiClients]);
+  }, [apiClients, isVault]);
 
   const filteredRows = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
