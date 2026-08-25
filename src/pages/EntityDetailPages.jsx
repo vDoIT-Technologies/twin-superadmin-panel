@@ -379,15 +379,12 @@ export function ClientDetailPage() {
   const setTabPage = (tab, page) => setTabPages((current) => ({ ...current, [tab]: page }));
   const clientName = profile?.name || profile?.organizationName || '';
   const plan = profile?.plan || '';
-  const clientRevenue = firstDecimal(kpis?.revenue, kpis?.totalRevenue, clientData?.revenue, clientData?.totalRevenue);
-  const costsBreakdown = kpis?.costs ?? clientData?.costs;
-  const costsTotal = costsBreakdown && typeof costsBreakdown === 'object'
-    ? Object.values(costsBreakdown).reduce((sum, value) => sum + (firstDecimal(value) ?? 0), 0)
-    : null;
-  const clientCost = firstDecimal(kpis?.cost, kpis?.totalCost, clientData?.cost, clientData?.totalCost, usage?.cost, usage?.totalCost) ?? costsTotal;
-  const clientUsersCount = firstDecimal(kpis?.vaultUsers, kpis?.userCount, kpis?.usersCount, clientData?.userCount, clientData?.usersCount);
-  const vaultFilesCount = firstDecimal(kpis?.filesStored, kpis?.totalFiles);
-  const vaultStorageGB = firstDecimal(kpis?.storageUsedGB);
+  // Vault client API values have a fixed contract, so use its KPI fields directly.
+  const clientRevenue = kpis?.revenue;
+  const clientCost = Object.values(kpis?.cost ?? {}).reduce((total, value) => total + value, 0);
+  const clientUsersCount = kpis?.vaultUsers;
+  const vaultFilesCount = kpis?.filesStored;
+  const vaultStorageGB = kpis?.storageUsedGB;
 
   const formatBytes = (bytes) => {
     if (!bytes) return '0 B';
@@ -399,11 +396,7 @@ export function ClientDetailPage() {
     return `${num} B`;
   };
 
-  const vaultStorageLabel = vaultStorageGB == null
-    ? formatBytes(kpis?.storedOnIpfsBytes || 0)
-    : vaultStorageGB >= 1024
-      ? `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(vaultStorageGB / 1024)} TB`
-      : `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(vaultStorageGB)} GB`;
+  const vaultStorageLabel = vaultStorageGB == null ? '-' : `${vaultStorageGB} GB`;
 
   const formatDateShort = (val) => {
     if (!val) return '-';
