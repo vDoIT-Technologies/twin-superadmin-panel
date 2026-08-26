@@ -142,16 +142,12 @@ export function normalizeStorageClient(client, index) {
   const parsedStorageGb = parsedStorage
     ? Number(parsedStorage[1]) * ({ TB: 1024, GB: 1, MB: 1 / 1024, KB: 1 / 1024 ** 2, B: 1 / BYTES_PER_GB }[parsedStorage[2]?.toUpperCase() ?? 'GB'])
     : firstNumber(rawStorage);
-  const activeValue = client.isActive ?? client.active ?? details.isActive ?? details.active;
-  const statusValue = client.clientStatus ?? client.status ?? details.status
-    ?? (activeValue == null ? 'inactive' : activeValue ? 'active' : 'inactive');
   const envValue = String(client.env ?? client.environment ?? client.__env ?? 'dev').toLowerCase();
 
   return {
     id: clientId == null ? null : String(clientId),
     rank: firstNumber(client.rank) ?? index + 1,
     name: client.clientName ?? client.name ?? client.companyName ?? details.name ?? details.companyName ?? 'Unknown client',
-    status: String(statusValue).toLowerCase() === 'active' ? 'active' : 'inactive',
     env: envValue === 'development' ? 'dev' : envValue === 'production' ? 'prod' : envValue,
     storageGb: storageGb ?? (storageTb != null ? storageTb * 1024 : storageBytes != null ? storageBytes / BYTES_PER_GB : parsedStorageGb ?? 0),
     files: firstNumber(client.files, client.fileCount, client.filesCount, client.totalFiles) ?? 0,

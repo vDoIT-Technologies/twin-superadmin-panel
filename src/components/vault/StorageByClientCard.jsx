@@ -1,11 +1,7 @@
 import { ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { envBadge, formatNumber } from '../../utils/dashboardUtils';
+import { envBadge } from '../../utils/dashboardUtils';
 import { formatStorageGb, getUserInitials } from '../../utils/vaultFormatters';
-
-function StatusBadge({ status }) {
-  return <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${status === 'active' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>{status === 'active' ? 'Active' : 'Inactive'}</span>;
-}
 
 export function StorageByClientCard({ clients }) {
   const navigate = useNavigate();
@@ -53,7 +49,6 @@ export function StorageByClientCard({ clients }) {
                       {client.name}
                     </strong>
                     <span className="flex shrink-0 items-center gap-1">
-                      <StatusBadge status={client.status} />
                       {envBadge(client.env)}
                     </span>
                   </span>
