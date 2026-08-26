@@ -888,6 +888,10 @@ export function UserDetailPage() {
 
   const { profile, kpis, revenue, usage } = userData;
   const isVault = adminProduct === 'vault';
+  const rawClientName = profile?.clientName || profile?.client?.name || '';
+  const clientName = isVault && /^unknown(?: client)?$/i.test(rawClientName.trim())
+    ? ''
+    : rawClientName;
 
   const totalServiceCost = firstDecimal(kpis?.cost, usage?.totals?.cost);
   const openAiCost = firstDecimal(
@@ -989,8 +993,8 @@ export function UserDetailPage() {
         title={profile?.name || "Unnamed"}
         subtitle={
           <>
-            <span>{profile?.clientName || ""}</span>
-            <span>·</span>
+            {clientName ? <span>{clientName}</span> : null}
+            {clientName && profile?.env ? <span>·</span> : null}
             <span>{profile?.env || ""}</span>
           </>
         }
@@ -1046,7 +1050,7 @@ export function UserDetailPage() {
               <span className="text-slate-400">Client</span>
 
               <strong className="font-semibold text-slate-700">
-                {profile?.clientName || "-"}
+                {clientName || "-"}
               </strong>
             </div>
 
