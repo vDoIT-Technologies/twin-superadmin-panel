@@ -9,6 +9,7 @@ import { envBadge, formatNumber } from '../utils/dashboardUtils';
 import { normalizeEntityStatus } from '../utils/status';
 import { getEntityFilterParams } from '../utils/entityFilters';
 import { superadminDemoData } from '../demo-data/superadminDemoData';
+import { useDebouncedValue } from '../utils/useDebouncedValue';
 
 function getTwinInitials(name) {
   if (!name) return '?';
@@ -59,6 +60,7 @@ export function TwinsPage() {
   const [filters, setFilters] = useEntityFilters('twins');
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
+  const debouncedQuery = useDebouncedValue(query.trim());
   const [sortConfig, setSortConfig] = useState({ key: 'pointsSpent', direction: 'desc' });
   const [page, setPage] = useState(1);
   const [apiTwins, setApiTwins] = useState([]);
@@ -97,13 +99,16 @@ export function TwinsPage() {
 
     async function load() {
       try {
-        const data = await dashboardService.getEntityTwins({
+        const requestParams = {
           page,
           limit: PAGE_SIZE,
           clientId: filters.client,
           env: filters.envs.length === 1 ? filters.envs[0] : undefined,
           ...getEntityFilterParams(filters.entityRange),
-        });
+        };
+        const data = debouncedQuery
+          ? await dashboardService.searchEntityTwins({ ...requestParams, search: debouncedQuery })
+          : await dashboardService.getEntityTwins(requestParams);
         if (!active) return;
         const payload = getPayload(data);
         setApiTwins(payload.items);
@@ -123,7 +128,7 @@ export function TwinsPage() {
 
     load();
     return () => { active = false; };
-  }, [filters.client, filters.entityRange, filters.envs, page]);
+  }, [debouncedQuery, filters.client, filters.entityRange, filters.envs, page]);
 
   useEffect(() => {
     setPage(1);
@@ -177,11 +182,11 @@ export function TwinsPage() {
         || twin.clientId === selectedClientId
         || (selectedClientName && twin.clientName.trim().toLowerCase() === selectedClientName);
       const matchesStatus = !filters.status || twin.status === filters.status;
-      const matchesQuery = !normalizedQuery || [twin.name, twin.role, twin.client, twin.env, twin.status]
+      const matchesQuery = debouncedQuery || !normalizedQuery || [twin.name, twin.role, twin.client, twin.env, twin.status]
         .some((value) => String(value ?? '').toLowerCase().includes(normalizedQuery));
       return matchesClient && matchesStatus && matchesQuery;
     });
-  }, [clientNamesById, filters.client, filters.status, query, twinRows]);
+  }, [clientNamesById, debouncedQuery, filters.client, filters.status, query, twinRows]);
 
   const sortedRows = useMemo(() => {
     const getVal = (t) => {
@@ -234,7 +239,16 @@ export function TwinsPage() {
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
           <label className="flex h-10 w-full shrink-0 items-center gap-2 rounded-xl bg-slate-50 px-3 text-slate-400 xl:w-64">
             <Search size={15} />
-            <input className="min-w-0 flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400" type="text" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search twins..." />
+            <input
+              className="min-w-0 flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
+              type="text"
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setPage(1);
+              }}
+              placeholder="Search twins..."
+            />
           </label>
 
           <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
