@@ -24,7 +24,8 @@ function getClientId(client) {
 }
 
 function formatOptionalCurrency(value) {
-  return value == null ? '---' : `$${formatOptionalNumber(value)}`;
+  if (value == null) return '---';
+  return Number(value) === 0 ? '$0.00' : `$${formatOptionalNumber(value)}`;
 }
 
 function formatCostCurrency(value) {
@@ -35,8 +36,8 @@ function formatCostCurrency(value) {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 6,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(amount);
 }
 
@@ -156,7 +157,7 @@ export function ClientsPage() {
           rowKey: `${id}-${primaryEnv || 'unknown'}-${index}`,
           detailRoute: primaryEnv ? `/clients/${id}?env=${encodeURIComponent(primaryEnv)}` : `/clients/${id}`,
           name: client.name,
-          plan: client.clientUniqueId,
+          plan: '',
           envs,
           primaryEnv,
           twins: client.twinsCount,
@@ -448,7 +449,9 @@ export function ClientsPage() {
                         </span>
                         <div className="min-w-0">
                           <strong className="block font-semibold text-slate-700"><TruncatedText value={client.name} /></strong>
-                          <span className="mt-0.5 block text-xs text-slate-400"><TruncatedText value={client.plan} /></span>
+                          {isVault && client.plan ? (
+                            <span className="mt-0.5 block text-xs text-slate-400"><TruncatedText value={client.plan} /></span>
+                          ) : null}
                         </div>
                       </div>
                     </td>

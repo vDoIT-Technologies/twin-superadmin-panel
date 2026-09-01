@@ -52,7 +52,8 @@ function formatOptionalNumber(value) {
 }
 
 function formatOptionalCurrency(value) {
-  return value == null ? '---' : `$${formatNumber(value)}`;
+  if (value == null) return '---';
+  return Number(value) === 0 ? '$0.00' : `$${formatNumber(value)}`;
 }
 
 export function TwinsPage() {
