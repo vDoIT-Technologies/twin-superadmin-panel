@@ -183,6 +183,7 @@ function firstDecimal(...values) {
 }
 
 export const formatOptionalCurrency = (value) => value == null ? '---' : formatCurrency(value);
+const formatOptionalCost = (value) => value == null ? '---' : formatCurrencyUpToFourDecimals(value);
 export const formatOptionalNumber = (value) => value == null ? '---' : formatNumber(value);
 
 const serviceLabels = {
@@ -193,11 +194,8 @@ const serviceLabels = {
 
 function getServiceUsageRows(clientData) {
   const usage = clientData?.usage || {};
-  const costSources = [
-    clientData?.kpis?.serviceCosts,
-    clientData?.serviceCosts, clientData?.vendorCost, clientData?.costs,
-    usage?.serviceCosts, usage?.vendorCost, usage?.costs,
-  ].filter((source) => source && typeof source === 'object' && !Array.isArray(source));
+  const costSources = [clientData?.kpis?.serviceCosts]
+    .filter((source) => source && typeof source === 'object' && !Array.isArray(source));
   const usageSources = [
     usage?.byService, usage?.services, usage?.usageByService,
     clientData?.serviceUsage, clientData?.usageByService, clientData?.servicesUsage,
@@ -352,9 +350,9 @@ export function ClientDetailPage() {
 
   const { profile, kpis, usage } = clientData;
   const serviceCosts = kpis?.serviceCosts || {};
-  const openAiCost = firstDecimal(serviceCosts?.openAi, serviceCosts?.openAI, serviceCosts?.openai, usage?.openaiCost, usage?.openAICost, usage?.openAiCost, usage?.open_ai_cost, kpis?.openaiCost, kpis?.openAICost, kpis?.open_ai_cost, clientData?.costs?.openai);
-  const elevenLabsCost = firstDecimal(serviceCosts?.elevenLabs, serviceCosts?.elevenlabs, usage?.elevenLabsCost, usage?.elevenlabsCost, kpis?.elevenLabsCost, kpis?.elevenlabsCost, clientData?.costs?.elevenLabs, clientData?.costs?.elevenlabs);
-  const didCost = firstDecimal(serviceCosts?.dId, serviceCosts?.did, serviceCosts?.dID, usage?.didCost, usage?.didUsageCost, usage?.did_cost, kpis?.didCost, kpis?.didUsageCost, kpis?.did_cost, clientData?.costs?.did);
+  const openAiCost = firstDecimal(serviceCosts?.openAi);
+  const elevenLabsCost = firstDecimal(serviceCosts?.elevenLabs);
+  const didCost = firstDecimal(serviceCosts?.dId);
   const totalCost = firstDecimal(kpis?.cost, kpis?.totalCost, usage?.cost, usage?.totalCost, clientData?.costs?.total)
     ?? (openAiCost != null || elevenLabsCost != null || didCost != null
       ? (openAiCost ?? 0) + (elevenLabsCost ?? 0) + (didCost ?? 0)
@@ -411,13 +409,13 @@ export function ClientDetailPage() {
       {adminProduct === 'vault' ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <MetricCard icon={TrendingUp} label="Revenue" value={formatOptionalCurrency(clientRevenue)} tone="emerald" />
-          <MetricCard icon={Wallet} label="Cost" value={formatOptionalCurrency(clientCost)} tone="rose" />
+          <MetricCard icon={Wallet} label="Cost" value={formatOptionalCost(clientCost)} tone="rose" />
           <MetricCard icon={Users} label="Users" value={formatOptionalNumber(clientUsersCount)} tone="indigo" />
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <MetricCard icon={TrendingUp} label="Revenue" value={formatCurrency(kpis?.revenue || 0)} tone="emerald" />
-          <MetricCard icon={Wallet} label="Cost" value={formatOptionalCurrency(displayedTotalCost)} tone="rose" />
+          <MetricCard icon={Wallet} label="Cost" value={formatOptionalCost(displayedTotalCost)} tone="rose" />
           <MetricCard icon={Bot} label="Twins" value={String(kpis?.twinsCount || 0)} tone="indigo" />
           <MetricCard icon={Users} label="Users" value={String(kpis?.usersCount || 0)} tone="amber" />
         </div>
@@ -453,7 +451,7 @@ export function ClientDetailPage() {
                 <>
                   <ServiceUsageRow label="OpenAI" cost={openAiCost} />
                   <ServiceUsageRow label="ElevenLabs" cost={elevenLabsCost} />
-                  <div className="flex items-center justify-between bg-slate-50/70 px-5 py-3 text-xs"><span className="font-semibold text-slate-500">Total cost</span><strong className="font-bold text-slate-900">{formatOptionalCurrency(displayedTotalCost)}</strong></div>
+                  <div className="flex items-center justify-between bg-slate-50/70 px-5 py-3 text-xs"><span className="font-semibold text-slate-500">Total cost</span><strong className="font-bold text-slate-900">{formatOptionalCost(displayedTotalCost)}</strong></div>
                 </>
               ) : (
                 // <>
@@ -481,7 +479,7 @@ export function ClientDetailPage() {
                     <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-4 bg-slate-50/70 px-5 py-3 text-xs">
                       <span className="font-semibold text-slate-500">Total cost</span>
                       <span />
-                      <strong className="w-20 text-right font-bold tabular-nums text-slate-900">{formatOptionalCurrency(displayedTotalCost)}</strong>
+                      <strong className="w-20 text-right font-bold tabular-nums text-slate-900">{formatOptionalCost(displayedTotalCost)}</strong>
                     </div>
                   </div>
                 </>
@@ -880,31 +878,9 @@ export function UserDetailPage() {
 
   const totalServiceCost = firstDecimal(kpis?.cost, usage?.totals?.cost);
   const serviceCosts = kpis?.serviceCosts || {};
-  const openAiCost = firstDecimal(
-    serviceCosts?.openAi,
-    serviceCosts?.openAI,
-    serviceCosts?.openai,
-    usage?.openaiCost,
-    usage?.openAICost,
-    kpis?.openaiCost,
-    userData?.openaiCost,
-  );
-  const elevenLabsCost = firstDecimal(
-    serviceCosts?.elevenLabs,
-    serviceCosts?.elevenlabs,
-    usage?.elevenlabsCost,
-    usage?.elevenLabsCost,
-    kpis?.elevenlabsCost,
-    userData?.elevenlabsCost,
-  );
-  const didCost = firstDecimal(
-    serviceCosts?.dId,
-    serviceCosts?.did,
-    serviceCosts?.dID,
-    usage?.didCost,
-    kpis?.didCost,
-    userData?.didCost,
-  );
+  const openAiCost = firstDecimal(serviceCosts?.openAi);
+  const elevenLabsCost = firstDecimal(serviceCosts?.elevenLabs);
+  const didCost = firstDecimal(serviceCosts?.dId);
 
   const primaryPackage = profile?.packageDetails?.vaultPackage ?? profile?.packageDetails?.twinPackage ?? null;
   const twinPackage = profile?.packageDetails?.twinPackage || null;
@@ -1277,8 +1253,8 @@ export function UserDetailPage() {
 
             {isVault ? (
               <>
-                <ServiceUsageRow label="OpenAI" cost={openAiCost ?? kpis?.cost ?? usage?.totals?.cost ?? 0} />
-                <ServiceUsageRow label="ElevenLabs" cost={elevenLabsCost ?? 0} />
+                <ServiceUsageRow label="OpenAI" cost={openAiCost} />
+                <ServiceUsageRow label="ElevenLabs" cost={elevenLabsCost} />
               </>
             ) : (
               <>
