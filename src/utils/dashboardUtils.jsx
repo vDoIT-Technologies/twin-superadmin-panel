@@ -45,6 +45,23 @@ export function formatCurrencyFull(value) {
   });
 }
 
+export function formatCost(value) {
+  if (value == null || value === '') return '---';
+  const rawValue = typeof value === 'object' && '$numberDecimal' in value
+    ? value.$numberDecimal
+    : value;
+  const amount = Number(rawValue);
+  if (!Number.isFinite(amount)) return '---';
+  if (amount === 0) return '$0.00';
+
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 20,
+  }).format(amount);
+}
+
 export function formatNumber(value) {
   if (value == null || Number.isNaN(value)) return '0';
   const n = Number(value);
@@ -147,7 +164,7 @@ export function ServiceUsageRow({ label, cost }) {
       <strong className="truncate font-semibold text-slate-700">{label}</strong>
       <span />
       <strong className="w-20 text-right font-semibold tabular-nums text-slate-800">
-        {cost == null ? '---' : formatCurrencyUpToFourDecimals(cost)}
+        {formatCost(cost)}
       </strong>
     </div>
   );
