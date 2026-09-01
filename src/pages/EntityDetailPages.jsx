@@ -183,6 +183,7 @@ function firstDecimal(...values) {
 }
 
 export const formatOptionalCurrency = (value) => value == null ? '---' : formatCurrency(value);
+const formatOptionalCost = (value) => value == null ? '---' : formatCurrencyUpToFourDecimals(value);
 export const formatOptionalNumber = (value) => value == null ? '---' : formatNumber(value);
 
 const serviceLabels = {
@@ -191,23 +192,10 @@ const serviceLabels = {
   polygon: 'Polygon gas', stripe: 'Stripe', moonpay: 'MoonPay',
 };
 
-// Frontend-only preview data shared by Client and Twin details. Remove this
-// fallback when their APIs return per-service usage and cost breakdowns.
-const demoServiceUsageRows = [
-  { key: 'elevenlabs', label: 'ElevenLabs', units: 8400, unitLabel: 'chars', cost: 1.43 },
-  // { key: 'filebase', label: 'Filebase / IPFS', units: 50.02, unitLabel: 'GB', cost: 0.30 },
-  { key: 'openai', label: 'OpenAI', units: 31000, unitLabel: 'tokens', cost: 0.42 },
-  { key: 'did', label: 'D-ID', units: 12, unitLabel: 'min', cost: 3.36 },
-  // { key: 'stripe', label: 'Stripe', units: 7, unitLabel: 'txn', cost: 1.05 },
-  // { key: 's3ses', label: 'AWS S3 + SES', units: 3.8, unitLabel: 'GB', cost: 0.18 },
-];
-
 function getServiceUsageRows(clientData) {
   const usage = clientData?.usage || {};
-  const costSources = [
-    clientData?.serviceCosts, clientData?.vendorCost, clientData?.costs,
-    usage?.serviceCosts, usage?.vendorCost, usage?.costs,
-  ].filter((source) => source && typeof source === 'object' && !Array.isArray(source));
+  const costSources = [clientData?.kpis?.serviceCosts]
+    .filter((source) => source && typeof source === 'object' && !Array.isArray(source));
   const usageSources = [
     usage?.byService, usage?.services, usage?.usageByService,
     clientData?.serviceUsage, clientData?.usageByService, clientData?.servicesUsage,
@@ -361,14 +349,14 @@ export function ClientDetailPage() {
   }
 
   const { profile, kpis, usage } = clientData;
-  const openAiCost = firstDecimal(usage?.openaiCost, usage?.openAICost, usage?.openAiCost, usage?.open_ai_cost, kpis?.openaiCost, kpis?.openAICost, kpis?.open_ai_cost, clientData?.costs?.openai);
-  const didCost = firstDecimal(usage?.didCost, usage?.didUsageCost, usage?.did_cost, kpis?.didCost, kpis?.didUsageCost, kpis?.did_cost, clientData?.costs?.did);
+  const serviceCosts = kpis?.serviceCosts || {};
+  const openAiCost = firstDecimal(serviceCosts?.openAi);
+  const elevenLabsCost = firstDecimal(serviceCosts?.elevenLabs);
+  const didCost = firstDecimal(serviceCosts?.dId);
   const totalCost = firstDecimal(kpis?.cost, kpis?.totalCost, usage?.cost, usage?.totalCost, clientData?.costs?.total)
-    ?? (openAiCost != null || didCost != null ? (openAiCost ?? 0) + (didCost ?? 0) : null);
-  const apiServiceUsageRows = getServiceUsageRows(clientData);
-  const serviceUsageRows = apiServiceUsageRows;
-  if (openAiCost > 0 && !serviceUsageRows.some((row) => row.key === 'openai')) serviceUsageRows.push({ key: 'openai', label: 'OpenAI', cost: openAiCost });
-  if (didCost > 0 && !serviceUsageRows.some((row) => row.key === 'did')) serviceUsageRows.push({ key: 'did', label: 'D-ID', cost: didCost });
+    ?? (openAiCost != null || elevenLabsCost != null || didCost != null
+      ? (openAiCost ?? 0) + (elevenLabsCost ?? 0) + (didCost ?? 0)
+      : null);
   const displayedTotalCost = totalCost;
   const twins = tabData.twins?.twins || [];
   const users = tabData.users?.users || [];
@@ -381,11 +369,8 @@ export function ClientDetailPage() {
   const plan = profile?.plan || '';
   // Vault client API values have a fixed contract, so use its KPI fields directly.
   const clientRevenue = kpis?.revenue;
-  const clientCost = Object.values(kpis?.cost ?? {}).reduce((total, value) => total + value, 0);
+  const clientCost = firstDecimal(kpis?.cost, displayedTotalCost);
   const clientUsersCount = kpis?.vaultUsers;
-  const vaultFilesCount = kpis?.filesStored;
-  const vaultStorageGB = kpis?.storageUsedGB;
-
   const formatBytes = (bytes) => {
     if (!bytes) return '0 B';
     const num = Number(bytes);
@@ -395,8 +380,6 @@ export function ClientDetailPage() {
     if (num >= 1024) return `${(num / 1024).toFixed(0)} KB`;
     return `${num} B`;
   };
-
-  const vaultStorageLabel = vaultStorageGB == null ? '-' : `${vaultStorageGB} GB`;
 
   const formatDateShort = (val) => {
     if (!val) return '-';
@@ -426,13 +409,13 @@ export function ClientDetailPage() {
       {adminProduct === 'vault' ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <MetricCard icon={TrendingUp} label="Revenue" value={formatOptionalCurrency(clientRevenue)} tone="emerald" />
-          <MetricCard icon={Wallet} label="Cost" value={formatOptionalCurrency(clientCost)} tone="rose" />
+          <MetricCard icon={Wallet} label="Cost" value={formatOptionalCost(clientCost)} tone="rose" />
           <MetricCard icon={Users} label="Users" value={formatOptionalNumber(clientUsersCount)} tone="indigo" />
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <MetricCard icon={TrendingUp} label="Revenue" value={formatCurrency(kpis?.revenue || 0)} tone="emerald" />
-          <MetricCard icon={Wallet} label="Cost" value={formatOptionalCurrency(displayedTotalCost)} tone="rose" />
+          <MetricCard icon={Wallet} label="Cost" value={formatOptionalCost(displayedTotalCost)} tone="rose" />
           <MetricCard icon={Bot} label="Twins" value={String(kpis?.twinsCount || 0)} tone="indigo" />
           <MetricCard icon={Users} label="Users" value={String(kpis?.usersCount || 0)} tone="amber" />
         </div>
@@ -462,13 +445,13 @@ export function ClientDetailPage() {
               <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Environment</span><strong className="font-semibold text-slate-700">{profile?.env || '-'}</strong></div>
             </div>
           </CardSection>
-          <CardSection title={adminProduct === 'vault' ? 'Vault summary' : 'All-service usage & cost'} flush>
+          <CardSection title="All-service usage & cost" flush>
             <div className="divide-y divide-slate-100">
               {adminProduct === 'vault' ? (
                 <>
-                  <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Active drives</span><strong className="font-semibold text-slate-700">{formatNumber(kpis?.activeDrives || 0)}</strong></div>
-                  <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Files stored</span><strong className="font-semibold text-slate-700">{formatOptionalNumber(vaultFilesCount)}</strong></div>
-                  <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Storage used</span><strong className="font-semibold text-slate-700">{vaultStorageLabel}</strong></div>
+                  <ServiceUsageRow label="OpenAI" cost={openAiCost} />
+                  <ServiceUsageRow label="ElevenLabs" cost={elevenLabsCost} />
+                  <div className="flex items-center justify-between bg-slate-50/70 px-5 py-3 text-xs"><span className="font-semibold text-slate-500">Total cost</span><strong className="font-bold text-slate-900">{formatOptionalCost(displayedTotalCost)}</strong></div>
                 </>
               ) : (
                 // <>
@@ -490,13 +473,13 @@ export function ClientDetailPage() {
                     <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-4 bg-slate-50 px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                       <span>Service used</span><span className="text-right">Usage</span><span className="w-20 text-right">Cost</span>
                     </div>
-                    <ServiceUsageRow label="OpenAI" cost={ 0} />
-                    <ServiceUsageRow label="ElevenLabs" cost={0} />
-                    <ServiceUsageRow label="D-ID" cost={0} />
+                    <ServiceUsageRow label="OpenAI" cost={openAiCost} />
+                    <ServiceUsageRow label="ElevenLabs" cost={elevenLabsCost} />
+                    <ServiceUsageRow label="D-ID" cost={didCost} />
                     <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-4 bg-slate-50/70 px-5 py-3 text-xs">
                       <span className="font-semibold text-slate-500">Total cost</span>
                       <span />
-                      <strong className="w-20 text-right font-bold tabular-nums text-slate-900">{formatOptionalCurrency(0)}</strong>
+                      <strong className="w-20 text-right font-bold tabular-nums text-slate-900">{formatOptionalCost(displayedTotalCost)}</strong>
                     </div>
                   </div>
                 </>
@@ -894,18 +877,10 @@ export function UserDetailPage() {
     : rawClientName;
 
   const totalServiceCost = firstDecimal(kpis?.cost, usage?.totals?.cost);
-  const openAiCost = firstDecimal(
-    usage?.openaiCost,
-    usage?.openAICost,
-    kpis?.openaiCost,
-    userData?.openaiCost,
-  );
-  const elevenLabsCost = firstDecimal(
-    usage?.elevenlabsCost,
-    usage?.elevenLabsCost,
-    kpis?.elevenlabsCost,
-    userData?.elevenlabsCost,
-  );
+  const serviceCosts = kpis?.serviceCosts || {};
+  const openAiCost = firstDecimal(serviceCosts?.openAi);
+  const elevenLabsCost = firstDecimal(serviceCosts?.elevenLabs);
+  const didCost = firstDecimal(serviceCosts?.dId);
 
   const primaryPackage = profile?.packageDetails?.vaultPackage ?? profile?.packageDetails?.twinPackage ?? null;
   const twinPackage = profile?.packageDetails?.twinPackage || null;
@@ -1278,14 +1253,14 @@ export function UserDetailPage() {
 
             {isVault ? (
               <>
-                <ServiceUsageRow label="OpenAI" cost={openAiCost ?? kpis?.cost ?? usage?.totals?.cost ?? 0} />
-                <ServiceUsageRow label="ElevenLabs" cost={elevenLabsCost ?? 0} />
+                <ServiceUsageRow label="OpenAI" cost={openAiCost} />
+                <ServiceUsageRow label="ElevenLabs" cost={elevenLabsCost} />
               </>
             ) : (
               <>
-                <ServiceUsageRow label="OpenAI" cost={kpis?.cost ?? usage?.totals?.cost ?? 0} />
-                <ServiceUsageRow label="ElevenLabs" cost={0} />
-                <ServiceUsageRow label="D-ID" cost={0} />
+                <ServiceUsageRow label="OpenAI" cost={openAiCost} />
+                <ServiceUsageRow label="ElevenLabs" cost={elevenLabsCost} />
+                <ServiceUsageRow label="D-ID" cost={didCost} />
               </>
             )}
 

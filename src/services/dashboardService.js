@@ -68,6 +68,10 @@ export const dashboardService = {
     });
     return response.data;
   },
+  async searchEntityClients(params = {}) {
+    const response = await api.get('/api/v1/search/clients', { params });
+    return response.data;
+  },
   async getEntityClientById(clientId, params = {}) {
     const response = await api.get(`/api/v1/entities/clients/${clientId}`, {
       params: {
@@ -117,6 +121,10 @@ export const dashboardService = {
     });
     return response.data;
   },
+  async searchEntityTwins(params = {}) {
+    const response = await api.get('/api/v1/search/twins', { params });
+    return response.data;
+  },
   async getEntityTwinById(twinId, params = {}) {
     const response = await api.get(`/api/v1/entities/twins/${twinId}`,{
       params: {
@@ -141,6 +149,10 @@ export const dashboardService = {
         to: params.to,
       },
     });
+    return response.data;
+  },
+  async searchEntityUsers(params = {}) {
+    const response = await api.get('/api/v1/search/users', { params });
     return response.data;
   },
   async getEntityUserById(userId, params = {}) {
