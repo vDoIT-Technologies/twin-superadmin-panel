@@ -9,6 +9,7 @@ import { dashboardService } from "../services";
 import { envBadge } from "../utils/dashboardUtils";
 import { normalizeEntityStatus } from "../utils/status";
 import { getEntityFilterParams } from "../utils/entityFilters";
+import { useDebouncedValue } from "../utils/useDebouncedValue";
 import {
   formatOptionalNumber,
   getClientInitials,
@@ -23,7 +24,21 @@ function getClientId(client) {
 }
 
 function formatOptionalCurrency(value) {
-  return value == null ? '---' : `$${formatOptionalNumber(value)}`;
+  if (value == null) return '---';
+  return Number(value) === 0 ? '$0.00' : `$${formatOptionalNumber(value)}`;
+}
+
+function formatCostCurrency(value) {
+  if (value == null) return '---';
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return '---';
+
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
 }
 
 export function ClientsPage() {
@@ -33,6 +48,7 @@ export function ClientsPage() {
   const [filters, setFilters] = useEntityFilters('clients');
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
+  const debouncedQuery = useDebouncedValue(query.trim());
   const [sortConfig, setSortConfig] = useState({
     key: "cost",
     direction: "desc",
@@ -87,13 +103,16 @@ export function ClientsPage() {
       setIsTableLoading(true);
       setApiClients([]);
       try {
-        const data = await dashboardService.getEntityClients({
+        const requestParams = {
           page: requestedPage,
           limit: PAGE_SIZE,
           env: filters.envs.length === 1 ? filters.envs[0] : undefined,
           status: isVault ? undefined : filters.status || undefined,
           ...getEntityFilterParams(filters.entityRange),
-        });
+        };
+        const data = !isVault && debouncedQuery
+          ? await dashboardService.searchEntityClients({ ...requestParams, search: debouncedQuery })
+          : await dashboardService.getEntityClients(requestParams);
 
         if (!isActive) return;
 
@@ -124,7 +143,7 @@ export function ClientsPage() {
     return () => {
       isActive = false;
     };
-  }, [filters.entityRange, filters.envs, filters.status, isVault, page]);
+  }, [debouncedQuery, filters.entityRange, filters.envs, filters.status, isVault, page]);
 
   const clientRows = useMemo(() => {
     return apiClients.map((client, index) => {
@@ -138,7 +157,7 @@ export function ClientsPage() {
           rowKey: `${id}-${primaryEnv || 'unknown'}-${index}`,
           detailRoute: primaryEnv ? `/clients/${id}?env=${encodeURIComponent(primaryEnv)}` : `/clients/${id}`,
           name: client.name,
-          plan: client.clientUniqueId,
+          plan: '',
           envs,
           primaryEnv,
           twins: client.twinsCount,
@@ -202,11 +221,11 @@ export function ClientsPage() {
     const normalizedQuery = query.trim().toLowerCase();
     return clientRows.filter((client) => {
       const matchesStatus = isVault || !filters.status || client.status === filters.status;
-      const matchesQuery = !normalizedQuery || [client.name, client.plan, ...client.envs]
+      const matchesQuery = (!isVault && debouncedQuery) || !normalizedQuery || [client.name, client.plan, ...client.envs]
         .some((value) => String(value ?? '').toLowerCase().includes(normalizedQuery));
       return matchesStatus && matchesQuery;
     });
-  }, [clientRows, filters.status, isVault, query]);
+  }, [clientRows, debouncedQuery, filters.status, isVault, query]);
 
   const sortedRows = useMemo(() => {
     const getSortValue = (client) => {
@@ -292,7 +311,7 @@ export function ClientsPage() {
         ...(!isVault ? [client.status === 'active' ? 'Active' : client.status === 'inactive' ? 'Inactive' : '---'] : []),
         ...(!isVault ? [client.twins] : []),
         client.users,
-        formatOptionalCurrency(client.cost),
+        formatCostCurrency(client.cost),
         formatOptionalCurrency(client.revenue),
       ]
         .map((value) => `"${String(value).replaceAll('"', '""')}"`)
@@ -320,7 +339,10 @@ export function ClientsPage() {
                 className="min-w-0 flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
                 type="text"
                 value={query}
-                onChange={(event) => setQuery(event.target.value)}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setPage(1);
+              }}
                 placeholder="Search clients..."
               />
             </label>
@@ -427,7 +449,9 @@ export function ClientsPage() {
                         </span>
                         <div className="min-w-0">
                           <strong className="block font-semibold text-slate-700"><TruncatedText value={client.name} /></strong>
-                          <span className="mt-0.5 block text-xs text-slate-400"><TruncatedText value={client.plan} /></span>
+                          {isVault && client.plan ? (
+                            <span className="mt-0.5 block text-xs text-slate-400"><TruncatedText value={client.plan} /></span>
+                          ) : null}
                         </div>
                       </div>
                     </td>
@@ -451,7 +475,7 @@ export function ClientsPage() {
                     ) : null}
                     {!isVault ? <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(client.twins)}</td> : null}
                     <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(client.users)}</td>
-                    <td className="px-4 py-3.5 text-right tabular-nums">{formatOptionalCurrency(client.cost)}</td>
+                    <td className="px-4 py-3.5 text-right tabular-nums">{formatCostCurrency(client.cost)}</td>
                     <td className="px-4 py-3.5 text-right tabular-nums">{formatOptionalCurrency(client.revenue)}</td>
                   </tr>
                 ))

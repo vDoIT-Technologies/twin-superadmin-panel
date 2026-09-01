@@ -10,6 +10,7 @@ import { dashboardService, dropdownApiAvailable, getClientsDropdown, getUsersDro
 import { envBadge, formatCurrencyFull, formatNumber } from '../utils/dashboardUtils';
 import { normalizeEntityStatus } from '../utils/status';
 import { getEntityFilterParams } from '../utils/entityFilters';
+import { useDebouncedValue } from '../utils/useDebouncedValue';
 
 function getUserInitials(name) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -121,6 +122,7 @@ export function UsersPage() {
   const [filters, setFilters] = useEntityFilters('users');
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
+  const debouncedQuery = useDebouncedValue(query.trim());
   const [sortConfig, setSortConfig] = useState({ key: 'pointsSpent', direction: 'desc' });
   const [page, setPage] = useState(1);
   const [apiUsers, setApiUsers] = useState([]);
@@ -189,7 +191,7 @@ export function UsersPage() {
       setIsTableLoading(true);
 
       try {
-        const data = await dashboardService.getEntityUsers({
+        const requestParams = {
           page,
           limit: PAGE_SIZE,
           clientId: filters.client,
@@ -199,7 +201,10 @@ export function UsersPage() {
           // userId:'691c24054f2211e4baa7d5fb',
           // userId:'6a71c9b32ae93520d98c72eb',
           ...getEntityFilterParams(filters.entityRange),
-        });
+        };
+        const data = !isVault && debouncedQuery
+          ? await dashboardService.searchEntityUsers({ ...requestParams, search: debouncedQuery })
+          : await dashboardService.getEntityUsers(requestParams);
 
         console.log('GET /api/v1/entities/users response:', data);
 
@@ -246,7 +251,7 @@ export function UsersPage() {
     return () => {
       isActive = false;
     };
-  }, [filters.client, filters.entityRange, filters.envs, page]);
+  }, [debouncedQuery, filters.client, filters.entityRange, filters.envs, isVault, page]);
 
   useEffect(() => {
     if (!isVault) {
@@ -392,13 +397,13 @@ export function UsersPage() {
         || user.clientId === selectedClientId
         || (selectedClientName && user.client.trim().toLowerCase() === selectedClientName);
       const matchesStatus = !filters.status || user.status === filters.status;
-      const matchesQuery = !q
+      const matchesQuery = (!isVault && debouncedQuery) || !q
         || user.name.toLowerCase().includes(q)
         || user.client.toLowerCase().includes(q)
         || getEnvLabel(user.env).toLowerCase().includes(q);
       return matchesClient && matchesStatus && matchesQuery;
     });
-  }, [clientNamesById, filters.client, filters.status, query, userRows]);
+  }, [clientNamesById, debouncedQuery, filters.client, filters.status, isVault, query, userRows]);
 
   const sortedRows = useMemo(() => {
     const getSortValue = (user) => {

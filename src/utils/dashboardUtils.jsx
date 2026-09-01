@@ -27,6 +27,7 @@ export function formatCompactNumber(value) {
 
 export function formatCurrency(value) {
   if (value == null || Number.isNaN(value)) return '$0';
+  if (Number(value) === 0) return '$0.00';
   return currencyFormatter.format(value);
 }
 
@@ -144,6 +145,7 @@ export function ServiceUsageRow({ label, cost }) {
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-4 px-5 py-3 text-xs">
       <strong className="truncate font-semibold text-slate-700">{label}</strong>
+      <span />
       <strong className="w-20 text-right font-semibold tabular-nums text-slate-800">
         {cost == null ? '---' : formatCurrencyUpToFourDecimals(cost)}
       </strong>
@@ -156,8 +158,7 @@ export function formatCurrencyUpToFourDecimals(value) {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
-    minimumFractionDigits: 0,
+    minimumFractionDigits: 2,
     maximumFractionDigits: 4,
   }).format(value);
 }
-

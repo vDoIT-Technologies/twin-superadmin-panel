@@ -6,6 +6,7 @@ export function formatCompactNumber(value) {
 }
 
 export function formatCurrency(value) {
+  if (Number(value) === 0) return '$0.00';
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
@@ -14,6 +15,7 @@ export function formatCurrency(value) {
 }
 
 export function formatCurrencyUpToTwoDecimals(value) {
+  if (Number(value) === 0) return '$0.00';
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
