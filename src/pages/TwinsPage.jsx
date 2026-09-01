@@ -5,7 +5,7 @@ import { dashboardService, getClientsDropdown } from '../services';
 import { useEntityFilters } from '../app/FilterContext';
 import { TruncatedText } from '../components/common/TruncatedText';
 import { FilterDropdown } from '../components/common/FilterDropdown';
-import { envBadge, formatNumber } from '../utils/dashboardUtils';
+import { envBadge, formatCost, formatNumber } from '../utils/dashboardUtils';
 import { normalizeEntityStatus } from '../utils/status';
 import { getEntityFilterParams } from '../utils/entityFilters';
 import { superadminDemoData } from '../demo-data/superadminDemoData';
@@ -225,7 +225,7 @@ export function TwinsPage() {
   const exportCsv = () => {
     const header = ['Twin', 'Env', 'Client', 'Users', 'Status', 'Revenue', 'Points Spent'];
     const lines = sortedRows.map((t) =>
-      [t.name, t.env, t.client, formatOptionalNumber(t.usersCount), t.status || '---', formatOptionalCurrency(t.cost), formatOptionalCurrency(t.revenue), formatOptionalNumber(t.totalPoints), formatOptionalNumber(t.pointsSpent)]
+      [t.name, t.env, t.client, formatOptionalNumber(t.usersCount), t.status || '---', formatCost(t.cost), formatOptionalCurrency(t.revenue), formatOptionalNumber(t.totalPoints), formatOptionalNumber(t.pointsSpent)]
         .map((v) => `"${String(v).replaceAll('"', '""')}"`).join(','));
     const blob = new Blob([[header.join(','), ...lines].join('\n')], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);

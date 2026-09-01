@@ -7,7 +7,7 @@ import { TruncatedText } from '../components/common/TruncatedText';
 import { FilterDropdown } from '../components/common/FilterDropdown';
 import { superadminDemoData } from '../demo-data/superadminDemoData';
 import { dashboardService, dropdownApiAvailable, getClientsDropdown, getUsersDropdown } from '../services';
-import { envBadge, formatCurrencyFull, formatNumber } from '../utils/dashboardUtils';
+import { envBadge, formatCost, formatCurrencyFull, formatNumber } from '../utils/dashboardUtils';
 import { normalizeEntityStatus } from '../utils/status';
 import { getEntityFilterParams } from '../utils/entityFilters';
 import { useDebouncedValue } from '../utils/useDebouncedValue';
@@ -470,7 +470,7 @@ export function UsersPage() {
         user.name,
         getEnvLabel(user.env),
         user.client || '---',
-        formatOptionalCurrency(user.cost),
+        formatCost(user.cost),
         formatOptionalCurrency(user.revenue),
         formatOptionalNumber(user.totalPoints),
         formatOptionalNumber(user.pointsSpent),
@@ -596,7 +596,7 @@ export function UsersPage() {
                     </td>
                     <td className="px-4 py-3.5 text-center text-slate-500">{superadminDemoData.ENV_META[user.env] ? envBadge(user.env) : getEnvLabel(user.env)}</td>
                     <td className="px-4 py-3.5 text-slate-500"><TruncatedText value={user.client || '---'} /></td>
-                    <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalCurrency(user.cost)}</td>
+                    <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatCost(user.cost)}</td>
                     <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalCurrency(user.revenue)}</td>
                     <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{user.totalPoints}</td>
                     <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{user.pointsSpent}</td>

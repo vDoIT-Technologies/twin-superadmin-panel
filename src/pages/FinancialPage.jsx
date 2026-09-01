@@ -13,7 +13,7 @@ import { FilterContext } from '../app/FilterContext';
 import { superadminDemoData } from '../demo-data/superadminDemoData';
 import { groupBy, selectFacts, timeSeries } from '../demo-data/superadminSelectors';
 import { areaChart, stackedBar } from '../utils/chartHelpers';
-import { deltaPercent, formatCurrencyFull, formatPercent } from '../utils/dashboardUtils.jsx';
+import { deltaPercent, formatCost, formatCurrencyFull, formatPercent } from '../utils/dashboardUtils.jsx';
 import { useAuth } from '../app/AuthContext';
 import { isServiceForProduct, isVendorForProduct } from '../utils/productAccess';
 import { TruncatedText } from '../components/common/TruncatedText';
@@ -150,7 +150,7 @@ export function FinancialPage() {
         tone: 'slate',
       },
       { label: 'Revenue (USD)', value: formatCurrencyFull(summary.totalRevenue), tone: 'slate' },
-      { label: 'COGS (USD)', value: formatCurrencyFull(summary.totalCost), tone: 'slate' },
+      { label: 'COGS (USD)', value: formatCost(summary.totalCost), tone: 'slate' },
       {
         label: 'Net margin',
         value: `${formatCurrencyFull(summary.marginValue)} · ${formatPercent(summary.marginPct, 1)}`,
@@ -186,7 +186,7 @@ export function FinancialPage() {
   const exportVendorCsv = () => {
     const header = ['Vendor', 'Category', 'Cost', '% of COGS'];
     const lines = vendorBreakdownRows.map((vendor) =>
-      [vendor.name, vendor.category, formatCurrencyFull(vendor.cost), `${vendor.share.toFixed(1)}%`]
+      [vendor.name, vendor.category, formatCost(vendor.cost), `${vendor.share.toFixed(1)}%`]
         .map((value) => `"${String(value).replaceAll('"', '""')}"`)
         .join(','),
     );
@@ -315,7 +315,7 @@ export function FinancialPage() {
             </span>
             {costDelta != null ? <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-600">↑ {Math.abs(costDelta).toFixed(1)}%</span> : null}
           </div>
-          <h2 className="mt-4 text-2xl font-bold tracking-tight text-slate-800">{formatCurrencyFull(summary.totalCost)}</h2>
+          <h2 className="mt-4 text-2xl font-bold tracking-tight text-slate-800">{formatCost(summary.totalCost)}</h2>
           <p className="mt-1 text-sm text-slate-400">Total COGS</p>
         </article>
 
@@ -325,7 +325,7 @@ export function FinancialPage() {
               <CalendarClock size={18} />
             </span>
           </div>
-          <h2 className="mt-4 text-2xl font-bold tracking-tight text-slate-800">{formatCurrencyFull(summary.projectedCost)}</h2>
+          <h2 className="mt-4 text-2xl font-bold tracking-tight text-slate-800">{formatCost(summary.projectedCost)}</h2>
           <p className="mt-1 text-sm text-slate-400">
             Projected month-end <span className="text-slate-400">· run-rate</span>
           </p>
@@ -515,7 +515,7 @@ export function FinancialPage() {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-slate-500"><TruncatedText value={vendor.category} /></td>
-                  <td className="px-4 py-3 text-right font-semibold tabular-nums text-slate-800">{formatCurrencyFull(vendor.cost)}</td>
+                  <td className="px-4 py-3 text-right font-semibold tabular-nums text-slate-800">{formatCost(vendor.cost)}</td>
                   <td className="px-4 py-3 text-right tabular-nums text-slate-500">{vendor.share.toFixed(1)}%</td>
                 </tr>
               ))}

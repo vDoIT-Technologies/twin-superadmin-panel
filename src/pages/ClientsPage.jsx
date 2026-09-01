@@ -6,7 +6,7 @@ import { useEntityFilters } from "../app/FilterContext";
 import { TruncatedText } from "../components/common/TruncatedText";
 import { FilterDropdown } from "../components/common/FilterDropdown";
 import { dashboardService } from "../services";
-import { envBadge } from "../utils/dashboardUtils";
+import { envBadge, formatCost } from "../utils/dashboardUtils";
 import { normalizeEntityStatus } from "../utils/status";
 import { getEntityFilterParams } from "../utils/entityFilters";
 import { useDebouncedValue } from "../utils/useDebouncedValue";
@@ -26,19 +26,6 @@ function getClientId(client) {
 function formatOptionalCurrency(value) {
   if (value == null) return '---';
   return Number(value) === 0 ? '$0.00' : `$${formatOptionalNumber(value)}`;
-}
-
-function formatCostCurrency(value) {
-  if (value == null) return '---';
-  const amount = Number(value);
-  if (!Number.isFinite(amount)) return '---';
-
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
 }
 
 export function ClientsPage() {
@@ -311,7 +298,7 @@ export function ClientsPage() {
         ...(!isVault ? [client.status === 'active' ? 'Active' : client.status === 'inactive' ? 'Inactive' : '---'] : []),
         ...(!isVault ? [client.twins] : []),
         client.users,
-        formatCostCurrency(client.cost),
+        formatCost(client.cost),
         formatOptionalCurrency(client.revenue),
       ]
         .map((value) => `"${String(value).replaceAll('"', '""')}"`)
@@ -475,7 +462,7 @@ export function ClientsPage() {
                     ) : null}
                     {!isVault ? <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(client.twins)}</td> : null}
                     <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(client.users)}</td>
-                    <td className="px-4 py-3.5 text-right tabular-nums">{formatCostCurrency(client.cost)}</td>
+                    <td className="px-4 py-3.5 text-right tabular-nums">{formatCost(client.cost)}</td>
                     <td className="px-4 py-3.5 text-right tabular-nums">{formatOptionalCurrency(client.revenue)}</td>
                   </tr>
                 ))

@@ -17,7 +17,7 @@ import { useLocation, useNavigate, useParams, useSearchParams } from 'react-rout
 import { dashboardService } from '../services';
 import { useAuth } from '../app/AuthContext';
 import { FilterContext } from '../app/FilterContext';
-import { envBadge, formatCurrency, formatCurrencyUpToFourDecimals, formatNumber, ServiceUsageRow } from '../utils/dashboardUtils';
+import { envBadge, formatCost, formatCurrency, formatNumber, ServiceUsageRow } from '../utils/dashboardUtils';
 import { formatCurrencyUpToTwoDecimals } from '../utils/formatters';
 
 const DETAIL_PAGE_SIZE = 10;
@@ -183,7 +183,7 @@ function firstDecimal(...values) {
 }
 
 export const formatOptionalCurrency = (value) => value == null ? '---' : formatCurrency(value);
-const formatOptionalCost = (value) => value == null ? '---' : formatCurrencyUpToFourDecimals(value);
+const formatOptionalCost = (value) => formatCost(value);
 export const formatOptionalNumber = (value) => value == null ? '---' : formatNumber(value);
 
 const serviceLabels = {
@@ -518,7 +518,7 @@ export function ClientDetailPage() {
                       {twin.role ? <span className="block text-xs text-slate-400">{twin.role}</span> : null}
                     </span>
                   </span>
-                  <span className="w-28 text-right font-medium text-slate-600">{formatCurrency(twin.estCost || 0)}</span>
+                  <span className="w-28 text-right font-medium text-slate-600">{formatCost(twin.estCost || 0)}</span>
                   <span className="w-20 text-right font-medium text-slate-600">{twin.share || 0}%</span>
                 </div>
               ))}
@@ -981,7 +981,7 @@ export function UserDetailPage() {
         <MetricCard
           icon={Wallet}
           label="Cost"
-          value={formatCurrencyUpToFourDecimals(kpis?.cost ?? 0)}
+          value={formatCost(kpis?.cost ?? 0)}
           tone="rose"
         />
 
@@ -1274,7 +1274,7 @@ export function UserDetailPage() {
               <strong className="w-20 whitespace-nowrap text-right font-bold tabular-nums text-slate-900">
                 {totalServiceCost == null
                   ? "---"
-                  : formatCurrencyUpToFourDecimals(totalServiceCost)}
+                  : formatCost(totalServiceCost)}
               </strong>
             </div>
           </div>

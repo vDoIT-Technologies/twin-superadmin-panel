@@ -36,18 +36,53 @@ function defaultProfileFromSession(session) {
 export function AuthProvider({ children }) {
   const [authState, setAuthState] = useState(() => {
     const storedSession = readStoredSession();
+    const hasCompleteStoredSession = Boolean(storedSession?.token && storedSession?.refreshToken);
+    const initialSession = hasCompleteStoredSession ? storedSession : null;
 
-    if (storedSession?.token) {
-      setAuthToken(storedSession.token);
+    if (storedSession && !hasCompleteStoredSession) {
+      persistStoredSession(null);
     }
 
     return {
-      isLoading: false,
+      isLoading: hasCompleteStoredSession,
+      isBootstrapping: hasCompleteStoredSession,
       isLoggingOut: false,
-      session: storedSession,
-      profile: defaultProfileFromSession(storedSession),
+      session: initialSession,
+      profile: defaultProfileFromSession(initialSession),
     };
   });
+
+  useEffect(() => {
+    if (!authState.isBootstrapping) return undefined;
+
+    let active = true;
+
+    refreshAccessToken()
+      .then(() => {
+        if (!active) return;
+        const refreshedSession = readStoredSession();
+        setAuthState((prev) => ({
+          ...prev,
+          isLoading: false,
+          isBootstrapping: false,
+          session: refreshedSession,
+          profile: defaultProfileFromSession(refreshedSession),
+        }));
+      })
+      .catch(() => {
+        if (!active) return;
+        clearAuthToken();
+        setAuthState({
+          isLoading: false,
+          isBootstrapping: false,
+          isLoggingOut: false,
+          session: null,
+          profile: defaultProfileFromSession(null),
+        });
+      });
+
+    return () => { active = false; };
+  }, [authState.isBootstrapping]);
 
   useEffect(() => {
     persistStoredSession(authState.session);
@@ -57,7 +92,7 @@ export function AuthProvider({ children }) {
     const token = authState.session?.token;
     const refreshToken = authState.session?.refreshToken;
 
-    if (!token || !refreshToken) {
+    if (!token || !refreshToken || authState.isBootstrapping) {
       return undefined;
     }
 
@@ -76,7 +111,7 @@ export function AuthProvider({ children }) {
     }, refreshDelayMs);
 
     return () => window.clearTimeout(timeoutId);
-  }, [authState.session?.refreshToken, authState.session?.token]);
+  }, [authState.isBootstrapping, authState.session?.refreshToken, authState.session?.token]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
