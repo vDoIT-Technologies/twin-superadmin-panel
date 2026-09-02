@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Download, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { dashboardService, getClientsDropdown } from '../services';
+import { dashboardService, exportService, getClientsDropdown } from '../services';
 import { useEntityFilters } from '../app/FilterContext';
 import { TruncatedText } from '../components/common/TruncatedText';
 import { FilterDropdown } from '../components/common/FilterDropdown';
@@ -68,6 +68,7 @@ export function TwinsPage() {
   const [clientFilterOptions, setClientFilterOptions] = useState([]);
   const [clientNamesById, setClientNamesById] = useState({});
   const [isLoading, setIsLoading] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
   const [pagination, setPagination] = useState({ total: 0, page: 1, limit: PAGE_SIZE, totalPages: 1 });
 
   useEffect(() => {
@@ -222,15 +223,21 @@ export function TwinsPage() {
       : { key, direction: key === 'twin' || key === 'env' || key === 'client' ? 'asc' : 'desc' });
   };
 
-  const exportCsv = () => {
-    const header = ['Twin', 'Env', 'Client', 'Users', 'Status', 'Revenue', 'Points Spent'];
-    const lines = sortedRows.map((t) =>
-      [t.name, t.env, t.client, formatOptionalNumber(t.usersCount), t.status || '---', formatCost(t.cost), formatOptionalCurrency(t.revenue), formatOptionalNumber(t.totalPoints), formatOptionalNumber(t.pointsSpent)]
-        .map((v) => `"${String(v).replaceAll('"', '""')}"`).join(','));
-    const blob = new Blob([[header.join(','), ...lines].join('\n')], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a'); link.href = url; link.download = 'twins.csv'; link.click();
-    URL.revokeObjectURL(url);
+  const exportCsv = async () => {
+    setIsExporting(true);
+    try {
+      await exportService.twins({
+        clientId: filters.client || undefined,
+        env: filters.envs.length === 1 ? filters.envs[0] : undefined,
+        status: filters.status || undefined,
+        search: debouncedQuery || undefined,
+        ...getEntityFilterParams(filters.entityRange),
+      });
+    } catch (error) {
+      console.error('GET /api/v1/export/twins failed:', error);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -295,8 +302,8 @@ export function TwinsPage() {
             />
           </div>
 
-          <button type="button" className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 px-3.5 text-sm font-semibold text-slate-600 transition hover:border-indigo-300 hover:text-indigo-600" onClick={exportCsv}>
-            <Download size={14} /> Export CSV
+          <button type="button" disabled={isExporting} className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 px-3.5 text-sm font-semibold text-slate-600 transition hover:border-indigo-300 hover:text-indigo-600 disabled:cursor-not-allowed disabled:opacity-60" onClick={exportCsv}>
+            <Download size={14} /> {isExporting ? 'Exporting...' : 'Export CSV'}
           </button>
           </div>
         </div>

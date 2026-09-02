@@ -6,7 +6,7 @@ import { useEntityFilters } from '../app/FilterContext';
 import { TruncatedText } from '../components/common/TruncatedText';
 import { FilterDropdown } from '../components/common/FilterDropdown';
 import { superadminDemoData } from '../demo-data/superadminDemoData';
-import { dashboardService, dropdownApiAvailable, getClientsDropdown, getUsersDropdown } from '../services';
+import { dashboardService, dropdownApiAvailable, exportService, getClientsDropdown, getUsersDropdown } from '../services';
 import { envBadge, formatCost, formatCurrencyFull, formatNumber } from '../utils/dashboardUtils';
 import { normalizeEntityStatus } from '../utils/status';
 import { getEntityFilterParams } from '../utils/entityFilters';
@@ -130,6 +130,7 @@ export function UsersPage() {
   const [userEnrichmentByKey, setUserEnrichmentByKey] = useState({});
   const [clientFilterOptions, setClientFilterOptions] = useState([]);
   const [isTableLoading, setIsTableLoading] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
   const [pagination, setPagination] = useState({
     total: 0,
     page: 1,
@@ -463,32 +464,21 @@ export function UsersPage() {
     );
   };
 
-  const exportCsv = () => {
-    const header = ['User', 'Env', 'Client', 'Cost', 'Revenue', 'Balance Points', 'Points Spent', 'Messages', 'Sessions'];
-    const lines = sortedRows.map((user) =>
-      [
-        user.name,
-        getEnvLabel(user.env),
-        user.client || '---',
-        formatCost(user.cost),
-        formatOptionalCurrency(user.revenue),
-        formatOptionalNumber(user.totalPoints),
-        formatOptionalNumber(user.pointsSpent),
-        formatOptionalNumber(user.messages),
-        formatOptionalNumber(user.sessions),
-      ]
-        .map((value) => `"${String(value).replaceAll('"', '""')}"`)
-        .join(','),
-    );
-
-    const csv = [header.join(','), ...lines].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'users.csv';
-    link.click();
-    URL.revokeObjectURL(url);
+  const exportCsv = async () => {
+    setIsExporting(true);
+    try {
+      await exportService.users({
+        clientId: filters.client || undefined,
+        env: filters.envs.length === 1 ? filters.envs[0] : undefined,
+        status: filters.status || undefined,
+        search: debouncedQuery || undefined,
+        ...getEntityFilterParams(filters.entityRange),
+      });
+    } catch (error) {
+      console.error('GET /api/v1/export/users failed:', error);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -538,9 +528,9 @@ export function UsersPage() {
             <FilterDropdown value={filters.client} onChange={(value) => updateTableFilter('client', value)} options={clientFilterOptions} placeholder="All clients" searchPlaceholder="Search client..." tone={isVault ? 'vault' : 'twin'} />
           </div>
 
-          <button type="button" className={`inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 px-3.5 text-sm font-semibold text-slate-600 transition ${isVault ? 'hover:border-emerald-300 hover:text-emerald-700' : 'hover:border-indigo-300 hover:text-indigo-600'}`} onClick={exportCsv}>
+          <button type="button" disabled={isExporting} className={`inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 px-3.5 text-sm font-semibold text-slate-600 transition disabled:cursor-not-allowed disabled:opacity-60 ${isVault ? 'hover:border-emerald-300 hover:text-emerald-700' : 'hover:border-indigo-300 hover:text-indigo-600'}`} onClick={exportCsv}>
             <Download size={14} />
-            Export CSV
+            {isExporting ? 'Exporting...' : 'Export CSV'}
           </button>
           </div>
         </div>

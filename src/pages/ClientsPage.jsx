@@ -5,7 +5,7 @@ import { useAuth } from "../app/AuthContext";
 import { useEntityFilters } from "../app/FilterContext";
 import { TruncatedText } from "../components/common/TruncatedText";
 import { FilterDropdown } from "../components/common/FilterDropdown";
-import { dashboardService } from "../services";
+import { dashboardService, exportService } from "../services";
 import { envBadge, formatCost } from "../utils/dashboardUtils";
 import { normalizeEntityStatus } from "../utils/status";
 import { getEntityFilterParams } from "../utils/entityFilters";
@@ -43,6 +43,7 @@ export function ClientsPage() {
   const [page, setPage] = useState(1);
   const [apiClients, setApiClients] = useState([]);
   const [isTableLoading, setIsTableLoading] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
   const [pagination, setPagination] = useState({
     total: 0,
     page: 1,
@@ -281,38 +282,20 @@ export function ClientsPage() {
     );
   };
 
-  const exportCsv = () => {
-    const header = [
-      "Client",
-      "Env",
-      ...(!isVault ? ["Status"] : []),
-      ...(!isVault ? ["Twins"] : []),
-      "Users",
-      "Cost",
-      "Revenue",
-    ];
-    const lines = sortedRows.map((client) =>
-      [
-        client.name,
-        client.envs.join(" | "),
-        ...(!isVault ? [client.status === 'active' ? 'Active' : client.status === 'inactive' ? 'Inactive' : '---'] : []),
-        ...(!isVault ? [client.twins] : []),
-        client.users,
-        formatCost(client.cost),
-        formatOptionalCurrency(client.revenue),
-      ]
-        .map((value) => `"${String(value).replaceAll('"', '""')}"`)
-        .join(","),
-    );
-
-    const csv = [header.join(","), ...lines].join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "clients.csv";
-    link.click();
-    URL.revokeObjectURL(url);
+  const exportCsv = async () => {
+    setIsExporting(true);
+    try {
+      await exportService.clients({
+        env: filters.envs.length === 1 ? filters.envs[0] : undefined,
+        status: isVault ? undefined : filters.status || undefined,
+        search: debouncedQuery || undefined,
+        ...getEntityFilterParams(filters.entityRange),
+      });
+    } catch (error) {
+      console.error('GET /api/v1/export/clients failed:', error);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -375,9 +358,10 @@ export function ClientsPage() {
               type="button"
               className={`inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 px-3.5 text-sm font-semibold text-slate-600 transition ${isVault ? 'hover:border-emerald-300 hover:text-emerald-700' : 'hover:border-indigo-300 hover:text-indigo-600'}`}
               onClick={exportCsv}
+              disabled={isExporting}
             >
               <Download size={14} />
-              Export CSV
+              {isExporting ? 'Exporting...' : 'Export CSV'}
             </button>
           </div>
         </div>

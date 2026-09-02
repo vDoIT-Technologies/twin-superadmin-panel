@@ -18,6 +18,7 @@ export {
 } from './authSessionStorage';
 export { authService } from './authService';
 export { dashboardService } from './dashboardService';
+export { exportService } from './exportService';
 export {
   dropdownApiAvailable,
   getClientsDropdown,
