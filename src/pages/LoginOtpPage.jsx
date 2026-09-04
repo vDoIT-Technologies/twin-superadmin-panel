@@ -219,7 +219,7 @@ export function LoginOtpPage() {
         <div>
           <span className="inline-flex min-h-[34px] items-center gap-2 rounded-full border border-indigo-600/10 bg-white/80 px-3.5 text-xs font-bold text-indigo-600 shadow-sm">
             <ShieldCheck size={14} />
-            Twin SuperAdmin
+            SuperAdmin
           </span>
           <h1 className="mt-4 max-w-[11ch] text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl lg:leading-[0.95]">Verify your identity before entering the control room.</h1>
           <p className="mt-4 max-w-xl text-base leading-relaxed text-slate-600">

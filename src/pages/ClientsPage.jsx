@@ -9,6 +9,7 @@ import { dashboardService, exportService } from "../services";
 import { envBadge, formatCost } from "../utils/dashboardUtils";
 import { normalizeEntityStatus } from "../utils/status";
 import { getEntityFilterParams } from "../utils/entityFilters";
+import { isNumericTableSearch, matchesTableSearch, TABLE_SEARCH_DATASET_LIMIT } from "../utils/tableSearch";
 import { useDebouncedValue } from "../utils/useDebouncedValue";
 import {
   formatOptionalNumber,
@@ -23,9 +24,15 @@ function getClientId(client) {
   return id == null ? '' : String(id);
 }
 
-function formatOptionalCurrency(value) {
-  if (value == null) return '---';
-  return Number(value) === 0 ? '$0.00' : `$${formatOptionalNumber(value)}`;
+function getClientCacheKeys(client) {
+  const env = getEnvList(client)[0] || '';
+  const id = getClientId(client);
+  const name = String(client?.name ?? client?.organizationName ?? '').trim().toLowerCase();
+
+  return [
+    id ? `id:${id}:${env}` : '',
+    name ? `name:${name}:${env}` : '',
+  ].filter(Boolean);
 }
 
 export function ClientsPage() {
@@ -51,6 +58,7 @@ export function ClientsPage() {
     totalPages: 1,
   });
   const previousScopeRef = useRef('');
+  const vaultClientCacheRef = useRef(new Map());
   const clientTableColumns = useMemo(() => [
     ["client", "Client"],
     ["env", "Env"],
@@ -98,18 +106,42 @@ export function ClientsPage() {
           status: isVault ? undefined : filters.status || undefined,
           ...getEntityFilterParams(filters.entityRange),
         };
-        const data = !isVault && debouncedQuery
+        const usesLocalNumericSearch = isNumericTableSearch(debouncedQuery);
+        const data = debouncedQuery && !usesLocalNumericSearch
           ? await dashboardService.searchEntityClients({ ...requestParams, search: debouncedQuery })
-          : await dashboardService.getEntityClients(requestParams);
+          : await dashboardService.getEntityClients(usesLocalNumericSearch
+            ? { ...requestParams, page: 1, limit: TABLE_SEARCH_DATASET_LIMIT }
+            : requestParams);
 
         if (!isActive) return;
 
-        const payload = getClientsPayload(data);
+        let payload = getClientsPayload(data);
+
+        if (isVault && debouncedQuery && !usesLocalNumericSearch) {
+          payload = {
+            ...payload,
+            clients: payload.clients.map((searchClient) => {
+              const cachedClient = getClientCacheKeys(searchClient)
+                .map((key) => vaultClientCacheRef.current.get(key))
+                .find(Boolean);
+
+              return cachedClient ?? searchClient;
+            }),
+          };
+        }
+
         const scopedClients = payload.clients.filter((client) => {
           const source = String(client?.source ?? client?.type ?? '').toLowerCase();
           if (!source) return true;
           return isVault ? source === 'vault' : source !== 'vault';
         });
+        if (isVault && !debouncedQuery) {
+          scopedClients.forEach((client) => {
+            getClientCacheKeys(client).forEach((key) => {
+              vaultClientCacheRef.current.set(key, client);
+            });
+          });
+        }
         setApiClients(scopedClients);
         setPagination({
           total: Number(payload.pagination?.total) || 0,
@@ -209,11 +241,23 @@ export function ClientsPage() {
     const normalizedQuery = query.trim().toLowerCase();
     return clientRows.filter((client) => {
       const matchesStatus = isVault || !filters.status || client.status === filters.status;
-      const matchesQuery = (!isVault && debouncedQuery) || !normalizedQuery || [client.name, client.plan, ...client.envs]
-        .some((value) => String(value ?? '').toLowerCase().includes(normalizedQuery));
+      const matchesQuery = matchesTableSearch(normalizedQuery, [
+        client.name,
+        client.plan,
+        ...client.envs,
+        client.status,
+        client.twins,
+        formatOptionalNumber(client.twins),
+        client.users,
+        formatOptionalNumber(client.users),
+        client.cost,
+        formatCost(client.cost),
+        client.revenue,
+        formatCost(client.revenue),
+      ]);
       return matchesStatus && matchesQuery;
     });
-  }, [clientRows, debouncedQuery, filters.status, isVault, query]);
+  }, [clientRows, filters.status, isVault, query]);
 
   const sortedRows = useMemo(() => {
     const getSortValue = (client) => {
@@ -257,8 +301,9 @@ export function ClientsPage() {
     });
   }, [filteredRows, sortConfig]);
 
-  const totalPages = Math.max(1, pagination.totalPages || 1);
-  const scopedTotal = pagination.total;
+  const usesLocalNumericSearch = isNumericTableSearch(debouncedQuery);
+  const totalPages = usesLocalNumericSearch ? 1 : Math.max(1, pagination.totalPages || 1);
+  const scopedTotal = usesLocalNumericSearch ? sortedRows.length : pagination.total;
   const scopedTotalPages = totalPages;
   const currentPage = Math.min(page, scopedTotalPages);
   const pageStart =
@@ -447,7 +492,7 @@ export function ClientsPage() {
                     {!isVault ? <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(client.twins)}</td> : null}
                     <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(client.users)}</td>
                     <td className="px-4 py-3.5 text-right tabular-nums">{formatCost(client.cost)}</td>
-                    <td className="px-4 py-3.5 text-right tabular-nums">{formatOptionalCurrency(client.revenue)}</td>
+                    <td className="px-4 py-3.5 text-right tabular-nums">{formatCost(client.revenue)}</td>
                   </tr>
                 ))
               )}
