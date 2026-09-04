@@ -10,6 +10,7 @@ import { normalizeEntityStatus } from '../utils/status';
 import { getEntityFilterParams } from '../utils/entityFilters';
 import { superadminDemoData } from '../demo-data/superadminDemoData';
 import { useDebouncedValue } from '../utils/useDebouncedValue';
+import { isNumericTableSearch, matchesTableSearch, TABLE_SEARCH_DATASET_LIMIT } from '../utils/tableSearch';
 
 function getTwinInitials(name) {
   if (!name) return '?';
@@ -49,11 +50,6 @@ function parseOptionalNumber(value) {
 
 function formatOptionalNumber(value) {
   return value == null ? '---' : formatNumber(value);
-}
-
-function formatOptionalCurrency(value) {
-  if (value == null) return '---';
-  return Number(value) === 0 ? '$0.00' : `$${formatNumber(value)}`;
 }
 
 export function TwinsPage() {
@@ -108,9 +104,12 @@ export function TwinsPage() {
           env: filters.envs.length === 1 ? filters.envs[0] : undefined,
           ...getEntityFilterParams(filters.entityRange),
         };
-        const data = debouncedQuery
+        const usesLocalNumericSearch = isNumericTableSearch(debouncedQuery);
+        const data = debouncedQuery && !usesLocalNumericSearch
           ? await dashboardService.searchEntityTwins({ ...requestParams, search: debouncedQuery })
-          : await dashboardService.getEntityTwins(requestParams);
+          : await dashboardService.getEntityTwins(usesLocalNumericSearch
+            ? { ...requestParams, page: 1, limit: TABLE_SEARCH_DATASET_LIMIT }
+            : requestParams);
         if (!active) return;
         const payload = getPayload(data);
         setApiTwins(payload.items);
@@ -174,7 +173,6 @@ export function TwinsPage() {
  
 
   const filteredRows = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
     const selectedClientId = getId(filters.client);
     const selectedClientName = selectedClientId
       ? clientNamesById[selectedClientId]?.trim().toLowerCase()
@@ -184,11 +182,26 @@ export function TwinsPage() {
         || twin.clientId === selectedClientId
         || (selectedClientName && twin.clientName.trim().toLowerCase() === selectedClientName);
       const matchesStatus = !filters.status || twin.status === filters.status;
-      const matchesQuery = debouncedQuery || !normalizedQuery || [twin.name, twin.role, twin.client, twin.env, twin.status]
-        .some((value) => String(value ?? '').toLowerCase().includes(normalizedQuery));
+      const matchesQuery = matchesTableSearch(query, [
+        twin.name,
+        twin.role,
+        twin.env,
+        twin.client,
+        twin.usersCount,
+        formatOptionalNumber(twin.usersCount),
+        twin.status,
+        twin.cost,
+        formatCost(twin.cost),
+        twin.revenue,
+        formatCost(twin.revenue),
+        twin.totalPoints,
+        formatOptionalNumber(twin.totalPoints),
+        twin.pointsSpent,
+        formatOptionalNumber(twin.pointsSpent),
+      ]);
       return matchesClient && matchesStatus && matchesQuery;
     });
-  }, [clientNamesById, debouncedQuery, filters.client, filters.status, query, twinRows]);
+  }, [clientNamesById, filters.client, filters.status, query, twinRows]);
 
   const sortedRows = useMemo(() => {
     const getVal = (t) => {
@@ -212,10 +225,12 @@ export function TwinsPage() {
     });
   }, [filteredRows, sortConfig]);
 
-  const totalPages = Math.max(1, pagination.totalPages);
+  const usesLocalNumericSearch = isNumericTableSearch(debouncedQuery);
+  const totalPages = usesLocalNumericSearch ? 1 : Math.max(1, pagination.totalPages);
   const currentPage = Math.min(page, totalPages);
   const pageStart = sortedRows.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
   const pageEnd = sortedRows.length === 0 ? 0 : pageStart + sortedRows.length - 1;
+  const displayedTotal = usesLocalNumericSearch ? sortedRows.length : pagination.total;
 
   const toggleSort = (key) => {
     setSortConfig((prev) => prev.key === key
@@ -348,7 +363,7 @@ export function TwinsPage() {
                   <td className="px-4 py-3.5 text-slate-500">
                     {twin.status ? <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${twin.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{twin.status === 'active' ? 'Active' : 'Inactive'}</span> : '---'}
                   </td>
-                  <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalCurrency(twin.revenue)}</td>
+                  <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatCost(twin.revenue)}</td>
                   <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(twin.pointsSpent)}</td>
                 </tr>
               ))}
@@ -364,7 +379,7 @@ export function TwinsPage() {
         </div>
 
         <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-5 py-3 text-sm text-slate-400">
-          <span>{pageStart}-{pageEnd} of {pagination.total}</span>
+          <span>{pageStart}-{pageEnd} of {displayedTotal}</span>
           <div className="flex items-center gap-2 font-medium text-slate-600">
             <button type="button" className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 disabled:opacity-40" disabled={currentPage === 1 || isLoading} aria-label="Previous page" onClick={() => setPage((p) => Math.max(1, p - 1))}><ChevronLeft size={14} /></button>
             <span>{currentPage} / {totalPages}</span>

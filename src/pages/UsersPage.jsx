@@ -7,9 +7,10 @@ import { TruncatedText } from '../components/common/TruncatedText';
 import { FilterDropdown } from '../components/common/FilterDropdown';
 import { superadminDemoData } from '../demo-data/superadminDemoData';
 import { dashboardService, dropdownApiAvailable, exportService, getClientsDropdown, getUsersDropdown } from '../services';
-import { envBadge, formatCost, formatCurrencyFull, formatNumber } from '../utils/dashboardUtils';
+import { envBadge, formatCost, formatNumber } from '../utils/dashboardUtils';
 import { normalizeEntityStatus } from '../utils/status';
 import { getEntityFilterParams } from '../utils/entityFilters';
+import { isNumericTableSearch, matchesTableSearch, TABLE_SEARCH_DATASET_LIMIT } from '../utils/tableSearch';
 import { useDebouncedValue } from '../utils/useDebouncedValue';
 
 function getUserInitials(name) {
@@ -41,10 +42,6 @@ function parseDecimal(value) {
 
 function formatOptionalNumber(value) {
   return value == null ? '---' : formatNumber(value);
-}
-
-function formatOptionalCurrency(value) {
-  return value == null ? '---' : formatCurrencyFull(value);
 }
 
 function getUsersPayload(response) {
@@ -203,9 +200,12 @@ export function UsersPage() {
           // userId:'6a71c9b32ae93520d98c72eb',
           ...getEntityFilterParams(filters.entityRange),
         };
-        const data = !isVault && debouncedQuery
+        const usesLocalNumericSearch = isNumericTableSearch(debouncedQuery);
+        const data = debouncedQuery && !usesLocalNumericSearch
           ? await dashboardService.searchEntityUsers({ ...requestParams, search: debouncedQuery })
-          : await dashboardService.getEntityUsers(requestParams);
+          : await dashboardService.getEntityUsers(usesLocalNumericSearch
+            ? { ...requestParams, page: 1, limit: TABLE_SEARCH_DATASET_LIMIT }
+            : requestParams);
 
         console.log('GET /api/v1/entities/users response:', data);
 
@@ -336,8 +336,42 @@ export function UsersPage() {
         //   ?? enrichment?.client?.name
         //   ?? clientNamesById[clientId]
           ?? '';
-        const totalPoints = parseDecimal(user?.totalPoints ?? enrichment?.totalPoints ?? 0);
-        const pointsSpent = parseDecimal(user?.pointsSpent ?? enrichment?.pointsSpent ?? 0);
+        const totalPoints = parseDecimal(
+          user?.totalPoints
+          ?? user?.points
+          ?? user?.pointsBalance
+          ?? user?.pointBalance
+          ?? user?.balancePoints
+          ?? user?.balance
+          ?? user?.kpis?.totalPoints
+          ?? user?.kpis?.pointsBalance
+          ?? enrichment?.totalPoints
+          ?? enrichment?.points
+          ?? enrichment?.pointsBalance
+          ?? enrichment?.pointBalance
+          ?? enrichment?.balancePoints
+          ?? enrichment?.balance
+          ?? enrichment?.kpis?.totalPoints
+          ?? enrichment?.kpis?.pointsBalance
+          ?? 0,
+        );
+        const pointsSpent = parseDecimal(
+          user?.pointsSpent
+          ?? user?.spentPoints
+          ?? user?.totalPointsSpent
+          ?? user?.pointsUsed
+          ?? user?.points_spent
+          ?? user?.kpis?.pointsSpent
+          ?? user?.kpis?.totalPointsSpent
+          ?? enrichment?.pointsSpent
+          ?? enrichment?.spentPoints
+          ?? enrichment?.totalPointsSpent
+          ?? enrichment?.pointsUsed
+          ?? enrichment?.points_spent
+          ?? enrichment?.kpis?.pointsSpent
+          ?? enrichment?.kpis?.totalPointsSpent
+          ?? 0,
+        );
         const cost = parseDecimal(user?.usage?.cost ?? enrichment?.usage?.cost ?? 0, 2);
         const revenue = parseDecimal(
           user?.revenue?.totalAmount
@@ -398,13 +432,26 @@ export function UsersPage() {
         || user.clientId === selectedClientId
         || (selectedClientName && user.client.trim().toLowerCase() === selectedClientName);
       const matchesStatus = !filters.status || user.status === filters.status;
-      const matchesQuery = (!isVault && debouncedQuery) || !q
-        || user.name.toLowerCase().includes(q)
-        || user.client.toLowerCase().includes(q)
-        || getEnvLabel(user.env).toLowerCase().includes(q);
+      const matchesQuery = matchesTableSearch(q, [
+        user.name,
+        getEnvLabel(user.env),
+        user.client,
+        user.cost,
+        formatCost(user.cost),
+        user.revenue,
+        formatCost(user.revenue),
+        user.totalPoints,
+        formatOptionalNumber(user.totalPoints),
+        user.pointsSpent,
+        formatOptionalNumber(user.pointsSpent),
+        user.messages,
+        formatOptionalNumber(user.messages),
+        user.sessions,
+        formatOptionalNumber(user.sessions),
+      ]);
       return matchesClient && matchesStatus && matchesQuery;
     });
-  }, [clientNamesById, debouncedQuery, filters.client, filters.status, isVault, query, userRows]);
+  }, [clientNamesById, filters.client, filters.status, query, userRows]);
 
   const sortedRows = useMemo(() => {
     const getSortValue = (user) => {
@@ -450,11 +497,13 @@ export function UsersPage() {
     return nextRows;
   }, [filteredRows, sortConfig]);
 
-  const totalPages = Math.max(1, pagination.totalPages || 1);
+  const usesLocalNumericSearch = isNumericTableSearch(debouncedQuery);
+  const totalPages = usesLocalNumericSearch ? 1 : Math.max(1, pagination.totalPages || 1);
   const currentPage = Math.min(page, totalPages);
   const paginatedRows = sortedRows;
   const pageStart = paginatedRows.length === 0 ? 0 : (currentPage - 1) * (pagination.limit || PAGE_SIZE) + 1;
   const pageEnd = paginatedRows.length === 0 ? 0 : pageStart + paginatedRows.length - 1;
+  const displayedTotal = usesLocalNumericSearch ? paginatedRows.length : pagination.total;
 
   const toggleSort = (key) => {
     setSortConfig((prev) =>
@@ -587,7 +636,7 @@ export function UsersPage() {
                     <td className="px-4 py-3.5 text-center text-slate-500">{superadminDemoData.ENV_META[user.env] ? envBadge(user.env) : getEnvLabel(user.env)}</td>
                     <td className="px-4 py-3.5 text-slate-500"><TruncatedText value={user.client || '---'} /></td>
                     <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatCost(user.cost)}</td>
-                    <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalCurrency(user.revenue)}</td>
+                    <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatCost(user.revenue)}</td>
                     <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{user.totalPoints}</td>
                     <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{user.pointsSpent}</td>
                     <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(user.messages)}</td>
@@ -608,7 +657,7 @@ export function UsersPage() {
 
         <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-5 py-3 text-sm text-slate-400">
           <span>
-            {pageStart}-{pageEnd} of {pagination.total}
+            {pageStart}-{pageEnd} of {displayedTotal}
           </span>
           <div className="flex items-center gap-2 font-medium text-slate-600">
             <button
