@@ -36,11 +36,11 @@ function LegacyAppRedirect() {
   return <Navigate to={nextPath} replace />;
 }
 
-function AuthScreenMessage({ message }) {
+function AuthScreenMessage({ message, title = 'SuperAdmin' }) {
   return (
     <section className="grid min-h-screen place-items-center bg-[radial-gradient(circle_at_top,rgba(99,102,241,0.14),transparent_36%),linear-gradient(180deg,#eff6ff_0%,#f8fafc_55%,#eef2ff_100%)] p-6">
       <div className="w-full max-w-[420px] rounded-3xl border border-slate-400/25 bg-white/90 p-7 text-center shadow-2xl backdrop-blur-md">
-        <span className="inline-flex min-h-[34px] items-center gap-2 rounded-full border border-indigo-600/10 bg-white/80 px-3.5 text-xs font-bold text-indigo-600 shadow-sm">SuperAdmin</span>
+        <span className="inline-flex min-h-[34px] items-center gap-2 rounded-full border border-indigo-600/10 bg-white/80 px-3.5 text-xs font-bold text-indigo-600 shadow-sm">{title}</span>
         <p className="mt-3.5 text-sm text-slate-600">{message}</p>
       </div>
     </section>
@@ -48,11 +48,17 @@ function AuthScreenMessage({ message }) {
 }
 
 function RequireAuth() {
-  const { isAuthenticated, isLoading, isLoggingOut } = useAuth();
+  const { adminProduct, isAuthenticated, isLoading, isLoggingOut } = useAuth();
   const location = useLocation();
 
   if (isLoading) {
-    return <AuthScreenMessage message={isLoggingOut ? 'Signing you out...' : 'Signing you in...'} />;
+    const productName = adminProduct === 'vault' ? 'Vault' : 'Twin';
+    return (
+      <AuthScreenMessage
+        title={isLoggingOut ? `${productName} SuperAdmin` : 'SuperAdmin'}
+        message={isLoggingOut ? 'Signing out...' : 'Signing you in...'}
+      />
+    );
   }
 
   if (!isAuthenticated) {
