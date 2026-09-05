@@ -532,7 +532,7 @@ export function UsersPage() {
 
   return (
     <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-panel">
+      <section className="overflow-visible rounded-2xl border border-slate-200 bg-white shadow-panel">
         <div className="border-b border-slate-100 px-5 py-4">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
           <label className="flex h-10 w-full shrink-0 items-center gap-2 rounded-xl bg-slate-50 px-3 text-slate-400 xl:w-64">
