@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Download, Search } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { dashboardService, exportService, getClientsDropdown } from '../services';
 import { useEntityFilters } from '../app/FilterContext';
 import { TruncatedText } from '../components/common/TruncatedText';
@@ -56,10 +56,16 @@ export function TwinsPage() {
   const PAGE_SIZE = 10;
   const [filters, setFilters] = useEntityFilters('twins');
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebouncedValue(query.trim());
   const [sortConfig, setSortConfig] = useState({ key: 'pointsSpent', direction: 'desc' });
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(() => {
+    const requestedPage = Number(searchParams.get('page'));
+    return Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+  });
+  const previousFilterScopeRef = useRef(null);
   const [apiTwins, setApiTwins] = useState([]);
   const [clientFilterOptions, setClientFilterOptions] = useState([]);
   const [clientNamesById, setClientNamesById] = useState({});
@@ -102,6 +108,7 @@ export function TwinsPage() {
           limit: PAGE_SIZE,
           clientId: filters.client,
           env: filters.envs.length === 1 ? filters.envs[0] : undefined,
+          status: filters.status || undefined,
           ...getEntityFilterParams(filters.entityRange),
         };
         const usesLocalNumericSearch = isNumericTableSearch(debouncedQuery);
@@ -129,11 +136,29 @@ export function TwinsPage() {
 
     load();
     return () => { active = false; };
-  }, [debouncedQuery, filters.client, filters.entityRange, filters.envs, page]);
+  }, [debouncedQuery, filters.client, filters.entityRange, filters.envs, filters.status, page]);
 
   useEffect(() => {
-    setPage(1);
-  }, [filters.client, filters.entityRange, filters.envs]);
+    const scopeKey = JSON.stringify({
+      client: filters.client,
+      entityRange: filters.entityRange,
+      envs: filters.envs,
+      status: filters.status,
+    });
+    const scopeChanged = previousFilterScopeRef.current !== null
+      && previousFilterScopeRef.current !== scopeKey;
+    previousFilterScopeRef.current = scopeKey;
+    if (scopeChanged) setPage(1);
+  }, [filters.client, filters.entityRange, filters.envs, filters.status]);
+
+  useEffect(() => {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      if (page > 1) next.set('page', String(page));
+      else next.delete('page');
+      return next;
+    }, { replace: true });
+  }, [page, setSearchParams]);
 
   const twinRows = useMemo(() => apiTwins.map((t, i) => {
     const clientId = getId(t.clientId ?? t.client?._id ?? t.client?.id);
@@ -350,7 +375,13 @@ export function TwinsPage() {
               ) : sortedRows.length === 0 ? (
                 <tr><td colSpan={7} className="px-5 py-12 text-center text-sm text-slate-400">No twins found</td></tr>
               ) : sortedRows.map((twin) => (
-                <tr key={twin.rowKey} className="cursor-pointer border-t border-slate-100 transition hover:bg-slate-50" onClick={() => navigate(twin.detailRoute)}>
+                <tr
+                  key={twin.rowKey}
+                  className="cursor-pointer border-t border-slate-100 transition hover:bg-slate-50"
+                  onClick={() => navigate(twin.detailRoute, {
+                    state: { from: `${location.pathname}${location.search}` },
+                  })}
+                >
                   <td className="px-4 py-3.5">
                     <div className="flex items-center gap-3">
                       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-violet-100 text-xs font-bold text-violet-600">{getTwinInitials(twin.name)}</span>

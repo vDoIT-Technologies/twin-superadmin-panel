@@ -506,10 +506,14 @@ export function ClientDetailPage() {
                 <div
                   key={twin._id}
                   className="flex cursor-pointer items-center justify-between border-b border-slate-100 px-5 py-3.5 transition hover:bg-slate-50"
-                  onClick={() => navigate(`/twins/${twin._id}`)}
+                  onClick={() => navigate(`/twins/${twin._id}`, {
+                    state: { from: `${location.pathname}${location.search}` },
+                  })}
                   role="button"
                   tabIndex={0}
-                  onKeyDown={(e) => e.key === 'Enter' && navigate(`/twins/${twin._id}`)}
+                  onKeyDown={(e) => e.key === 'Enter' && navigate(`/twins/${twin._id}`, {
+                    state: { from: `${location.pathname}${location.search}` },
+                  })}
                 >
                   <span className="flex flex-1 items-center gap-3">
                     <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-purple-100 text-xs font-bold text-purple-600">{getInitials(twin.name || '')}</span>
@@ -552,10 +556,14 @@ export function ClientDetailPage() {
                 <div
                   key={user._id}
                   className="flex cursor-pointer items-center justify-between border-b border-slate-100 px-5 py-3.5 transition hover:bg-slate-50"
-                  onClick={() => navigate(`/users/${user._id}`)}
+                  onClick={() => navigate(`/users/${user._id}`, {
+                    state: { from: `${location.pathname}${location.search}` },
+                  })}
                   role="button"
                   tabIndex={0}
-                  onKeyDown={(e) => e.key === 'Enter' && navigate(`/users/${user._id}`)}
+                  onKeyDown={(e) => e.key === 'Enter' && navigate(`/users/${user._id}`, {
+                    state: { from: `${location.pathname}${location.search}` },
+                  })}
                 >
                   <span className="flex flex-1 items-center gap-3">
                     <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-indigo-100 text-xs font-bold text-indigo-600">{getInitials(user.name || '')}</span>
@@ -646,6 +654,7 @@ export function ClientDetailPage() {
 
 export function TwinDetailPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { twinId } = useParams();
   const [searchParams] = useSearchParams();
   const selectedEnv = searchParams.get('env') || '';
@@ -694,7 +703,7 @@ export function TwinDetailPage() {
         initials={getInitials(profile?.name || '')}
         title={profile?.name || 'Unnamed'}
         subtitle={`${profile?.role || ''} · ${profile?.clientName || ''}`}
-        onBack={() => navigate('/twins')}
+        onBack={() => navigate(location.state?.from || '/twins')}
       />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -729,6 +738,7 @@ export function TwinDetailPage() {
 export function UserDetailPage() {
   const { adminProduct } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { userId } = useParams();
   const [searchParams] = useSearchParams();
   const selectedEnv = searchParams.get('env') || '';
@@ -973,7 +983,7 @@ export function UserDetailPage() {
             <span>{profile?.env || ""}</span>
           </>
         }
-        onBack={() => navigate("/users")}
+        onBack={() => navigate(location.state?.from || "/users")}
       />
 
       {/* KPI Cards */}
@@ -1104,7 +1114,9 @@ export function UserDetailPage() {
                     title={getTwinName(twin) || "Name unavailable"}
                     subtitle={twin.role || ""}
                     onClick={() =>
-                      navigate(`/twins/${twin._id ?? twin.id ?? twin.twinId}`)
+                      navigate(`/twins/${twin._id ?? twin.id ?? twin.twinId}`, {
+                        state: { from: `${location.pathname}${location.search}` },
+                      })
                     }
                   />
                 ))}
