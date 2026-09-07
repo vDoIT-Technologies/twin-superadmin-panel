@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Download, Search } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../app/AuthContext";
 import { useEntityFilters } from "../app/FilterContext";
 import { TruncatedText } from "../components/common/TruncatedText";
@@ -41,13 +41,18 @@ export function ClientsPage() {
   const PAGE_SIZE = 10;
   const [filters, setFilters] = useEntityFilters('clients');
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebouncedValue(query.trim());
   const [sortConfig, setSortConfig] = useState({
     key: "cost",
     direction: "desc",
   });
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(() => {
+    const requestedPage = Number(searchParams.get('page'));
+    return Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+  });
   const [apiClients, setApiClients] = useState([]);
   const [isTableLoading, setIsTableLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
@@ -57,7 +62,7 @@ export function ClientsPage() {
     limit: PAGE_SIZE,
     totalPages: 1,
   });
-  const previousScopeRef = useRef('');
+  const previousScopeRef = useRef(null);
   const vaultClientCacheRef = useRef(new Map());
   const clientTableColumns = useMemo(() => [
     ["client", "Client"],
@@ -89,7 +94,7 @@ export function ClientsPage() {
       range: filters.entityRange,
       status: isVault ? null : filters.status,
     });
-    const scopeChanged = previousScopeRef.current !== scopeKey;
+    const scopeChanged = previousScopeRef.current !== null && previousScopeRef.current !== scopeKey;
     previousScopeRef.current = scopeKey;
     const requestedPage = scopeChanged ? 1 : page;
 
@@ -164,6 +169,15 @@ export function ClientsPage() {
       isActive = false;
     };
   }, [debouncedQuery, filters.entityRange, filters.envs, filters.status, isVault, page]);
+
+  useEffect(() => {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      if (page > 1) next.set('page', String(page));
+      else next.delete('page');
+      return next;
+    }, { replace: true });
+  }, [page, setSearchParams]);
 
   const clientRows = useMemo(() => {
     return apiClients.map((client, index) => {
@@ -456,7 +470,9 @@ export function ClientsPage() {
                   <tr
                     key={client.rowKey}
                     className="cursor-pointer border-t border-slate-100 transition hover:bg-slate-50"
-                    onClick={() => navigate(client.detailRoute)}
+                    onClick={() => navigate(client.detailRoute, {
+                      state: { from: `${location.pathname}${location.search}` },
+                    })}
                   >
                     <td className="px-4 py-3.5 text-left">
                       <div className="flex items-center gap-3">
