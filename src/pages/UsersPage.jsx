@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Download, Search } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../app/AuthContext';
 import { useEntityFilters } from '../app/FilterContext';
 import { TruncatedText } from '../components/common/TruncatedText';
@@ -118,10 +118,16 @@ export function UsersPage() {
   const PAGE_SIZE = 10;
   const [filters, setFilters] = useEntityFilters('users');
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebouncedValue(query.trim());
   const [sortConfig, setSortConfig] = useState({ key: 'pointsSpent', direction: 'desc' });
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(() => {
+    const requestedPage = Number(searchParams.get('page'));
+    return Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+  });
+  const previousFilterScopeRef = useRef(null);
   const [apiUsers, setApiUsers] = useState([]);
   const [clientNamesById, setClientNamesById] = useState({});
   const [userEnrichmentByKey, setUserEnrichmentByKey] = useState({});
@@ -308,8 +314,25 @@ export function UsersPage() {
   }, [filters.envs, isVault]);
 
   useEffect(() => {
-    setPage(1);
+    const scopeKey = JSON.stringify({
+      client: filters.client,
+      entityRange: filters.entityRange,
+      envs: filters.envs,
+    });
+    const scopeChanged = previousFilterScopeRef.current !== null
+      && previousFilterScopeRef.current !== scopeKey;
+    previousFilterScopeRef.current = scopeKey;
+    if (scopeChanged) setPage(1);
   }, [filters.client, filters.entityRange, filters.envs]);
+
+  useEffect(() => {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      if (page > 1) next.set('page', String(page));
+      else next.delete('page');
+      return next;
+    }, { replace: true });
+  }, [page, setSearchParams]);
 
     const userRows = useMemo(() => {
     console.log("API", apiUsers);
@@ -626,7 +649,13 @@ export function UsersPage() {
                 </tr>
               ) : (
                 paginatedRows.map((user) => (
-                  <tr key={user.rowKey} className="cursor-pointer border-t border-slate-100 transition hover:bg-slate-50" onClick={() => navigate(user.detailRoute)}>
+                  <tr
+                    key={user.rowKey}
+                    className="cursor-pointer border-t border-slate-100 transition hover:bg-slate-50"
+                    onClick={() => navigate(user.detailRoute, {
+                      state: { from: `${location.pathname}${location.search}` },
+                    })}
+                  >
                     <td className="px-4 py-3.5">
                       <div className="flex min-w-0 items-center gap-3">
                         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-amber-100 text-xs font-bold text-amber-600">{getUserInitials(user.name || '?')}</span>

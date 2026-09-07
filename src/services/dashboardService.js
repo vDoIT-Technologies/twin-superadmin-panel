@@ -114,6 +114,7 @@ export const dashboardService = {
         clientId: params.clientId,
         twinId: params.twinId,
         env: params.env,
+        status: params.status,
         filter: params.filter,
         from: params.from,
         to: params.to,
