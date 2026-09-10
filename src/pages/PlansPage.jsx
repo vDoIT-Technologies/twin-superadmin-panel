@@ -76,9 +76,78 @@ const blankSubscriptionForm = {
   timePeriod: 'Monthly',
   storageLimit: '1000',
   points: '12000',
+  discountType: '',
+  discountValue: '',
   status: 'Active',
   description: '',
 };
+
+const VALID_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9 '&().-]*$/;
+const POSITIVE_INTEGER_PATTERN = /^\d+$/;
+const POSITIVE_DECIMAL_PATTERN = /^\d+(\.\d{1,2})?$/;
+
+function validateName(value, label) {
+  const trimmedValue = value.trim();
+  if (!trimmedValue) return `${label} is required.`;
+  if (trimmedValue.length < 2 || trimmedValue.length > 80) return `${label} must be between 2 and 80 characters.`;
+  if (!VALID_NAME_PATTERN.test(trimmedValue)) return `${label} can only contain letters, numbers, spaces, and common punctuation.`;
+  return '';
+}
+
+function validatePositiveInteger(value, label, required = true) {
+  if (String(value).trim() === '') return required ? `${label} is required.` : '';
+  if (!POSITIVE_INTEGER_PATTERN.test(String(value)) || Number(value) <= 0) return `${label} must be a whole number greater than 0.`;
+  return '';
+}
+
+function validatePrice(value, label) {
+  if (String(value).trim() === '') return `${label} is required.`;
+  if (!POSITIVE_DECIMAL_PATTERN.test(String(value)) || Number(value) <= 0) return `${label} must be greater than 0 with up to 2 decimal places.`;
+  return '';
+}
+
+function validateDiscount(form) {
+  const hasType = Boolean(form.discountType);
+  const hasValue = String(form.discountValue).trim() !== '';
+  const errors = {};
+
+  if (hasType !== hasValue) {
+    if (!hasType) errors.discountType = 'Discount type is required when a discount value is provided.';
+    if (!hasValue) errors.discountValue = 'Discount value is required when a discount type is selected.';
+  } else if (hasValue && (!POSITIVE_DECIMAL_PATTERN.test(String(form.discountValue)) || Number(form.discountValue) < 0)) {
+    errors.discountValue = 'Discount value must be 0 or greater with up to 2 decimal places.';
+  } else if (hasValue && form.discountType === 'percentage' && Number(form.discountValue) > 100) {
+    errors.discountValue = 'Percentage discount cannot exceed 100.';
+  }
+
+  return errors;
+}
+
+function validatePointPackage(form) {
+  return {
+    label: validateName(form.label, 'Label'),
+    points: validatePositiveInteger(form.points, 'Points'),
+    price: validatePrice(form.price, 'Price'),
+    status: form.status ? '' : 'Status is required.',
+    ...validateDiscount(form),
+  };
+}
+
+function validateStoragePackage(form) {
+  return {
+    name: validateName(form.name, 'Name'),
+    storageLimit: validatePositiveInteger(form.storageLimit, 'Storage'),
+    amount: validatePrice(form.amount, 'Price'),
+    timePeriod: form.timePeriod ? '' : 'Time period is required.',
+    status: form.status ? '' : 'Status is required.',
+    points: validatePositiveInteger(form.points, 'Points', false),
+    ...validateDiscount(form),
+  };
+}
+
+function hasErrors(errors) {
+  return Object.values(errors).some(Boolean);
+}
 
 function StatCard({ icon: Icon, label, value, tone }) {
   return (
@@ -193,12 +262,13 @@ function PackageCard({
   );
 }
 
-function Field({ label, children, hint }) {
+function Field({ label, children, hint, error }) {
   return (
     <label className="block">
       <span className="text-sm font-semibold text-slate-700">{label}</span>
       {children}
-      {hint ? <span className="mt-1 block text-xs text-slate-400">{hint}</span> : null}
+      {error ? <span className="mt-1 block text-[10px] font-medium leading-4 text-rose-600">{error}</span> : null}
+      {!error && hint ? <span className="mt-1 block text-xs text-slate-400">{hint}</span> : null}
     </label>
   );
 }
@@ -226,7 +296,7 @@ function ThemedDropdown({ value, onChange, options, placeholder }) {
 function Modal({ title, subtitle, onClose, children }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-2xl rounded-[2rem] border border-emerald-100 bg-white p-6 shadow-2xl">
+      <div className="max-h-[calc(100vh-2rem)] w-full max-w-2xl overflow-y-auto rounded-[2rem] border border-emerald-100 bg-white p-6 shadow-2xl">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-600">Package Builder</p>
@@ -260,6 +330,10 @@ export function PlansPage() {
   const [editingPointForm, setEditingPointForm] = useState(blankPointForm);
   const [editingSubscriptionId, setEditingSubscriptionId] = useState(null);
   const [editingSubscriptionForm, setEditingSubscriptionForm] = useState(blankSubscriptionForm);
+  const [pointErrors, setPointErrors] = useState({});
+  const [subscriptionErrors, setSubscriptionErrors] = useState({});
+  const [editingPointErrors, setEditingPointErrors] = useState({});
+  const [editingSubscriptionErrors, setEditingSubscriptionErrors] = useState({});
 
   const totalPointRevenue = useMemo(
     () => pointPackages.reduce((sum, item) => sum + Number(item.price || 0), 0),
@@ -272,13 +346,18 @@ export function PlansPage() {
 
   const handlePointChange = (key, value) => {
     setPointForm((prev) => ({ ...prev, [key]: value }));
+    setPointErrors((prev) => ({ ...prev, [key]: '' }));
   };
 
   const handleSubscriptionChange = (key, value) => {
     setSubscriptionForm((prev) => ({ ...prev, [key]: value }));
+    setSubscriptionErrors((prev) => ({ ...prev, [key]: '' }));
   };
 
   const savePointPackage = () => {
+    const errors = validatePointPackage(pointForm);
+    setPointErrors(errors);
+    if (hasErrors(errors)) return;
     const payload = {
       id: pointForm.id || `pt-${pointForm.label.trim().toLowerCase().replace(/\s+/g, '-')}`,
       label: pointForm.label.trim() || 'Untitled Package',
@@ -299,13 +378,18 @@ export function PlansPage() {
   };
 
   const saveSubscriptionPackage = () => {
+    const errors = validateStoragePackage(subscriptionForm);
+    setSubscriptionErrors(errors);
+    if (hasErrors(errors)) return;
     const payload = {
       id: subscriptionForm.id || `sub-${subscriptionForm.name.trim().toLowerCase().replace(/\s+/g, '-')}`,
-      name: subscriptionForm.name.trim() || 'Untitled Subscription',
+      name: subscriptionForm.name.trim() || 'Untitled Storage Package',
       amount: Number(subscriptionForm.amount || 0),
       timePeriod: subscriptionForm.timePeriod,
       storageLimit: Number(subscriptionForm.storageLimit || 0),
       points: Number(subscriptionForm.points || 0),
+      discountType: subscriptionForm.discountType || null,
+      discountValue: subscriptionForm.discountValue === '' ? null : Number(subscriptionForm.discountValue),
       status: subscriptionForm.status,
       description: subscriptionForm.description.trim() || 'No description added yet.',
     };
@@ -319,6 +403,7 @@ export function PlansPage() {
   };
 
   const editPointPackage = (item) => {
+    setEditingPointErrors({});
     setEditingPointId(item.id);
     setEditingPointForm({
       id: item.id,
@@ -326,13 +411,14 @@ export function PlansPage() {
       tag: item.tag ?? 'Most Popular',
       points: String(item.points),
       price: String(item.price),
-      discountType: item.discountType,
-      discountValue: String(item.discountValue),
+      discountType: item.discountType ?? '',
+      discountValue: item.discountValue == null ? '' : String(item.discountValue),
       status: item.status,
     });
   };
 
   const editSubscriptionPackage = (item) => {
+    setEditingSubscriptionErrors({});
     setEditingSubscriptionId(item.id);
     setEditingSubscriptionForm({
       id: item.id,
@@ -341,6 +427,8 @@ export function PlansPage() {
       timePeriod: item.timePeriod,
       storageLimit: String(item.storageLimit),
       points: String(item.points),
+      discountType: item.discountType ?? '',
+      discountValue: item.discountValue == null ? '' : String(item.discountValue),
       status: item.status,
       description: item.description,
     });
@@ -348,13 +436,18 @@ export function PlansPage() {
 
   const updateEditingPointForm = (key, value) => {
     setEditingPointForm((prev) => ({ ...prev, [key]: value }));
+    setEditingPointErrors((prev) => ({ ...prev, [key]: '' }));
   };
 
   const updateEditingSubscriptionForm = (key, value) => {
     setEditingSubscriptionForm((prev) => ({ ...prev, [key]: value }));
+    setEditingSubscriptionErrors((prev) => ({ ...prev, [key]: '' }));
   };
 
   const saveInlinePointPackage = () => {
+    const errors = validatePointPackage(editingPointForm);
+    setEditingPointErrors(errors);
+    if (hasErrors(errors)) return;
     const payload = {
       id: editingPointId,
       label: editingPointForm.label.trim() || 'Untitled Package',
@@ -372,13 +465,18 @@ export function PlansPage() {
   };
 
   const saveInlineSubscriptionPackage = () => {
+    const errors = validateStoragePackage(editingSubscriptionForm);
+    setEditingSubscriptionErrors(errors);
+    if (hasErrors(errors)) return;
     const payload = {
       id: editingSubscriptionId,
-      name: editingSubscriptionForm.name.trim() || 'Untitled Subscription',
+      name: editingSubscriptionForm.name.trim() || 'Untitled Storage Package',
       amount: Number(editingSubscriptionForm.amount || 0),
       timePeriod: editingSubscriptionForm.timePeriod,
       storageLimit: Number(editingSubscriptionForm.storageLimit || 0),
       points: Number(editingSubscriptionForm.points || 0),
+      discountType: editingSubscriptionForm.discountType || null,
+      discountValue: editingSubscriptionForm.discountValue === '' ? null : Number(editingSubscriptionForm.discountValue),
       status: editingSubscriptionForm.status,
       description: editingSubscriptionForm.description.trim() || 'No description added yet.',
     };
@@ -389,7 +487,7 @@ export function PlansPage() {
   };
 
   const pointFormMode = 'Create Point Package';
-  const subscriptionFormMode = 'Create Subscription Package';
+  const subscriptionFormMode = 'Create Storage Package';
   const pointDiscountTypeOptions = [
     { value: 'amount', label: 'Amount' },
     { value: 'percentage', label: 'Percentage' },
@@ -418,19 +516,19 @@ export function PlansPage() {
             </span>
             <h1 className="mt-2 text-[1.7rem] font-semibold tracking-tight text-slate-900 sm:text-[1.8rem]">Plans</h1>
             <p className="mt-1 text-sm leading-5 text-slate-600">
-              Configure point packages and subscription packages for Vault.
+              Configure point packages and storage packages for Vault.
             </p>
           </div>
           <div className="grid gap-2.5 sm:grid-cols-2 xl:min-w-[300px]">
             <StatCard icon={WalletCards} label="Point packages" value={String(pointPackages.length)} tone="bg-emerald-100 text-emerald-700" />
-            <StatCard icon={CreditCard} label="Subscription plans" value={String(subscriptionPackages.length)} tone="bg-teal-100 text-teal-700" />
+            <StatCard icon={CreditCard} label="Storage packages" value={String(subscriptionPackages.length)} tone="bg-teal-100 text-teal-700" />
           </div>
         </div>
       </header>
 
       <div className="flex flex-wrap items-center gap-3">
         <TabButton active={activeTab === 'points'} onClick={() => setActiveTab('points')}>Point Packages</TabButton>
-        <TabButton active={activeTab === 'subscriptions'} onClick={() => setActiveTab('subscriptions')}>Subscription Packages</TabButton>
+        <TabButton active={activeTab === 'subscriptions'} onClick={() => setActiveTab('subscriptions')}>Storage Packages</TabButton>
       </div>
 
       {activeTab === 'points' ? (
@@ -441,6 +539,7 @@ export function PlansPage() {
                 type="button"
                 onClick={() => {
                   setPointForm(blankPointForm);
+                  setPointErrors({});
                   setIsPointBuilderOpen(true);
                 }}
                 className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700"
@@ -463,30 +562,20 @@ export function PlansPage() {
                   onCancel={() => {
                     setEditingPointId(null);
                     setEditingPointForm(blankPointForm);
+                    setEditingPointErrors({});
                   }}
                   onDelete={() => setPointPackages((prev) => prev.filter((pkg) => pkg.id !== item.id))}
                   metrics={[]}
                 >
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Label">
+                    <Field label="Label" error={editingPointErrors.label}>
                       <input value={editingPointForm.label} onChange={(event) => updateEditingPointForm('label', event.target.value)} className={inputClassName()} />
                     </Field>
-                    <Field label="Points">
-                      <input type="number" value={editingPointForm.points} onChange={(event) => updateEditingPointForm('points', event.target.value)} className={inputClassName()} />
+                    <Field label="Points" error={editingPointErrors.points}>
+                      <input inputMode="numeric" value={editingPointForm.points} onChange={(event) => updateEditingPointForm('points', event.target.value)} className={inputClassName()} />
                     </Field>
-                    <Field label="Price (USD)">
-                      <input type="number" value={editingPointForm.price} onChange={(event) => updateEditingPointForm('price', event.target.value)} className={inputClassName()} />
-                    </Field>
-                    <Field label="Discount value">
-                      <input type="number" value={editingPointForm.discountValue} onChange={(event) => updateEditingPointForm('discountValue', event.target.value)} className={inputClassName()} />
-                    </Field>
-                    <Field label="Discount type">
-                      <ThemedDropdown
-                        value={editingPointForm.discountType}
-                        onChange={(value) => updateEditingPointForm('discountType', value ?? 'amount')}
-                        options={pointDiscountTypeOptions}
-                        placeholder="Select discount type"
-                      />
+                    <Field label="Price (USD)" error={editingPointErrors.price}>
+                      <input inputMode="decimal" value={editingPointForm.price} onChange={(event) => updateEditingPointForm('price', event.target.value)} className={inputClassName()} />
                     </Field>
                     <Field label="Status">
                       <ThemedDropdown
@@ -496,6 +585,21 @@ export function PlansPage() {
                         placeholder="Select status"
                       />
                     </Field>
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-4">
+                    <Field label="Discount type" error={editingPointErrors.discountType}>
+                      <ThemedDropdown
+                        value={editingPointForm.discountType}
+                        onChange={(value) => updateEditingPointForm('discountType', value ?? 'amount')}
+                        options={pointDiscountTypeOptions}
+                        placeholder="Select discount type"
+                      />
+                    </Field>
+                    <Field label="Discount value" error={editingPointErrors.discountValue}>
+                      <input inputMode="decimal" value={editingPointForm.discountValue} onChange={(event) => updateEditingPointForm('discountValue', event.target.value)} className={inputClassName()} />
+                    </Field>
+                  </div>
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
                     <Field label="Tag">
                       <input
                         value={editingPointForm.tag}
@@ -517,19 +621,19 @@ export function PlansPage() {
               onClose={() => setIsPointBuilderOpen(false)}
             >
               <div className="space-y-4">
-                <Field label="Label">
+                <Field label="Label" error={pointErrors.label}>
                   <input value={pointForm.label} onChange={(event) => handlePointChange('label', event.target.value)} className={inputClassName()} placeholder="Label" />
                 </Field>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Points included">
-                    <input type="number" value={pointForm.points} onChange={(event) => handlePointChange('points', event.target.value)} className={inputClassName()} />
+                  <Field label="Points included" error={pointErrors.points}>
+                    <input inputMode="numeric" value={pointForm.points} onChange={(event) => handlePointChange('points', event.target.value)} className={inputClassName()} />
                   </Field>
-                  <Field label="Price (USD)">
-                    <input type="number" value={pointForm.price} onChange={(event) => handlePointChange('price', event.target.value)} className={inputClassName()} />
+                  <Field label="Price (USD)" error={pointErrors.price}>
+                    <input inputMode="decimal" value={pointForm.price} onChange={(event) => handlePointChange('price', event.target.value)} className={inputClassName()} />
                   </Field>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Discount type">
+                  <Field label="Discount type" error={pointErrors.discountType}>
                     <ThemedDropdown
                       value={pointForm.discountType}
                       onChange={(value) => handlePointChange('discountType', value ?? 'amount')}
@@ -537,8 +641,8 @@ export function PlansPage() {
                       placeholder="Select discount type"
                     />
                   </Field>
-                  <Field label="Discount value">
-                    <input type="number" value={pointForm.discountValue} onChange={(event) => handlePointChange('discountValue', event.target.value)} className={inputClassName()} />
+                  <Field label="Discount value" error={pointErrors.discountValue}>
+                    <input inputMode="decimal" value={pointForm.discountValue} onChange={(event) => handlePointChange('discountValue', event.target.value)} className={inputClassName()} />
                   </Field>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -567,7 +671,7 @@ export function PlansPage() {
                   <Save size={15} />
                   Create
                 </button>
-                <button type="button" onClick={() => setPointForm(blankPointForm)} className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600 transition hover:border-emerald-200 hover:text-emerald-700">
+                <button type="button" onClick={() => { setPointForm(blankPointForm); setPointErrors({}); }} className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600 transition hover:border-emerald-200 hover:text-emerald-700">
                   Reset
                 </button>
               </div>
@@ -582,6 +686,7 @@ export function PlansPage() {
                 type="button"
                 onClick={() => {
                   setSubscriptionForm(blankSubscriptionForm);
+                  setSubscriptionErrors({});
                   setIsSubscriptionBuilderOpen(true);
                 }}
                 className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700"
@@ -604,12 +709,13 @@ export function PlansPage() {
                   onCancel={() => {
                     setEditingSubscriptionId(null);
                     setEditingSubscriptionForm(blankSubscriptionForm);
+                    setEditingSubscriptionErrors({});
                   }}
                   onDelete={() => setSubscriptionPackages((prev) => prev.filter((pkg) => pkg.id !== item.id))}
                   metrics={[]}
                 >
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Subscription name">
+                    <Field label="Storage package name" error={editingSubscriptionErrors.name}>
                       <input value={editingSubscriptionForm.name} onChange={(event) => updateEditingSubscriptionForm('name', event.target.value)} className={inputClassName()} />
                     </Field>
                     <Field label="Status">
@@ -620,11 +726,11 @@ export function PlansPage() {
                         placeholder="Select status"
                       />
                     </Field>
-                    <Field label="Storage (GB)">
-                      <input type="number" value={editingSubscriptionForm.storageLimit} onChange={(event) => updateEditingSubscriptionForm('storageLimit', event.target.value)} className={inputClassName()} />
+                    <Field label="Storage (GB)" error={editingSubscriptionErrors.storageLimit}>
+                      <input inputMode="numeric" value={editingSubscriptionForm.storageLimit} onChange={(event) => updateEditingSubscriptionForm('storageLimit', event.target.value)} className={inputClassName()} />
                     </Field>
-                    <Field label="Amount (USD)">
-                      <input type="number" value={editingSubscriptionForm.amount} onChange={(event) => updateEditingSubscriptionForm('amount', event.target.value)} className={inputClassName()} />
+                    <Field label="Price (USD)" error={editingSubscriptionErrors.amount}>
+                      <input inputMode="decimal" value={editingSubscriptionForm.amount} onChange={(event) => updateEditingSubscriptionForm('amount', event.target.value)} className={inputClassName()} />
                     </Field>
                     <Field label="Time Period">
                       <ThemedDropdown
@@ -634,8 +740,16 @@ export function PlansPage() {
                         placeholder="Select time period"
                       />
                     </Field>
-                    <Field label="Points">
-                      <input type="number" value={editingSubscriptionForm.points} onChange={(event) => updateEditingSubscriptionForm('points', event.target.value)} className={inputClassName()} />
+                    <Field label="Points" error={editingSubscriptionErrors.points}>
+                      <input inputMode="numeric" value={editingSubscriptionForm.points} onChange={(event) => updateEditingSubscriptionForm('points', event.target.value)} className={inputClassName()} />
+                    </Field>
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-4">
+                    <Field label="Discount type" error={editingSubscriptionErrors.discountType}>
+                      <ThemedDropdown value={editingSubscriptionForm.discountType} onChange={(value) => updateEditingSubscriptionForm('discountType', value ?? '')} options={pointDiscountTypeOptions} placeholder="Select discount type" />
+                    </Field>
+                    <Field label="Discount value" error={editingSubscriptionErrors.discountValue}>
+                      <input inputMode="decimal" value={editingSubscriptionForm.discountValue} onChange={(event) => updateEditingSubscriptionForm('discountValue', event.target.value)} className={inputClassName()} />
                     </Field>
                   </div>
                   <div className="mt-4">
@@ -654,15 +768,15 @@ export function PlansPage() {
               onClose={() => setIsSubscriptionBuilderOpen(false)}
             >
               <div className="space-y-4">
-                <Field label="Subscription name">
-                  <input value={subscriptionForm.name} onChange={(event) => handleSubscriptionChange('name', event.target.value)} className={inputClassName()} placeholder="Subscription Name" />
+                <Field label="Storage package name" error={subscriptionErrors.name}>
+                  <input value={subscriptionForm.name} onChange={(event) => handleSubscriptionChange('name', event.target.value)} className={inputClassName()} placeholder="Storage package name" />
                 </Field>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Storage (GB)">
-                    <input type="number" value={subscriptionForm.storageLimit} onChange={(event) => handleSubscriptionChange('storageLimit', event.target.value)} className={inputClassName()} />
+                  <Field label="Storage (GB)" error={subscriptionErrors.storageLimit}>
+                    <input inputMode="numeric" value={subscriptionForm.storageLimit} onChange={(event) => handleSubscriptionChange('storageLimit', event.target.value)} className={inputClassName()} />
                   </Field>
-                  <Field label="Amount (USD)">
-                    <input type="number" value={subscriptionForm.amount} onChange={(event) => handleSubscriptionChange('amount', event.target.value)} className={inputClassName()} />
+                  <Field label="Price (USD)" error={subscriptionErrors.amount}>
+                    <input inputMode="decimal" value={subscriptionForm.amount} onChange={(event) => handleSubscriptionChange('amount', event.target.value)} className={inputClassName()} />
                   </Field>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-3">
@@ -682,8 +796,16 @@ export function PlansPage() {
                       placeholder="Select status"
                     />
                   </Field>
-                  <Field label="Points">
-                    <input type="number" value={subscriptionForm.points} onChange={(event) => handleSubscriptionChange('points', event.target.value)} className={inputClassName()} />
+                  <Field label="Points" error={subscriptionErrors.points}>
+                    <input inputMode="numeric" value={subscriptionForm.points} onChange={(event) => handleSubscriptionChange('points', event.target.value)} className={inputClassName()} />
+                  </Field>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <Field label="Discount type" error={subscriptionErrors.discountType}>
+                    <ThemedDropdown value={subscriptionForm.discountType} onChange={(value) => handleSubscriptionChange('discountType', value ?? '')} options={pointDiscountTypeOptions} placeholder="Select discount type" />
+                  </Field>
+                  <Field label="Discount value" error={subscriptionErrors.discountValue}>
+                    <input inputMode="decimal" value={subscriptionForm.discountValue} onChange={(event) => handleSubscriptionChange('discountValue', event.target.value)} className={inputClassName()} />
                   </Field>
                 </div>
                 <Field label="Description">
@@ -696,7 +818,7 @@ export function PlansPage() {
                   <Save size={15} />
                   Create
                 </button>
-                <button type="button" onClick={() => setSubscriptionForm(blankSubscriptionForm)} className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600 transition hover:border-emerald-200 hover:text-emerald-700">
+                <button type="button" onClick={() => { setSubscriptionForm(blankSubscriptionForm); setSubscriptionErrors({}); }} className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600 transition hover:border-emerald-200 hover:text-emerald-700">
                   Reset
                 </button>
               </div>
