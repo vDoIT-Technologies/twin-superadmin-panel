@@ -58,7 +58,7 @@ export function formatCost(value) {
     style: 'currency',
     currency: 'USD',
     minimumFractionDigits: 0,
-    maximumFractionDigits: 20,
+    maximumFractionDigits: 6,
   }).format(amount);
 }
 
