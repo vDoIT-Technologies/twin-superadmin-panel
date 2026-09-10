@@ -215,11 +215,11 @@ export function ClientsPage() {
       const pointsSpent = parseDecimal(client.pointsSpent);
       const revenue = parseDecimal(client.revenue);
       const cost = parseDecimal(
-        client.totalCost ?? client.usageCost ?? client.cogs
+        client.cost
+        ?? client.totalCost ?? client.usageCost ?? client.cogs
         ?? client.usage?.totalCost ?? client.usage?.cost
         ?? client.kpis?.totalCost ?? client.kpis?.cost
         ?? client.metrics?.totalCost ?? client.metrics?.cost
-        ?? client.cost,
       );
       const margin = parseDecimal(client.margin);
       const lastActive = client.lastActive;
@@ -507,8 +507,8 @@ export function ClientsPage() {
                     ) : null}
                     {!isVault ? <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(client.twins)}</td> : null}
                     <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(client.users)}</td>
-                    <td className="px-4 py-3.5 text-right tabular-nums">{formatCost(client.cost)}</td>
-                    <td className="px-4 py-3.5 text-right tabular-nums">{formatCost(client.revenue)}</td>
+                    <td className="whitespace-nowrap px-4 py-3.5 text-right tabular-nums">{formatCost(client.cost)}</td>
+                    <td className="whitespace-nowrap px-4 py-3.5 text-right tabular-nums">{formatCost(client.revenue)}</td>
                   </tr>
                 ))
               )}
