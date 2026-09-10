@@ -242,7 +242,11 @@ function Field({ label, children, hint, error, required = false }) {
           {label}
           {required ? <span className="ml-0.5 text-rose-500">*</span> : null}
         </span>
-        {required ? <span className="text-xs font-medium text-slate-400">required</span> : null}
+        {required ? (
+          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+            Required
+          </span>
+        ) : null}
       </span>
       {children}
       {error ? <span className="mt-1 block text-[10px] font-medium leading-4 text-rose-600">{error}</span> : null}

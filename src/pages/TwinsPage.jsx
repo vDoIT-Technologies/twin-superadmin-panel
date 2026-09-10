@@ -188,7 +188,7 @@ export function TwinsPage() {
       client: clientName || clientNamesById[clientId] || '---',
       clientName,
       usersCount,
-      cost: parseOptionalNumber(t.totalCost ?? t.usageCost ?? t.cogs ?? t.cost ?? t.usage?.totalCost ?? t.usage?.cost ?? t.kpis?.totalCost ?? t.kpis?.cost),
+      cost: parseOptionalNumber(t.cost ?? t.totalCost ?? t.usageCost ?? t.cogs ?? t.usage?.totalCost ?? t.usage?.cost ?? t.kpis?.totalCost ?? t.kpis?.cost),
       revenue: parseOptionalNumber(t.totalRevenue ?? t.revenueAmount ?? t.revenue ?? t.usage?.totalRevenue ?? t.usage?.revenue ?? t.kpis?.totalRevenue ?? t.kpis?.revenue),
       totalPoints: parseOptionalNumber(t.totalPoints ?? t.points ?? t.pointsBalance ?? t.pointBalance ?? t.balance ?? t.kpis?.totalPoints ?? t.kpis?.pointsBalance),
       pointsSpent: parseOptionalNumber(t.pointsSpent ?? t.spentPoints ?? t.totalPointsSpent ?? t.pointsUsed ?? t.points_spent ?? t.kpis?.pointsSpent ?? t.kpis?.totalPointsSpent),
@@ -394,8 +394,8 @@ export function TwinsPage() {
                   <td className="px-4 py-3.5 text-slate-500">
                     {twin.status ? <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${twin.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{twin.status === 'active' ? 'Active' : 'Inactive'}</span> : '---'}
                   </td>
-                  <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatCost(twin.revenue)}</td>
-                  <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(twin.pointsSpent)}</td>
+                  <td className="whitespace-nowrap px-4 py-3.5 text-right tabular-nums text-slate-500">{formatCost(twin.revenue)}</td>
+                  <td className="whitespace-nowrap px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(twin.pointsSpent)}</td>
                 </tr>
               ))}
             </tbody>

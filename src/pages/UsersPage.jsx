@@ -334,16 +334,12 @@ export function UsersPage() {
     }, { replace: true });
   }, [page, setSearchParams]);
 
-    const userRows = useMemo(() => {
-    console.log("API", apiUsers);
-      
-      return apiUsers
-          
+  const userRows = useMemo(() => {
+    return apiUsers
       .map((user, index) => {
         const userKey = getId(user?._id ?? user?.id ?? user?.userId);
         const emailKey = typeof user?.email === 'string' ? user.email.toLowerCase() : '';
-          const enrichment = userEnrichmentByKey[userKey] ?? userEnrichmentByKey[emailKey] ?? {};
-          console.log("Enrichment", enrichment);
+        const enrichment = userEnrichmentByKey[userKey] ?? userEnrichmentByKey[emailKey] ?? {};
         const firstName = user?.firstName?.trim?.() ?? '';
         const lastName = user?.lastName?.trim?.() ?? '';
         const fullName = [firstName, lastName].filter(Boolean).join(' ');
@@ -395,7 +391,13 @@ export function UsersPage() {
           ?? enrichment?.kpis?.totalPointsSpent
           ?? 0,
         );
-        const cost = parseDecimal(user?.usage?.cost ?? enrichment?.usage?.cost ?? 0, 2);
+        const cost = parseDecimal(
+          user?.cost
+          ?? enrichment?.cost
+          ?? user?.usage?.cost
+          ?? enrichment?.usage?.cost
+          ?? 0,
+        );
         const revenue = parseDecimal(
           user?.revenue?.totalAmount
           ?? user?.revenue
@@ -664,10 +666,10 @@ export function UsersPage() {
                     </td>
                     <td className="px-4 py-3.5 text-center text-slate-500">{superadminDemoData.ENV_META[user.env] ? envBadge(user.env) : getEnvLabel(user.env)}</td>
                     <td className="px-4 py-3.5 text-slate-500"><TruncatedText value={user.client || '---'} /></td>
-                    <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatCost(user.cost)}</td>
-                    <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatCost(user.revenue)}</td>
-                    <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{user.totalPoints}</td>
-                    <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{user.pointsSpent}</td>
+                    <td className="whitespace-nowrap px-4 py-3.5 text-right tabular-nums text-slate-500">{formatCost(user.cost)}</td>
+                    <td className="whitespace-nowrap px-4 py-3.5 text-right tabular-nums text-slate-500">{formatCost(user.revenue)}</td>
+                    <td className="whitespace-nowrap px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(user.totalPoints)}</td>
+                    <td className="whitespace-nowrap px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(user.pointsSpent)}</td>
                     <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(user.messages)}</td>
                     <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(user.sessions)}</td>
                   </tr>
