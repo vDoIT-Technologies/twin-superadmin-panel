@@ -1,84 +1,122 @@
-import { useMemo, useState } from 'react';
-import { CreditCard, Layers3, Pencil, Plus, Save, Sparkles, Trash2, WalletCards, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AlertCircle, CheckCircle2, CreditCard, Layers3, Pencil, Plus, RefreshCw, Save, Sparkles, Trash2, WalletCards, X } from 'lucide-react';
 import { FilterDropdown } from '../components/common/FilterDropdown';
-
-const initialPointPackages = [
-  {
-    id: 'pt-starter',
-    label: 'Starter Points',
-    tag: 'Most Popular',
-    points: 5000,
-    price: 49,
-    discountType: 'amount',
-    discountValue: 0,
-    status: 'active',
-  },
-  {
-    id: 'pt-growth',
-    label: 'Growth Points',
-    tag: 'Best Value',
-    points: 15000,
-    price: 129,
-    discountType: 'percentage',
-    discountValue: 8,
-    status: 'active',
-  },
-  {
-    id: 'pt-scale',
-    label: 'Scale Points',
-    tag: 'Most Popular',
-    points: 40000,
-    price: 299,
-    discountType: 'percentage',
-    discountValue: 15,
-    status: 'inactive',
-  },
-];
-
-const initialSubscriptionPackages = [
-  {
-    id: 'sub-core',
-    name: 'Core Vault',
-    amount: 199,
-    timePeriod: 'Monthly',
-    storageLimit: 500,
-    points: 10000,
-    status: 'Active',
-    description: 'Core file storage and admin oversight for growing teams.',
-  },
-  {
-    id: 'sub-business',
-    name: 'Business Vault',
-    amount: 4490,
-    timePeriod: 'Yearly',
-    storageLimit: 2500,
-    points: 60000,
-    status: 'Active',
-    description: 'Multi-team subscription for business-grade storage operations.',
-  },
-];
+import { packageService } from '../services';
 
 const blankPointForm = {
   id: '',
   label: '',
-  tag: 'Most Popular',
-  points: '10000',
-  price: '99',
-  discountType: 'amount',
-  discountValue: '0',
+  tag: '',
+  points: '',
+  price: '',
   status: 'active',
 };
 
 const blankSubscriptionForm = {
   id: '',
   name: '',
-  amount: '299',
-  timePeriod: 'Monthly',
-  storageLimit: '1000',
-  points: '12000',
+  amount: '',
+  timePeriod: 'month',
+  storageLimit: '',
+  points: '',
   status: 'Active',
   description: '',
 };
+
+function unwrapPackageList(response) {
+  const payload = response?.data ?? response?.result ?? response;
+  if (Array.isArray(payload)) return payload;
+  return payload?.packages ?? payload?.items ?? payload?.rows ?? [];
+}
+
+function getPackageId(item) {
+  return String(item?._id ?? item?.id ?? item?.packageId ?? '');
+}
+
+function normalizePointPackage(item) {
+  return {
+    id: getPackageId(item),
+    label: item?.label ?? '',
+    tag: item?.tag ?? '',
+    points: Number(item?.points ?? 0),
+    price: Number(item?.priceUSD ?? item?.price ?? 0),
+    status: item?.isActive === false ? 'inactive' : 'active',
+  };
+}
+
+function normalizeStoragePackage(item) {
+  const interval = String(item?.interval ?? item?.timePeriod ?? 'month').toLowerCase();
+  return {
+    id: getPackageId(item),
+    name: item?.name ?? '',
+    amount: Number(item?.amount ?? 0),
+    timePeriod: interval === 'yearly' ? 'year' : interval === 'monthly' ? 'month' : interval,
+    storageLimit: Number(item?.storageGB ?? item?.storageLimit ?? 0),
+    points: Number(item?.bonusPoints ?? item?.points ?? 0),
+    status: item?.isActive === false ? 'Inactive' : 'Active',
+    description: item?.description ?? '',
+  };
+}
+
+function getApiErrorMessage(error, fallback) {
+  return error?.response?.data?.message ?? error?.response?.data?.error ?? error?.message ?? fallback;
+}
+
+const VALID_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9 '&().-]*$/;
+const POSITIVE_INTEGER_PATTERN = /^\d+$/;
+const POSITIVE_DECIMAL_PATTERN = /^\d+(\.\d{1,2})?$/;
+
+function validateName(value, label) {
+  const trimmedValue = value.trim();
+  if (!trimmedValue) return `${label} is required.`;
+  if (trimmedValue.length < 2 || trimmedValue.length > 80) return `${label} must be between 2 and 80 characters.`;
+  if (!VALID_NAME_PATTERN.test(trimmedValue)) return `${label} can only contain letters, numbers, spaces, and common punctuation.`;
+  return '';
+}
+
+function validatePositiveInteger(value, label, required = true) {
+  if (String(value).trim() === '') return required ? `${label} is required.` : '';
+  if (!POSITIVE_INTEGER_PATTERN.test(String(value)) || Number(value) <= 0) return `${label} must be a whole number greater than 0.`;
+  return '';
+}
+
+function validatePrice(value, label) {
+  if (String(value).trim() === '') return `${label} is required.`;
+  if (!POSITIVE_DECIMAL_PATTERN.test(String(value)) || Number(value) <= 0) return `${label} must be greater than 0 with up to 2 decimal places.`;
+  return '';
+}
+
+function validateTag(value) {
+  const trimmedValue = value.trim();
+  if (!trimmedValue) return 'Tag is required.';
+  if (trimmedValue.length > 25) return 'Tag must be 25 characters or fewer.';
+  return '';
+}
+
+function validatePointPackage(form) {
+  return {
+    label: validateName(form.label, 'Label'),
+    points: validatePositiveInteger(form.points, 'Points'),
+    price: validatePrice(form.price, 'Price'),
+    tag: validateTag(form.tag),
+    status: form.status ? '' : 'Status is required.',
+  };
+}
+
+function validateStoragePackage(form) {
+  return {
+    name: validateName(form.name, 'Name'),
+    storageLimit: validatePositiveInteger(form.storageLimit, 'Storage'),
+    amount: validatePrice(form.amount, 'Price'),
+    timePeriod: form.timePeriod ? '' : 'Time period is required.',
+    status: form.status ? '' : 'Status is required.',
+    points: validatePositiveInteger(form.points, 'Points'),
+  };
+}
+
+function hasErrors(errors) {
+  return Object.values(errors).some(Boolean);
+}
 
 function StatCard({ icon: Icon, label, value, tone }) {
   return (
@@ -119,6 +157,7 @@ function PackageCard({
   isEditing = false,
   onSave,
   onCancel,
+  isBusy = false,
   children,
 }) {
   const isActive = status === 'active' || status === 'Active';
@@ -144,7 +183,8 @@ function PackageCard({
               <button
                 type="button"
                 onClick={onSave}
-                className="inline-flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700"
+                disabled={isBusy}
+                className="inline-flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-wait disabled:opacity-60"
               >
                 <Save size={14} />
                 Save
@@ -170,7 +210,8 @@ function PackageCard({
           <button
             type="button"
             onClick={onDelete}
-            className="inline-flex items-center gap-2 rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
+            disabled={isBusy}
+            className="inline-flex items-center gap-2 rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-wait disabled:opacity-60"
           >
             <Trash2 size={14} />
             Delete
@@ -193,12 +234,19 @@ function PackageCard({
   );
 }
 
-function Field({ label, children, hint }) {
+function Field({ label, children, hint, error, required = false }) {
   return (
     <label className="block">
-      <span className="text-sm font-semibold text-slate-700">{label}</span>
+      <span className="flex items-center justify-between gap-3 text-sm font-semibold text-slate-700">
+        <span>
+          {label}
+          {required ? <span className="ml-0.5 text-rose-500">*</span> : null}
+        </span>
+        {required ? <span className="text-xs font-medium text-slate-400">required</span> : null}
+      </span>
       {children}
-      {hint ? <span className="mt-1 block text-xs text-slate-400">{hint}</span> : null}
+      {error ? <span className="mt-1 block text-[10px] font-medium leading-4 text-rose-600">{error}</span> : null}
+      {!error && hint ? <span className="mt-1 block text-xs text-slate-400">{hint}</span> : null}
     </label>
   );
 }
@@ -226,7 +274,7 @@ function ThemedDropdown({ value, onChange, options, placeholder }) {
 function Modal({ title, subtitle, onClose, children }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-2xl rounded-[2rem] border border-emerald-100 bg-white p-6 shadow-2xl">
+      <div className="max-h-[calc(100vh-2rem)] w-full max-w-2xl overflow-y-auto rounded-[2rem] border border-emerald-100 bg-white p-6 shadow-2xl">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-600">Package Builder</p>
@@ -248,10 +296,47 @@ function Modal({ title, subtitle, onClose, children }) {
   );
 }
 
+function DeleteConfirmationModal({ packageName, isDeleting, onCancel, onConfirm }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4 backdrop-blur-sm" role="presentation">
+      <div className="w-full max-w-md rounded-[2rem] border border-rose-100 bg-white p-6 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="delete-package-title">
+        <div className="flex items-start justify-between gap-4">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-rose-50 text-rose-600"><Trash2 size={20} /></span>
+          <button type="button" onClick={onCancel} disabled={isDeleting} className="rounded-xl border border-slate-200 p-2 text-slate-500 transition hover:text-slate-900 disabled:opacity-50" aria-label="Close confirmation"><X size={17} /></button>
+        </div>
+        <h2 id="delete-package-title" className="mt-4 text-xl font-semibold text-slate-900">Delete package?</h2>
+        <p className="mt-2 text-sm leading-6 text-slate-500">
+          Are you sure you want to delete <strong className="font-semibold text-slate-700">{packageName}</strong>? This package will no longer be available.
+        </p>
+        <div className="mt-6 flex justify-end gap-3">
+          <button type="button" onClick={onCancel} disabled={isDeleting} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:border-slate-300 disabled:opacity-50">Cancel</button>
+          <button type="button" onClick={onConfirm} disabled={isDeleting} className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-wait disabled:opacity-60">
+            <Trash2 size={15} />
+            {isDeleting ? 'Deleting...' : 'Delete package'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Toast({ type, message, onClose }) {
+  const isSuccess = type === 'success';
+  return (
+    <div className={`fixed bottom-4 right-4 z-[60] flex w-[min(24rem,calc(100vw-2rem))] items-start gap-3 rounded-2xl border bg-white p-4 shadow-2xl ${isSuccess ? 'border-emerald-200' : 'border-rose-200'}`} role={isSuccess ? 'status' : 'alert'}>
+      <span className={`mt-0.5 shrink-0 ${isSuccess ? 'text-emerald-600' : 'text-rose-600'}`}>
+        {isSuccess ? <CheckCircle2 size={19} /> : <AlertCircle size={19} />}
+      </span>
+      <p className="flex-1 text-sm font-medium leading-5 text-slate-700">{message}</p>
+      <button type="button" onClick={onClose} className="shrink-0 text-slate-400 transition hover:text-slate-700" aria-label="Dismiss notification"><X size={17} /></button>
+    </div>
+  );
+}
+
 export function PlansPage() {
   const [activeTab, setActiveTab] = useState('points');
-  const [pointPackages, setPointPackages] = useState(initialPointPackages);
-  const [subscriptionPackages, setSubscriptionPackages] = useState(initialSubscriptionPackages);
+  const [pointPackages, setPointPackages] = useState([]);
+  const [subscriptionPackages, setSubscriptionPackages] = useState([]);
   const [pointForm, setPointForm] = useState(blankPointForm);
   const [subscriptionForm, setSubscriptionForm] = useState(blankSubscriptionForm);
   const [isPointBuilderOpen, setIsPointBuilderOpen] = useState(false);
@@ -260,6 +345,47 @@ export function PlansPage() {
   const [editingPointForm, setEditingPointForm] = useState(blankPointForm);
   const [editingSubscriptionId, setEditingSubscriptionId] = useState(null);
   const [editingSubscriptionForm, setEditingSubscriptionForm] = useState(blankSubscriptionForm);
+  const [pointErrors, setPointErrors] = useState({});
+  const [subscriptionErrors, setSubscriptionErrors] = useState({});
+  const [editingPointErrors, setEditingPointErrors] = useState({});
+  const [editingSubscriptionErrors, setEditingSubscriptionErrors] = useState({});
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [pendingAction, setPendingAction] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  const loadPackages = useCallback(async ({ showSuccess = false } = {}) => {
+    setIsLoading(true);
+    setLoadError('');
+    try {
+      const [pointResponse, storageResponse] = await Promise.all([
+        packageService.getPackages('points'),
+        packageService.getPackages('storage'),
+      ]);
+      setPointPackages(unwrapPackageList(pointResponse).map(normalizePointPackage));
+      setSubscriptionPackages(unwrapPackageList(storageResponse).map(normalizeStoragePackage));
+      if (showSuccess) setToast({ type: 'success', message: 'Packages loaded successfully.' });
+    } catch (error) {
+      console.error('GET /api/v1/packages failed:', error);
+      const message = getApiErrorMessage(error, 'Packages could not be loaded.');
+      setLoadError(message);
+      setToast({ type: 'error', message });
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadPackages({ showSuccess: true });
+  }, [loadPackages]);
+
+  useEffect(() => {
+    if (!toast) return undefined;
+    const timeoutId = window.setTimeout(() => setToast(null), 4000);
+    return () => window.clearTimeout(timeoutId);
+  }, [toast]);
 
   const totalPointRevenue = useMemo(
     () => pointPackages.reduce((sum, item) => sum + Number(item.price || 0), 0),
@@ -272,67 +398,90 @@ export function PlansPage() {
 
   const handlePointChange = (key, value) => {
     setPointForm((prev) => ({ ...prev, [key]: value }));
+    setPointErrors((prev) => ({ ...prev, [key]: '' }));
   };
 
   const handleSubscriptionChange = (key, value) => {
     setSubscriptionForm((prev) => ({ ...prev, [key]: value }));
+    setSubscriptionErrors((prev) => ({ ...prev, [key]: '' }));
   };
 
-  const savePointPackage = () => {
+  const savePointPackage = async () => {
+    const errors = validatePointPackage(pointForm);
+    setPointErrors(errors);
+    if (hasErrors(errors)) return;
     const payload = {
-      id: pointForm.id || `pt-${pointForm.label.trim().toLowerCase().replace(/\s+/g, '-')}`,
-      label: pointForm.label.trim() || 'Untitled Package',
-      tag: pointForm.tag,
+      label: pointForm.label.trim(),
       points: Number(pointForm.points || 0),
-      price: Number(pointForm.price || 0),
-      discountType: pointForm.discountType,
-      discountValue: Number(pointForm.discountValue || 0),
-      status: pointForm.status,
+      priceUSD: Number(pointForm.price || 0),
+      tag: pointForm.tag.trim(),
+      isActive: pointForm.status === 'active',
     };
-
-    setPointPackages((prev) => {
-      const exists = prev.some((item) => item.id === payload.id);
-      return exists ? prev.map((item) => (item.id === payload.id ? payload : item)) : [payload, ...prev];
-    });
-    setPointForm(blankPointForm);
-    setIsPointBuilderOpen(false);
+    setPendingAction('create-point');
+    setActionError('');
+    try {
+      const response = await packageService.createPackage(payload);
+      await loadPackages();
+      setPointForm(blankPointForm);
+      setIsPointBuilderOpen(false);
+      setToast({ type: 'success', message: response?.message || 'Point package created successfully.' });
+    } catch (error) {
+      console.error('POST /api/v1/packages failed:', error);
+      const message = getApiErrorMessage(error, 'Point package could not be created.');
+      setActionError(message);
+      setToast({ type: 'error', message });
+    } finally {
+      setPendingAction('');
+    }
   };
 
-  const saveSubscriptionPackage = () => {
+  const saveSubscriptionPackage = async () => {
+    const errors = validateStoragePackage(subscriptionForm);
+    setSubscriptionErrors(errors);
+    if (hasErrors(errors)) return;
     const payload = {
-      id: subscriptionForm.id || `sub-${subscriptionForm.name.trim().toLowerCase().replace(/\s+/g, '-')}`,
-      name: subscriptionForm.name.trim() || 'Untitled Subscription',
+      name: subscriptionForm.name.trim(),
+      storageGB: Number(subscriptionForm.storageLimit || 0),
       amount: Number(subscriptionForm.amount || 0),
-      timePeriod: subscriptionForm.timePeriod,
-      storageLimit: Number(subscriptionForm.storageLimit || 0),
-      points: Number(subscriptionForm.points || 0),
-      status: subscriptionForm.status,
-      description: subscriptionForm.description.trim() || 'No description added yet.',
+      currency: 'USD',
+      interval: subscriptionForm.timePeriod,
+      description: subscriptionForm.description.trim() || undefined,
+      bonusPoints: Number(subscriptionForm.points || 0),
+      isActive: subscriptionForm.status === 'Active',
     };
-
-    setSubscriptionPackages((prev) => {
-      const exists = prev.some((item) => item.id === payload.id);
-      return exists ? prev.map((item) => (item.id === payload.id ? payload : item)) : [payload, ...prev];
-    });
-    setSubscriptionForm(blankSubscriptionForm);
-    setIsSubscriptionBuilderOpen(false);
+    setPendingAction('create-storage');
+    setActionError('');
+    try {
+      const response = await packageService.createPackage(payload);
+      await loadPackages();
+      setSubscriptionForm(blankSubscriptionForm);
+      setIsSubscriptionBuilderOpen(false);
+      setToast({ type: 'success', message: response?.message || 'Storage package created successfully.' });
+    } catch (error) {
+      console.error('POST /api/v1/packages failed:', error);
+      const message = getApiErrorMessage(error, 'Storage package could not be created.');
+      setActionError(message);
+      setToast({ type: 'error', message });
+    } finally {
+      setPendingAction('');
+    }
   };
 
   const editPointPackage = (item) => {
+    setEditingPointErrors({});
     setEditingPointId(item.id);
     setEditingPointForm({
       id: item.id,
       label: item.label,
-      tag: item.tag ?? 'Most Popular',
+      tag: item.tag ?? '',
       points: String(item.points),
       price: String(item.price),
-      discountType: item.discountType,
-      discountValue: String(item.discountValue),
       status: item.status,
     });
   };
 
   const editSubscriptionPackage = (item) => {
+    setEditingSubscriptionErrors({});
     setEditingSubscriptionId(item.id);
     setEditingSubscriptionForm({
       id: item.id,
@@ -348,52 +497,123 @@ export function PlansPage() {
 
   const updateEditingPointForm = (key, value) => {
     setEditingPointForm((prev) => ({ ...prev, [key]: value }));
+    setEditingPointErrors((prev) => ({ ...prev, [key]: '' }));
   };
 
   const updateEditingSubscriptionForm = (key, value) => {
     setEditingSubscriptionForm((prev) => ({ ...prev, [key]: value }));
+    setEditingSubscriptionErrors((prev) => ({ ...prev, [key]: '' }));
   };
 
-  const saveInlinePointPackage = () => {
+  const saveInlinePointPackage = async () => {
+    const errors = validatePointPackage(editingPointForm);
+    setEditingPointErrors(errors);
+    if (hasErrors(errors)) return;
     const payload = {
-      id: editingPointId,
-      label: editingPointForm.label.trim() || 'Untitled Package',
-      tag: editingPointForm.tag,
+      label: editingPointForm.label.trim(),
       points: Number(editingPointForm.points || 0),
-      price: Number(editingPointForm.price || 0),
-      discountType: editingPointForm.discountType,
-      discountValue: Number(editingPointForm.discountValue || 0),
-      status: editingPointForm.status,
+      priceUSD: Number(editingPointForm.price || 0),
+      tag: editingPointForm.tag.trim(),
+      isActive: editingPointForm.status === 'active',
     };
-
-    setPointPackages((prev) => prev.map((item) => (item.id === editingPointId ? payload : item)));
-    setEditingPointId(null);
-    setEditingPointForm(blankPointForm);
+    setPendingAction(`update-${editingPointId}`);
+    setActionError('');
+    try {
+      const response = await packageService.updatePackage(editingPointId, payload);
+      await loadPackages();
+      setEditingPointId(null);
+      setEditingPointForm(blankPointForm);
+      setToast({ type: 'success', message: response?.message || 'Point package updated successfully.' });
+    } catch (error) {
+      console.error('PUT /api/v1/packages/:id failed:', error);
+      const message = getApiErrorMessage(error, 'Point package could not be updated.');
+      setActionError(message);
+      setToast({ type: 'error', message });
+    } finally {
+      setPendingAction('');
+    }
   };
 
-  const saveInlineSubscriptionPackage = () => {
+  const saveInlineSubscriptionPackage = async () => {
+    const errors = validateStoragePackage(editingSubscriptionForm);
+    setEditingSubscriptionErrors(errors);
+    if (hasErrors(errors)) return;
     const payload = {
-      id: editingSubscriptionId,
-      name: editingSubscriptionForm.name.trim() || 'Untitled Subscription',
+      name: editingSubscriptionForm.name.trim(),
+      storageGB: Number(editingSubscriptionForm.storageLimit || 0),
       amount: Number(editingSubscriptionForm.amount || 0),
-      timePeriod: editingSubscriptionForm.timePeriod,
-      storageLimit: Number(editingSubscriptionForm.storageLimit || 0),
-      points: Number(editingSubscriptionForm.points || 0),
-      status: editingSubscriptionForm.status,
-      description: editingSubscriptionForm.description.trim() || 'No description added yet.',
+      currency: 'USD',
+      interval: editingSubscriptionForm.timePeriod,
+      description: editingSubscriptionForm.description.trim() || undefined,
+      bonusPoints: Number(editingSubscriptionForm.points || 0),
+      isActive: editingSubscriptionForm.status === 'Active',
     };
+    setPendingAction(`update-${editingSubscriptionId}`);
+    setActionError('');
+    try {
+      const response = await packageService.updatePackage(editingSubscriptionId, payload);
+      await loadPackages();
+      setEditingSubscriptionId(null);
+      setEditingSubscriptionForm(blankSubscriptionForm);
+      setToast({ type: 'success', message: response?.message || 'Storage package updated successfully.' });
+    } catch (error) {
+      console.error('PUT /api/v1/packages/:id failed:', error);
+      const message = getApiErrorMessage(error, 'Storage package could not be updated.');
+      setActionError(message);
+      setToast({ type: 'error', message });
+    } finally {
+      setPendingAction('');
+    }
+  };
 
-    setSubscriptionPackages((prev) => prev.map((item) => (item.id === editingSubscriptionId ? payload : item)));
-    setEditingSubscriptionId(null);
-    setEditingSubscriptionForm(blankSubscriptionForm);
+  const deletePointPackage = async (packageId) => {
+    setPendingAction(`delete-${packageId}`);
+    setActionError('');
+    try {
+      const response = await packageService.deletePackage(packageId);
+      setPointPackages((prev) => prev.filter((item) => item.id !== packageId));
+      setToast({ type: 'success', message: response?.message || 'Point package deleted successfully.' });
+      return true;
+    } catch (error) {
+      console.error('DELETE /api/v1/packages/:id failed:', error);
+      const message = getApiErrorMessage(error, 'Point package could not be deleted.');
+      setActionError(message);
+      setToast({ type: 'error', message });
+      return false;
+    } finally {
+      setPendingAction('');
+    }
+  };
+
+  const deleteStoragePackage = async (packageId) => {
+    setPendingAction(`delete-${packageId}`);
+    setActionError('');
+    try {
+      const response = await packageService.deletePackage(packageId);
+      setSubscriptionPackages((prev) => prev.filter((item) => item.id !== packageId));
+      setToast({ type: 'success', message: response?.message || 'Storage package deleted successfully.' });
+      return true;
+    } catch (error) {
+      console.error('DELETE /api/v1/packages/:id failed:', error);
+      const message = getApiErrorMessage(error, 'Storage package could not be deleted.');
+      setActionError(message);
+      setToast({ type: 'error', message });
+      return false;
+    } finally {
+      setPendingAction('');
+    }
+  };
+
+  const confirmDeletePackage = async () => {
+    if (!deleteTarget) return;
+    const deleted = deleteTarget.type === 'points'
+      ? await deletePointPackage(deleteTarget.id)
+      : await deleteStoragePackage(deleteTarget.id);
+    if (deleted) setDeleteTarget(null);
   };
 
   const pointFormMode = 'Create Point Package';
-  const subscriptionFormMode = 'Create Subscription Package';
-  const pointDiscountTypeOptions = [
-    { value: 'amount', label: 'Amount' },
-    { value: 'percentage', label: 'Percentage' },
-  ];
+  const subscriptionFormMode = 'Create Storage Package';
   const pointStatusOptions = [
     { value: 'active', label: 'Active' },
     { value: 'inactive', label: 'Inactive' },
@@ -403,8 +623,8 @@ export function PlansPage() {
     { value: 'Inactive', label: 'Inactive' },
   ];
   const subscriptionTimePeriodOptions = [
-    { value: 'Monthly', label: 'Monthly' },
-    { value: 'Yearly', label: 'Yearly' },
+    { value: 'month', label: 'Monthly' },
+    { value: 'year', label: 'Yearly' },
   ];
 
   return (
@@ -418,22 +638,37 @@ export function PlansPage() {
             </span>
             <h1 className="mt-2 text-[1.7rem] font-semibold tracking-tight text-slate-900 sm:text-[1.8rem]">Plans</h1>
             <p className="mt-1 text-sm leading-5 text-slate-600">
-              Configure point packages and subscription packages for Vault.
+              Configure point packages and storage packages for Vault.
             </p>
           </div>
           <div className="grid gap-2.5 sm:grid-cols-2 xl:min-w-[300px]">
             <StatCard icon={WalletCards} label="Point packages" value={String(pointPackages.length)} tone="bg-emerald-100 text-emerald-700" />
-            <StatCard icon={CreditCard} label="Subscription plans" value={String(subscriptionPackages.length)} tone="bg-teal-100 text-teal-700" />
+            <StatCard icon={CreditCard} label="Storage packages" value={String(subscriptionPackages.length)} tone="bg-teal-100 text-teal-700" />
           </div>
         </div>
       </header>
 
       <div className="flex flex-wrap items-center gap-3">
         <TabButton active={activeTab === 'points'} onClick={() => setActiveTab('points')}>Point Packages</TabButton>
-        <TabButton active={activeTab === 'subscriptions'} onClick={() => setActiveTab('subscriptions')}>Subscription Packages</TabButton>
+        <TabButton active={activeTab === 'subscriptions'} onClick={() => setActiveTab('subscriptions')}>Storage Packages</TabButton>
       </div>
 
-      {activeTab === 'points' ? (
+      {loadError ? (
+        <div className="flex items-center justify-between gap-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          <span className="flex items-center gap-2"><AlertCircle size={16} />{loadError}</span>
+          <button type="button" onClick={() => loadPackages({ showSuccess: true })} className="inline-flex shrink-0 items-center gap-2 font-semibold"><RefreshCw size={14} />Try again</button>
+        </div>
+      ) : null}
+      {actionError ? (
+        <div className="flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"><AlertCircle size={16} />{actionError}</div>
+      ) : null}
+
+      {isLoading ? (
+        <div className="flex min-h-48 items-center justify-center gap-3 rounded-3xl border border-slate-200 bg-white text-sm font-medium text-slate-500 shadow-panel">
+          <span className="h-5 w-5 animate-spin rounded-full border-2 border-emerald-200 border-t-emerald-600" aria-hidden="true" />
+          Loading packages...
+        </div>
+      ) : activeTab === 'points' ? (
         <>
           <section className="space-y-5">
             <div className="flex items-center justify-end">
@@ -441,6 +676,7 @@ export function PlansPage() {
                 type="button"
                 onClick={() => {
                   setPointForm(blankPointForm);
+                  setPointErrors({});
                   setIsPointBuilderOpen(true);
                 }}
                 className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700"
@@ -460,35 +696,29 @@ export function PlansPage() {
                   isEditing={editingPointId === item.id}
                   onEdit={() => editPointPackage(item)}
                   onSave={saveInlinePointPackage}
+                  isBusy={pendingAction === `update-${item.id}` || pendingAction === `delete-${item.id}`}
                   onCancel={() => {
                     setEditingPointId(null);
                     setEditingPointForm(blankPointForm);
+                    setEditingPointErrors({});
                   }}
-                  onDelete={() => setPointPackages((prev) => prev.filter((pkg) => pkg.id !== item.id))}
+                  onDelete={() => {
+                    setActionError('');
+                    setDeleteTarget({ id: item.id, type: 'points', name: item.label });
+                  }}
                   metrics={[]}
                 >
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Label">
-                      <input value={editingPointForm.label} onChange={(event) => updateEditingPointForm('label', event.target.value)} className={inputClassName()} />
+                    <Field label="Label" error={editingPointErrors.label} required>
+                      <input value={editingPointForm.label} onChange={(event) => updateEditingPointForm('label', event.target.value)} className={inputClassName()} placeholder="Enter label" />
                     </Field>
-                    <Field label="Points">
-                      <input type="number" value={editingPointForm.points} onChange={(event) => updateEditingPointForm('points', event.target.value)} className={inputClassName()} />
+                    <Field label="Points" error={editingPointErrors.points} required>
+                      <input inputMode="numeric" value={editingPointForm.points} onChange={(event) => updateEditingPointForm('points', event.target.value)} className={inputClassName()} placeholder="Enter points included" />
                     </Field>
-                    <Field label="Price (USD)">
-                      <input type="number" value={editingPointForm.price} onChange={(event) => updateEditingPointForm('price', event.target.value)} className={inputClassName()} />
+                    <Field label="Price (USD)" error={editingPointErrors.price} required>
+                      <input inputMode="decimal" value={editingPointForm.price} onChange={(event) => updateEditingPointForm('price', event.target.value)} className={inputClassName()} placeholder="Enter price" />
                     </Field>
-                    <Field label="Discount value">
-                      <input type="number" value={editingPointForm.discountValue} onChange={(event) => updateEditingPointForm('discountValue', event.target.value)} className={inputClassName()} />
-                    </Field>
-                    <Field label="Discount type">
-                      <ThemedDropdown
-                        value={editingPointForm.discountType}
-                        onChange={(value) => updateEditingPointForm('discountType', value ?? 'amount')}
-                        options={pointDiscountTypeOptions}
-                        placeholder="Select discount type"
-                      />
-                    </Field>
-                    <Field label="Status">
+                    <Field label="Status" required>
                       <ThemedDropdown
                         value={editingPointForm.status}
                         onChange={(value) => updateEditingPointForm('status', value ?? 'active')}
@@ -496,7 +726,9 @@ export function PlansPage() {
                         placeholder="Select status"
                       />
                     </Field>
-                    <Field label="Tag">
+                  </div>
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    <Field label="Tag" error={editingPointErrors.tag} required>
                       <input
                         value={editingPointForm.tag}
                         onChange={(event) => updateEditingPointForm('tag', event.target.value)}
@@ -517,32 +749,19 @@ export function PlansPage() {
               onClose={() => setIsPointBuilderOpen(false)}
             >
               <div className="space-y-4">
-                <Field label="Label">
-                  <input value={pointForm.label} onChange={(event) => handlePointChange('label', event.target.value)} className={inputClassName()} placeholder="Label" />
+                <Field label="Label" error={pointErrors.label} required>
+                  <input value={pointForm.label} onChange={(event) => handlePointChange('label', event.target.value)} className={inputClassName()} placeholder="Enter label" />
                 </Field>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Points included">
-                    <input type="number" value={pointForm.points} onChange={(event) => handlePointChange('points', event.target.value)} className={inputClassName()} />
+                  <Field label="Points included" error={pointErrors.points} required>
+                    <input inputMode="numeric" value={pointForm.points} onChange={(event) => handlePointChange('points', event.target.value)} className={inputClassName()} placeholder="Enter points included" />
                   </Field>
-                  <Field label="Price (USD)">
-                    <input type="number" value={pointForm.price} onChange={(event) => handlePointChange('price', event.target.value)} className={inputClassName()} />
-                  </Field>
-                </div>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Discount type">
-                    <ThemedDropdown
-                      value={pointForm.discountType}
-                      onChange={(value) => handlePointChange('discountType', value ?? 'amount')}
-                      options={pointDiscountTypeOptions}
-                      placeholder="Select discount type"
-                    />
-                  </Field>
-                  <Field label="Discount value">
-                    <input type="number" value={pointForm.discountValue} onChange={(event) => handlePointChange('discountValue', event.target.value)} className={inputClassName()} />
+                  <Field label="Price (USD)" error={pointErrors.price} required>
+                    <input inputMode="decimal" value={pointForm.price} onChange={(event) => handlePointChange('price', event.target.value)} className={inputClassName()} placeholder="Enter price" />
                   </Field>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Tag">
+                  <Field label="Tag" error={pointErrors.tag} required>
                     <input
                       value={pointForm.tag}
                       onChange={(event) => handlePointChange('tag', event.target.value)}
@@ -551,7 +770,7 @@ export function PlansPage() {
                       maxLength={25}
                     />
                   </Field>
-                  <Field label="Status">
+                  <Field label="Status" required>
                     <ThemedDropdown
                       value={pointForm.status}
                       onChange={(value) => handlePointChange('status', value ?? 'active')}
@@ -563,11 +782,11 @@ export function PlansPage() {
               </div>
 
               <div className="mt-6 flex flex-wrap gap-3">
-                <button type="button" onClick={savePointPackage} className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700">
+                <button type="button" onClick={savePointPackage} disabled={pendingAction === 'create-point'} className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-wait disabled:opacity-60">
                   <Save size={15} />
                   Create
                 </button>
-                <button type="button" onClick={() => setPointForm(blankPointForm)} className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600 transition hover:border-emerald-200 hover:text-emerald-700">
+                <button type="button" onClick={() => { setPointForm(blankPointForm); setPointErrors({}); }} className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600 transition hover:border-emerald-200 hover:text-emerald-700">
                   Reset
                 </button>
               </div>
@@ -582,6 +801,7 @@ export function PlansPage() {
                 type="button"
                 onClick={() => {
                   setSubscriptionForm(blankSubscriptionForm);
+                  setSubscriptionErrors({});
                   setIsSubscriptionBuilderOpen(true);
                 }}
                 className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700"
@@ -595,24 +815,29 @@ export function PlansPage() {
                 <PackageCard
                   key={item.id}
                   title={item.name}
-                  meta={`$${item.amount.toLocaleString('en-US')} · ${item.timePeriod} · ${item.storageLimit.toLocaleString('en-US')} GB · ${item.points.toLocaleString('en-US')} points`}
+                  meta={`$${item.amount.toLocaleString('en-US')} · ${item.timePeriod === 'year' ? 'Yearly' : 'Monthly'} · ${item.storageLimit.toLocaleString('en-US')} GB · ${item.points.toLocaleString('en-US')} points`}
                   status={item.status}
                   description={item.description}
                   isEditing={editingSubscriptionId === item.id}
                   onEdit={() => editSubscriptionPackage(item)}
                   onSave={saveInlineSubscriptionPackage}
+                  isBusy={pendingAction === `update-${item.id}` || pendingAction === `delete-${item.id}`}
                   onCancel={() => {
                     setEditingSubscriptionId(null);
                     setEditingSubscriptionForm(blankSubscriptionForm);
+                    setEditingSubscriptionErrors({});
                   }}
-                  onDelete={() => setSubscriptionPackages((prev) => prev.filter((pkg) => pkg.id !== item.id))}
+                  onDelete={() => {
+                    setActionError('');
+                    setDeleteTarget({ id: item.id, type: 'storage', name: item.name });
+                  }}
                   metrics={[]}
                 >
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Subscription name">
-                      <input value={editingSubscriptionForm.name} onChange={(event) => updateEditingSubscriptionForm('name', event.target.value)} className={inputClassName()} />
+                    <Field label="Storage package name" error={editingSubscriptionErrors.name} required>
+                      <input value={editingSubscriptionForm.name} onChange={(event) => updateEditingSubscriptionForm('name', event.target.value)} className={inputClassName()} placeholder="Enter storage package name" />
                     </Field>
-                    <Field label="Status">
+                    <Field label="Status" required>
                       <ThemedDropdown
                         value={editingSubscriptionForm.status}
                         onChange={(value) => updateEditingSubscriptionForm('status', value ?? 'Active')}
@@ -620,22 +845,22 @@ export function PlansPage() {
                         placeholder="Select status"
                       />
                     </Field>
-                    <Field label="Storage (GB)">
-                      <input type="number" value={editingSubscriptionForm.storageLimit} onChange={(event) => updateEditingSubscriptionForm('storageLimit', event.target.value)} className={inputClassName()} />
+                    <Field label="Storage (GB)" error={editingSubscriptionErrors.storageLimit} required>
+                      <input inputMode="numeric" value={editingSubscriptionForm.storageLimit} onChange={(event) => updateEditingSubscriptionForm('storageLimit', event.target.value)} className={inputClassName()} placeholder="Enter storage (GB)" />
                     </Field>
-                    <Field label="Amount (USD)">
-                      <input type="number" value={editingSubscriptionForm.amount} onChange={(event) => updateEditingSubscriptionForm('amount', event.target.value)} className={inputClassName()} />
+                    <Field label="Price (USD)" error={editingSubscriptionErrors.amount} required>
+                      <input inputMode="decimal" value={editingSubscriptionForm.amount} onChange={(event) => updateEditingSubscriptionForm('amount', event.target.value)} className={inputClassName()} placeholder="Enter price (USD)" />
                     </Field>
-                    <Field label="Time Period">
+                    <Field label="Time Period" required>
                       <ThemedDropdown
                         value={editingSubscriptionForm.timePeriod}
-                        onChange={(value) => updateEditingSubscriptionForm('timePeriod', value ?? 'Monthly')}
+                        onChange={(value) => updateEditingSubscriptionForm('timePeriod', value ?? 'month')}
                         options={subscriptionTimePeriodOptions}
                         placeholder="Select time period"
                       />
                     </Field>
-                    <Field label="Points">
-                      <input type="number" value={editingSubscriptionForm.points} onChange={(event) => updateEditingSubscriptionForm('points', event.target.value)} className={inputClassName()} />
+                    <Field label="Points" error={editingSubscriptionErrors.points} required>
+                      <input inputMode="numeric" value={editingSubscriptionForm.points} onChange={(event) => updateEditingSubscriptionForm('points', event.target.value)} className={inputClassName()} placeholder="Enter points" />
                     </Field>
                   </div>
                   <div className="mt-4">
@@ -654,27 +879,27 @@ export function PlansPage() {
               onClose={() => setIsSubscriptionBuilderOpen(false)}
             >
               <div className="space-y-4">
-                <Field label="Subscription name">
-                  <input value={subscriptionForm.name} onChange={(event) => handleSubscriptionChange('name', event.target.value)} className={inputClassName()} placeholder="Subscription Name" />
+                <Field label="Storage package name" error={subscriptionErrors.name} required>
+                  <input value={subscriptionForm.name} onChange={(event) => handleSubscriptionChange('name', event.target.value)} className={inputClassName()} placeholder="Enter storage package name" />
                 </Field>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Storage (GB)">
-                    <input type="number" value={subscriptionForm.storageLimit} onChange={(event) => handleSubscriptionChange('storageLimit', event.target.value)} className={inputClassName()} />
+                  <Field label="Storage (GB)" error={subscriptionErrors.storageLimit} required>
+                    <input inputMode="numeric" value={subscriptionForm.storageLimit} onChange={(event) => handleSubscriptionChange('storageLimit', event.target.value)} className={inputClassName()} placeholder="Enter storage (GB)" />
                   </Field>
-                  <Field label="Amount (USD)">
-                    <input type="number" value={subscriptionForm.amount} onChange={(event) => handleSubscriptionChange('amount', event.target.value)} className={inputClassName()} />
+                  <Field label="Price (USD)" error={subscriptionErrors.amount} required>
+                    <input inputMode="decimal" value={subscriptionForm.amount} onChange={(event) => handleSubscriptionChange('amount', event.target.value)} className={inputClassName()} placeholder="Enter price (USD)" />
                   </Field>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-3">
-                  <Field label="Time Period">
+                  <Field label="Time Period" required>
                     <ThemedDropdown
                       value={subscriptionForm.timePeriod}
-                      onChange={(value) => handleSubscriptionChange('timePeriod', value ?? 'Monthly')}
+                      onChange={(value) => handleSubscriptionChange('timePeriod', value ?? 'month')}
                       options={subscriptionTimePeriodOptions}
                       placeholder="Select time period"
                     />
                   </Field>
-                  <Field label="Status">
+                  <Field label="Status" required>
                     <ThemedDropdown
                       value={subscriptionForm.status}
                       onChange={(value) => handleSubscriptionChange('status', value ?? 'Active')}
@@ -682,8 +907,8 @@ export function PlansPage() {
                       placeholder="Select status"
                     />
                   </Field>
-                  <Field label="Points">
-                    <input type="number" value={subscriptionForm.points} onChange={(event) => handleSubscriptionChange('points', event.target.value)} className={inputClassName()} />
+                  <Field label="Points" error={subscriptionErrors.points} required>
+                    <input inputMode="numeric" value={subscriptionForm.points} onChange={(event) => handleSubscriptionChange('points', event.target.value)} className={inputClassName()} placeholder="Enter points" />
                   </Field>
                 </div>
                 <Field label="Description">
@@ -692,11 +917,11 @@ export function PlansPage() {
               </div>
 
               <div className="mt-6 flex flex-wrap gap-3">
-                <button type="button" onClick={saveSubscriptionPackage} className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700">
+                <button type="button" onClick={saveSubscriptionPackage} disabled={pendingAction === 'create-storage'} className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-wait disabled:opacity-60">
                   <Save size={15} />
                   Create
                 </button>
-                <button type="button" onClick={() => setSubscriptionForm(blankSubscriptionForm)} className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600 transition hover:border-emerald-200 hover:text-emerald-700">
+                <button type="button" onClick={() => { setSubscriptionForm(blankSubscriptionForm); setSubscriptionErrors({}); }} className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600 transition hover:border-emerald-200 hover:text-emerald-700">
                   Reset
                 </button>
               </div>
@@ -704,6 +929,15 @@ export function PlansPage() {
           ) : null}
         </>
       )}
+      {deleteTarget ? (
+        <DeleteConfirmationModal
+          packageName={deleteTarget.name}
+          isDeleting={pendingAction === `delete-${deleteTarget.id}`}
+          onCancel={() => setDeleteTarget(null)}
+          onConfirm={confirmDeletePackage}
+        />
+      ) : null}
+      {toast ? <Toast type={toast.type} message={toast.message} onClose={() => setToast(null)} /> : null}
     </section>
   );
 }
