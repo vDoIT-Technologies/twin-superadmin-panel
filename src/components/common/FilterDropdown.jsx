@@ -9,6 +9,7 @@ export function FilterDropdown({
   searchPlaceholder = 'Search...',
   searchable = true,
   align = 'left',
+  placement = 'bottom',
   showPlaceholderOption = true,
   tone = 'twin',
   highlightWhenOpen = true,
@@ -89,7 +90,7 @@ export function FilterDropdown({
       </div>
 
       {open ? (
-        <div className={`absolute z-50 mt-2 max-h-80 w-60 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl ring-1 ring-slate-900/5 ${align === 'right' ? 'right-0' : 'left-0'}`}>
+        <div className={`absolute z-50 max-h-80 w-60 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl ring-1 ring-slate-900/5 ${placement === 'top' ? 'bottom-full mb-2' : 'mt-2'} ${align === 'right' ? 'right-0' : 'left-0'}`}>
           {searchable ? (
             <label className={`mb-1.5 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-slate-400 focus-within:bg-white ${isVault ? 'focus-within:border-emerald-300' : 'focus-within:border-indigo-300'}`}>
               <Search size={14} className="shrink-0" />
