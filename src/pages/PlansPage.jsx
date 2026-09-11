@@ -15,6 +15,7 @@ const blankPointForm = {
 const blankSubscriptionForm = {
   id: '',
   name: '',
+  tag: '',
   amount: '',
   timePeriod: 'month',
   storageLimit: '',
@@ -49,7 +50,8 @@ function normalizeStoragePackage(item) {
   return {
     id: getPackageId(item),
     name: item?.name ?? '',
-    amount: Number(item?.amount ?? 0),
+    tag: item?.tag ?? '',
+    amount: Number(item?.amount ?? 0) / 100,
     timePeriod: interval === 'yearly' ? 'year' : interval === 'monthly' ? 'month' : interval,
     storageLimit: Number(item?.storageGB ?? item?.storageLimit ?? 0),
     points: Number(item?.bonusPoints ?? item?.points ?? 0),
@@ -65,11 +67,15 @@ function getApiErrorMessage(error, fallback) {
 const VALID_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9 '&().-]*$/;
 const POSITIVE_INTEGER_PATTERN = /^\d+$/;
 const POSITIVE_DECIMAL_PATTERN = /^\d+(\.\d{1,2})?$/;
+const PRICE_INPUT_PATTERN = /^\d*(\.\d{0,2})?$/;
+const PACKAGE_LABEL_MAX_LENGTH = 30;
+const PACKAGE_LABEL_PREVIEW_LENGTH = 24;
 
 function validateName(value, label) {
   const trimmedValue = value.trim();
   if (!trimmedValue) return `${label} is required.`;
-  if (trimmedValue.length < 2 || trimmedValue.length > 80) return `${label} must be between 2 and 80 characters.`;
+  const maxLength = label === 'Label' ? PACKAGE_LABEL_MAX_LENGTH : 80;
+  if (trimmedValue.length < 2 || trimmedValue.length > maxLength) return `${label} must be between 2 and ${maxLength} characters.`;
   if (!VALID_NAME_PATTERN.test(trimmedValue)) return `${label} can only contain letters, numbers, spaces, and common punctuation.`;
   return '';
 }
@@ -88,9 +94,12 @@ function validatePrice(value, label) {
 
 function validateTag(value) {
   const trimmedValue = value.trim();
-  if (!trimmedValue) return 'Tag is required.';
   if (trimmedValue.length > 25) return 'Tag must be 25 characters or fewer.';
   return '';
+}
+
+function updatePriceIfValid(value, updateForm) {
+  if (PRICE_INPUT_PATTERN.test(value)) updateForm(value);
 }
 
 function validatePointPackage(form) {
@@ -105,12 +114,13 @@ function validatePointPackage(form) {
 
 function validateStoragePackage(form) {
   return {
-    name: validateName(form.name, 'Name'),
+    name: validateName(form.name, 'Label'),
     storageLimit: validatePositiveInteger(form.storageLimit, 'Storage'),
     amount: validatePrice(form.amount, 'Price'),
     timePeriod: form.timePeriod ? '' : 'Time period is required.',
     status: form.status ? '' : 'Status is required.',
-    points: validatePositiveInteger(form.points, 'Points'),
+    points: validatePositiveInteger(form.points, 'Points', false),
+    tag: validateTag(form.tag),
   };
 }
 
@@ -146,6 +156,24 @@ function TabButton({ active, children, onClick }) {
   );
 }
 
+function PackageLabel({ value }) {
+  const isTruncated = value.length > PACKAGE_LABEL_PREVIEW_LENGTH;
+  const displayedValue = isTruncated
+    ? `${value.slice(0, PACKAGE_LABEL_PREVIEW_LENGTH)}…`
+    : value;
+
+  return (
+    <span
+      className="themed-tooltip inline-block max-w-full align-bottom"
+      data-tooltip={isTruncated ? value : undefined}
+      aria-label={value}
+      tabIndex={isTruncated ? 0 : undefined}
+    >
+      {displayedValue}
+    </span>
+  );
+}
+
 function PackageCard({
   title,
   meta,
@@ -167,7 +195,7 @@ function PackageCard({
       <div className={`flex flex-col sm:flex-row sm:items-start sm:justify-between ${isEditing ? 'gap-4' : 'gap-3'}`}>
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
+            <h3 className="min-w-0 text-lg font-semibold text-slate-900"><PackageLabel value={title} /></h3>
             <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
               isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'
             }`}>
@@ -242,11 +270,6 @@ function Field({ label, children, hint, error, required = false }) {
           {label}
           {required ? <span className="ml-0.5 text-rose-500">*</span> : null}
         </span>
-        {required ? (
-          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-            Required
-          </span>
-        ) : null}
       </span>
       {children}
       {error ? <span className="mt-1 block text-[10px] font-medium leading-4 text-rose-600">{error}</span> : null}
@@ -259,7 +282,16 @@ function inputClassName() {
   return 'mt-2 h-9 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-300 focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100';
 }
 
-function ThemedDropdown({ value, onChange, options, placeholder }) {
+function LabelLengthHint({ value }) {
+  return (
+    <span className="flex items-center justify-between gap-3">
+      <span>Use 2–{PACKAGE_LABEL_MAX_LENGTH} characters.</span>
+      <span className="tabular-nums">{value.length}/{PACKAGE_LABEL_MAX_LENGTH}</span>
+    </span>
+  );
+}
+
+function ThemedDropdown({ value, onChange, options, placeholder, showPlaceholderOption = false, placement = 'bottom' }) {
   return (
     <div className="mt-2 [&_.filter-dropdown-trigger]:rounded-2xl [&_.filter-dropdown-trigger]:px-4 [&_.filter-dropdown-trigger]:text-sm [&_.filter-dropdown-trigger]:font-medium [&_.filter-dropdown-trigger]:shadow-none">
       <FilterDropdown
@@ -268,7 +300,8 @@ function ThemedDropdown({ value, onChange, options, placeholder }) {
         options={options}
         placeholder={placeholder}
         searchable={false}
-        showPlaceholderOption={false}
+        showPlaceholderOption={showPlaceholderOption}
+        placement={placement}
         tone="vault"
       />
     </div>
@@ -445,12 +478,13 @@ export function PlansPage() {
     if (hasErrors(errors)) return;
     const payload = {
       name: subscriptionForm.name.trim(),
+      tag: subscriptionForm.tag.trim(),
       storageGB: Number(subscriptionForm.storageLimit || 0),
-      amount: Number(subscriptionForm.amount || 0),
+      amount: Math.round(Number(subscriptionForm.amount || 0) * 100),
       currency: 'USD',
       interval: subscriptionForm.timePeriod,
       description: subscriptionForm.description.trim() || undefined,
-      bonusPoints: Number(subscriptionForm.points || 0),
+      bonusPoints: subscriptionForm.points === '' ? 0 : Number(subscriptionForm.points),
       isActive: subscriptionForm.status === 'Active',
     };
     setPendingAction('create-storage');
@@ -490,6 +524,7 @@ export function PlansPage() {
     setEditingSubscriptionForm({
       id: item.id,
       name: item.name,
+      tag: item.tag ?? '',
       amount: String(item.amount),
       timePeriod: item.timePeriod,
       storageLimit: String(item.storageLimit),
@@ -544,12 +579,13 @@ export function PlansPage() {
     if (hasErrors(errors)) return;
     const payload = {
       name: editingSubscriptionForm.name.trim(),
+      tag: editingSubscriptionForm.tag.trim(),
       storageGB: Number(editingSubscriptionForm.storageLimit || 0),
-      amount: Number(editingSubscriptionForm.amount || 0),
+      amount: Math.round(Number(editingSubscriptionForm.amount || 0) * 100),
       currency: 'USD',
       interval: editingSubscriptionForm.timePeriod,
       description: editingSubscriptionForm.description.trim() || undefined,
-      bonusPoints: Number(editingSubscriptionForm.points || 0),
+      bonusPoints: editingSubscriptionForm.points === '' ? 0 : Number(editingSubscriptionForm.points),
       isActive: editingSubscriptionForm.status === 'Active',
     };
     setPendingAction(`update-${editingSubscriptionId}`);
@@ -621,6 +657,10 @@ export function PlansPage() {
   const pointStatusOptions = [
     { value: 'active', label: 'Active' },
     { value: 'inactive', label: 'Inactive' },
+  ];
+  const packageTagOptions = [
+    { value: 'Most Popular', label: 'Most Popular' },
+    { value: 'Best Value', label: 'Best Value' },
   ];
   const subscriptionStatusOptions = [
     { value: 'Active', label: 'Active' },
@@ -713,14 +753,14 @@ export function PlansPage() {
                   metrics={[]}
                 >
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Label" error={editingPointErrors.label} required>
-                      <input value={editingPointForm.label} onChange={(event) => updateEditingPointForm('label', event.target.value)} className={inputClassName()} placeholder="Enter label" />
+                    <Field label="Label" error={editingPointErrors.label} hint={<LabelLengthHint value={editingPointForm.label} />} required>
+                      <input value={editingPointForm.label} onChange={(event) => updateEditingPointForm('label', event.target.value)} className={inputClassName()} placeholder="Enter label" maxLength={PACKAGE_LABEL_MAX_LENGTH} aria-label={`Package label, ${editingPointForm.label.length} of ${PACKAGE_LABEL_MAX_LENGTH} characters used`} />
                     </Field>
                     <Field label="Points" error={editingPointErrors.points} required>
                       <input inputMode="numeric" value={editingPointForm.points} onChange={(event) => updateEditingPointForm('points', event.target.value)} className={inputClassName()} placeholder="Enter points included" />
                     </Field>
                     <Field label="Price (USD)" error={editingPointErrors.price} required>
-                      <input inputMode="decimal" value={editingPointForm.price} onChange={(event) => updateEditingPointForm('price', event.target.value)} className={inputClassName()} placeholder="Enter price" />
+                      <input inputMode="decimal" value={editingPointForm.price} onChange={(event) => updatePriceIfValid(event.target.value, (value) => updateEditingPointForm('price', value))} className={inputClassName()} placeholder="Enter price" />
                     </Field>
                     <Field label="Status" required>
                       <ThemedDropdown
@@ -732,13 +772,14 @@ export function PlansPage() {
                     </Field>
                   </div>
                   <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                    <Field label="Tag" error={editingPointErrors.tag} required>
-                      <input
+                    <Field label="Tag" error={editingPointErrors.tag}>
+                      <ThemedDropdown
                         value={editingPointForm.tag}
-                        onChange={(event) => updateEditingPointForm('tag', event.target.value)}
-                        className={inputClassName()}
-                        placeholder="Most Popular / Best Value"
-                        maxLength={25}
+                        onChange={(value) => updateEditingPointForm('tag', value ?? '')}
+                        options={packageTagOptions}
+                        placeholder="No tag"
+                        showPlaceholderOption
+                        placement="top"
                       />
                     </Field>
                   </div>
@@ -753,25 +794,26 @@ export function PlansPage() {
               onClose={() => setIsPointBuilderOpen(false)}
             >
               <div className="space-y-4">
-                <Field label="Label" error={pointErrors.label} required>
-                  <input value={pointForm.label} onChange={(event) => handlePointChange('label', event.target.value)} className={inputClassName()} placeholder="Enter label" />
+                <Field label="Label" error={pointErrors.label} hint={<LabelLengthHint value={pointForm.label} />} required>
+                  <input value={pointForm.label} onChange={(event) => handlePointChange('label', event.target.value)} className={inputClassName()} placeholder="Enter label" maxLength={PACKAGE_LABEL_MAX_LENGTH} aria-label={`Package label, ${pointForm.label.length} of ${PACKAGE_LABEL_MAX_LENGTH} characters used`} />
                 </Field>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field label="Points included" error={pointErrors.points} required>
                     <input inputMode="numeric" value={pointForm.points} onChange={(event) => handlePointChange('points', event.target.value)} className={inputClassName()} placeholder="Enter points included" />
                   </Field>
                   <Field label="Price (USD)" error={pointErrors.price} required>
-                    <input inputMode="decimal" value={pointForm.price} onChange={(event) => handlePointChange('price', event.target.value)} className={inputClassName()} placeholder="Enter price" />
+                    <input inputMode="decimal" value={pointForm.price} onChange={(event) => updatePriceIfValid(event.target.value, (value) => handlePointChange('price', value))} className={inputClassName()} placeholder="Enter price" />
                   </Field>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Tag" error={pointErrors.tag} required>
-                    <input
+                  <Field label="Tag" error={pointErrors.tag}>
+                    <ThemedDropdown
                       value={pointForm.tag}
-                      onChange={(event) => handlePointChange('tag', event.target.value)}
-                      className={inputClassName()}
-                      placeholder="Most Popular / Best Value"
-                      maxLength={25}
+                      onChange={(value) => handlePointChange('tag', value ?? '')}
+                      options={packageTagOptions}
+                      placeholder="No tag"
+                      showPlaceholderOption
+                      placement="top"
                     />
                   </Field>
                   <Field label="Status" required>
@@ -838,8 +880,8 @@ export function PlansPage() {
                   metrics={[]}
                 >
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Storage package name" error={editingSubscriptionErrors.name} required>
-                      <input value={editingSubscriptionForm.name} onChange={(event) => updateEditingSubscriptionForm('name', event.target.value)} className={inputClassName()} placeholder="Enter storage package name" />
+                    <Field label="Label" error={editingSubscriptionErrors.name} hint={<LabelLengthHint value={editingSubscriptionForm.name} />} required>
+                      <input value={editingSubscriptionForm.name} onChange={(event) => updateEditingSubscriptionForm('name', event.target.value)} className={inputClassName()} placeholder="Enter label" maxLength={PACKAGE_LABEL_MAX_LENGTH} />
                     </Field>
                     <Field label="Status" required>
                       <ThemedDropdown
@@ -853,7 +895,7 @@ export function PlansPage() {
                       <input inputMode="numeric" value={editingSubscriptionForm.storageLimit} onChange={(event) => updateEditingSubscriptionForm('storageLimit', event.target.value)} className={inputClassName()} placeholder="Enter storage (GB)" />
                     </Field>
                     <Field label="Price (USD)" error={editingSubscriptionErrors.amount} required>
-                      <input inputMode="decimal" value={editingSubscriptionForm.amount} onChange={(event) => updateEditingSubscriptionForm('amount', event.target.value)} className={inputClassName()} placeholder="Enter price (USD)" />
+                      <input inputMode="decimal" value={editingSubscriptionForm.amount} onChange={(event) => updatePriceIfValid(event.target.value, (value) => updateEditingSubscriptionForm('amount', value))} className={inputClassName()} placeholder="Enter price (USD)" />
                     </Field>
                     <Field label="Time Period" required>
                       <ThemedDropdown
@@ -863,8 +905,18 @@ export function PlansPage() {
                         placeholder="Select time period"
                       />
                     </Field>
-                    <Field label="Points" error={editingSubscriptionErrors.points} required>
+                    <Field label="Points" error={editingSubscriptionErrors.points}>
                       <input inputMode="numeric" value={editingSubscriptionForm.points} onChange={(event) => updateEditingSubscriptionForm('points', event.target.value)} className={inputClassName()} placeholder="Enter points" />
+                    </Field>
+                    <Field label="Tag" error={editingSubscriptionErrors.tag}>
+                      <ThemedDropdown
+                        value={editingSubscriptionForm.tag}
+                        onChange={(value) => updateEditingSubscriptionForm('tag', value ?? '')}
+                        options={packageTagOptions}
+                        placeholder="No tag"
+                        showPlaceholderOption
+                        placement="top"
+                      />
                     </Field>
                   </div>
                   <div className="mt-4">
@@ -883,18 +935,18 @@ export function PlansPage() {
               onClose={() => setIsSubscriptionBuilderOpen(false)}
             >
               <div className="space-y-4">
-                <Field label="Storage package name" error={subscriptionErrors.name} required>
-                  <input value={subscriptionForm.name} onChange={(event) => handleSubscriptionChange('name', event.target.value)} className={inputClassName()} placeholder="Enter storage package name" />
+                <Field label="Label" error={subscriptionErrors.name} hint={<LabelLengthHint value={subscriptionForm.name} />} required>
+                  <input value={subscriptionForm.name} onChange={(event) => handleSubscriptionChange('name', event.target.value)} className={inputClassName()} placeholder="Enter label" maxLength={PACKAGE_LABEL_MAX_LENGTH} />
                 </Field>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field label="Storage (GB)" error={subscriptionErrors.storageLimit} required>
                     <input inputMode="numeric" value={subscriptionForm.storageLimit} onChange={(event) => handleSubscriptionChange('storageLimit', event.target.value)} className={inputClassName()} placeholder="Enter storage (GB)" />
                   </Field>
                   <Field label="Price (USD)" error={subscriptionErrors.amount} required>
-                    <input inputMode="decimal" value={subscriptionForm.amount} onChange={(event) => handleSubscriptionChange('amount', event.target.value)} className={inputClassName()} placeholder="Enter price (USD)" />
+                    <input inputMode="decimal" value={subscriptionForm.amount} onChange={(event) => updatePriceIfValid(event.target.value, (value) => handleSubscriptionChange('amount', value))} className={inputClassName()} placeholder="Enter price (USD)" />
                   </Field>
                 </div>
-                <div className="grid gap-4 sm:grid-cols-3">
+                <div className="grid gap-4 sm:grid-cols-2">
                   <Field label="Time Period" required>
                     <ThemedDropdown
                       value={subscriptionForm.timePeriod}
@@ -911,8 +963,18 @@ export function PlansPage() {
                       placeholder="Select status"
                     />
                   </Field>
-                  <Field label="Points" error={subscriptionErrors.points} required>
+                  <Field label="Points" error={subscriptionErrors.points}>
                     <input inputMode="numeric" value={subscriptionForm.points} onChange={(event) => handleSubscriptionChange('points', event.target.value)} className={inputClassName()} placeholder="Enter points" />
+                  </Field>
+                  <Field label="Tag" error={subscriptionErrors.tag}>
+                    <ThemedDropdown
+                      value={subscriptionForm.tag}
+                      onChange={(value) => handleSubscriptionChange('tag', value ?? '')}
+                      options={packageTagOptions}
+                      placeholder="No tag"
+                      showPlaceholderOption
+                      placement="top"
+                    />
                   </Field>
                 </div>
                 <Field label="Description">
