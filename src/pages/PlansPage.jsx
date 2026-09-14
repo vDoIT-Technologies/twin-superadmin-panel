@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertCircle, CheckCircle2, CreditCard, Layers3, Pencil, Plus, RefreshCw, Save, Sparkles, Trash2, WalletCards, X } from 'lucide-react';
+import { AlertCircle, CheckCircle2, CreditCard, Layers3, Pencil, Plus, Save, Sparkles, Trash2, WalletCards, X } from 'lucide-react';
 import { FilterDropdown } from '../components/common/FilterDropdown';
 import { packageService } from '../services';
 
@@ -10,6 +10,7 @@ const blankPointForm = {
   points: '',
   price: '',
   status: 'active',
+  description: '',
 };
 
 const blankSubscriptionForm = {
@@ -42,6 +43,7 @@ function normalizePointPackage(item) {
     points: Number(item?.points ?? 0),
     price: Number(item?.priceUSD ?? item?.price ?? 0),
     status: item?.isActive === false ? 'inactive' : 'active',
+    description: item?.description ?? '',
   };
 }
 
@@ -387,15 +389,12 @@ export function PlansPage() {
   const [editingPointErrors, setEditingPointErrors] = useState({});
   const [editingSubscriptionErrors, setEditingSubscriptionErrors] = useState({});
   const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState('');
-  const [actionError, setActionError] = useState('');
   const [pendingAction, setPendingAction] = useState('');
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [toast, setToast] = useState(null);
 
   const loadPackages = useCallback(async ({ showSuccess = false } = {}) => {
     setIsLoading(true);
-    setLoadError('');
     try {
       const [pointResponse, storageResponse] = await Promise.all([
         packageService.getPackages('points'),
@@ -407,7 +406,6 @@ export function PlansPage() {
     } catch (error) {
       console.error('GET /api/v1/packages failed:', error);
       const message = getApiErrorMessage(error, 'Packages could not be loaded.');
-      setLoadError(message);
       setToast({ type: 'error', message });
     } finally {
       setIsLoading(false);
@@ -452,10 +450,10 @@ export function PlansPage() {
       points: Number(pointForm.points || 0),
       priceUSD: Number(pointForm.price || 0),
       tag: pointForm.tag.trim(),
+      description: pointForm.description.trim() || undefined,
       isActive: pointForm.status === 'active',
     };
     setPendingAction('create-point');
-    setActionError('');
     try {
       const response = await packageService.createPackage(payload);
       await loadPackages();
@@ -465,7 +463,6 @@ export function PlansPage() {
     } catch (error) {
       console.error('POST /api/v1/packages failed:', error);
       const message = getApiErrorMessage(error, 'Point package could not be created.');
-      setActionError(message);
       setToast({ type: 'error', message });
     } finally {
       setPendingAction('');
@@ -488,7 +485,6 @@ export function PlansPage() {
       isActive: subscriptionForm.status === 'Active',
     };
     setPendingAction('create-storage');
-    setActionError('');
     try {
       const response = await packageService.createPackage(payload);
       await loadPackages();
@@ -498,7 +494,6 @@ export function PlansPage() {
     } catch (error) {
       console.error('POST /api/v1/packages failed:', error);
       const message = getApiErrorMessage(error, 'Storage package could not be created.');
-      setActionError(message);
       setToast({ type: 'error', message });
     } finally {
       setPendingAction('');
@@ -515,6 +510,7 @@ export function PlansPage() {
       points: String(item.points),
       price: String(item.price),
       status: item.status,
+      description: item.description,
     });
   };
 
@@ -553,10 +549,10 @@ export function PlansPage() {
       points: Number(editingPointForm.points || 0),
       priceUSD: Number(editingPointForm.price || 0),
       tag: editingPointForm.tag.trim(),
+      description: editingPointForm.description.trim() || undefined,
       isActive: editingPointForm.status === 'active',
     };
     setPendingAction(`update-${editingPointId}`);
-    setActionError('');
     try {
       const response = await packageService.updatePackage(editingPointId, payload);
       await loadPackages();
@@ -566,7 +562,6 @@ export function PlansPage() {
     } catch (error) {
       console.error('PUT /api/v1/packages/:id failed:', error);
       const message = getApiErrorMessage(error, 'Point package could not be updated.');
-      setActionError(message);
       setToast({ type: 'error', message });
     } finally {
       setPendingAction('');
@@ -589,7 +584,6 @@ export function PlansPage() {
       isActive: editingSubscriptionForm.status === 'Active',
     };
     setPendingAction(`update-${editingSubscriptionId}`);
-    setActionError('');
     try {
       const response = await packageService.updatePackage(editingSubscriptionId, payload);
       await loadPackages();
@@ -599,7 +593,6 @@ export function PlansPage() {
     } catch (error) {
       console.error('PUT /api/v1/packages/:id failed:', error);
       const message = getApiErrorMessage(error, 'Storage package could not be updated.');
-      setActionError(message);
       setToast({ type: 'error', message });
     } finally {
       setPendingAction('');
@@ -608,7 +601,6 @@ export function PlansPage() {
 
   const deletePointPackage = async (packageId) => {
     setPendingAction(`delete-${packageId}`);
-    setActionError('');
     try {
       const response = await packageService.deletePackage(packageId);
       setPointPackages((prev) => prev.filter((item) => item.id !== packageId));
@@ -617,7 +609,6 @@ export function PlansPage() {
     } catch (error) {
       console.error('DELETE /api/v1/packages/:id failed:', error);
       const message = getApiErrorMessage(error, 'Point package could not be deleted.');
-      setActionError(message);
       setToast({ type: 'error', message });
       return false;
     } finally {
@@ -627,7 +618,6 @@ export function PlansPage() {
 
   const deleteStoragePackage = async (packageId) => {
     setPendingAction(`delete-${packageId}`);
-    setActionError('');
     try {
       const response = await packageService.deletePackage(packageId);
       setSubscriptionPackages((prev) => prev.filter((item) => item.id !== packageId));
@@ -636,7 +626,6 @@ export function PlansPage() {
     } catch (error) {
       console.error('DELETE /api/v1/packages/:id failed:', error);
       const message = getApiErrorMessage(error, 'Storage package could not be deleted.');
-      setActionError(message);
       setToast({ type: 'error', message });
       return false;
     } finally {
@@ -697,16 +686,6 @@ export function PlansPage() {
         <TabButton active={activeTab === 'subscriptions'} onClick={() => setActiveTab('subscriptions')}>Storage Packages</TabButton>
       </div>
 
-      {loadError ? (
-        <div className="flex items-center justify-between gap-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          <span className="flex items-center gap-2"><AlertCircle size={16} />{loadError}</span>
-          <button type="button" onClick={() => loadPackages({ showSuccess: true })} className="inline-flex shrink-0 items-center gap-2 font-semibold"><RefreshCw size={14} />Try again</button>
-        </div>
-      ) : null}
-      {actionError ? (
-        <div className="flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"><AlertCircle size={16} />{actionError}</div>
-      ) : null}
-
       {isLoading ? (
         <div className="flex min-h-48 items-center justify-center gap-3 rounded-3xl border border-slate-200 bg-white text-sm font-medium text-slate-500 shadow-panel">
           <span className="h-5 w-5 animate-spin rounded-full border-2 border-emerald-200 border-t-emerald-600" aria-hidden="true" />
@@ -736,7 +715,7 @@ export function PlansPage() {
                   title={item.label}
                   meta={`$${item.price.toLocaleString('en-US')} · ${item.points.toLocaleString('en-US')} points`}
                   status={item.status}
-                  description=""
+                  description={item.description}
                   isEditing={editingPointId === item.id}
                   onEdit={() => editPointPackage(item)}
                   onSave={saveInlinePointPackage}
@@ -747,7 +726,6 @@ export function PlansPage() {
                     setEditingPointErrors({});
                   }}
                   onDelete={() => {
-                    setActionError('');
                     setDeleteTarget({ id: item.id, type: 'points', name: item.label });
                   }}
                   metrics={[]}
@@ -781,6 +759,11 @@ export function PlansPage() {
                         showPlaceholderOption
                         placement="top"
                       />
+                    </Field>
+                  </div>
+                  <div className="mt-4">
+                    <Field label="Description">
+                      <textarea value={editingPointForm.description} onChange={(event) => updateEditingPointForm('description', event.target.value)} className={`${inputClassName()} min-h-28 resize-none`} placeholder="Add description..." />
                     </Field>
                   </div>
                 </PackageCard>
@@ -825,6 +808,9 @@ export function PlansPage() {
                     />
                   </Field>
                 </div>
+                <Field label="Description">
+                  <textarea value={pointForm.description} onChange={(event) => handlePointChange('description', event.target.value)} className={`${inputClassName()} min-h-28 resize-none`} placeholder="Add description..." />
+                </Field>
               </div>
 
               <div className="mt-6 flex flex-wrap gap-3">
@@ -874,7 +860,6 @@ export function PlansPage() {
                     setEditingSubscriptionErrors({});
                   }}
                   onDelete={() => {
-                    setActionError('');
                     setDeleteTarget({ id: item.id, type: 'storage', name: item.name });
                   }}
                   metrics={[]}
