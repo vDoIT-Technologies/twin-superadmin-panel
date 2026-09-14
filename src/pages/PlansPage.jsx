@@ -10,6 +10,7 @@ const blankPointForm = {
   points: '',
   price: '',
   status: 'active',
+  description: '',
 };
 
 const blankSubscriptionForm = {
@@ -42,6 +43,7 @@ function normalizePointPackage(item) {
     points: Number(item?.points ?? 0),
     price: Number(item?.priceUSD ?? item?.price ?? 0),
     status: item?.isActive === false ? 'inactive' : 'active',
+    description: item?.description ?? '',
   };
 }
 
@@ -448,6 +450,7 @@ export function PlansPage() {
       points: Number(pointForm.points || 0),
       priceUSD: Number(pointForm.price || 0),
       tag: pointForm.tag.trim(),
+      description: pointForm.description.trim() || undefined,
       isActive: pointForm.status === 'active',
     };
     setPendingAction('create-point');
@@ -507,6 +510,7 @@ export function PlansPage() {
       points: String(item.points),
       price: String(item.price),
       status: item.status,
+      description: item.description,
     });
   };
 
@@ -545,6 +549,7 @@ export function PlansPage() {
       points: Number(editingPointForm.points || 0),
       priceUSD: Number(editingPointForm.price || 0),
       tag: editingPointForm.tag.trim(),
+      description: editingPointForm.description.trim() || undefined,
       isActive: editingPointForm.status === 'active',
     };
     setPendingAction(`update-${editingPointId}`);
@@ -710,7 +715,7 @@ export function PlansPage() {
                   title={item.label}
                   meta={`$${item.price.toLocaleString('en-US')} · ${item.points.toLocaleString('en-US')} points`}
                   status={item.status}
-                  description=""
+                  description={item.description}
                   isEditing={editingPointId === item.id}
                   onEdit={() => editPointPackage(item)}
                   onSave={saveInlinePointPackage}
@@ -756,6 +761,11 @@ export function PlansPage() {
                       />
                     </Field>
                   </div>
+                  <div className="mt-4">
+                    <Field label="Description">
+                      <textarea value={editingPointForm.description} onChange={(event) => updateEditingPointForm('description', event.target.value)} className={`${inputClassName()} min-h-28 resize-none`} placeholder="Add description..." />
+                    </Field>
+                  </div>
                 </PackageCard>
               ))}
             </div>
@@ -798,6 +808,9 @@ export function PlansPage() {
                     />
                   </Field>
                 </div>
+                <Field label="Description">
+                  <textarea value={pointForm.description} onChange={(event) => handlePointChange('description', event.target.value)} className={`${inputClassName()} min-h-28 resize-none`} placeholder="Add description..." />
+                </Field>
               </div>
 
               <div className="mt-6 flex flex-wrap gap-3">
