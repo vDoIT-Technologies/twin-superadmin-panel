@@ -427,6 +427,7 @@ export function UsersPage() {
           rowKey: `${id}-${env || 'unknown'}-${index}`,
           detailRoute,
           name: fullName || suppliedName || user?.email || '',
+          email: user?.email || '',
           client: clientName,
           clientId,
           env,
@@ -459,6 +460,7 @@ export function UsersPage() {
       const matchesStatus = !filters.status || user.status === filters.status;
       const matchesQuery = matchesTableSearch(q, [
         user.name,
+        user.email,
         getEnvLabel(user.env),
         user.client,
         user.cost,
