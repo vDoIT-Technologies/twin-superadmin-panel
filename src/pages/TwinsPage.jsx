@@ -326,7 +326,7 @@ export function TwinsPage() {
                 { value: '1year', label: 'Last 1 Year' },
                 { value: 'morethan1year', label: 'More Than 1 Year' },
               ]}
-              placeholder="All Dates"
+              placeholder="Created: All time"
               searchable={false}
               align="right"
               tone="twin"
