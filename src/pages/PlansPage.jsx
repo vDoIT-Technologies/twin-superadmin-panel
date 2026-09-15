@@ -66,9 +66,10 @@ function getApiErrorMessage(error, fallback) {
   return error?.response?.data?.message ?? error?.response?.data?.error ?? error?.message ?? fallback;
 }
 
-const VALID_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9 '&().-]*$/;
+const VALID_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9 ]*$/;
 const POSITIVE_INTEGER_PATTERN = /^\d+$/;
 const POSITIVE_DECIMAL_PATTERN = /^\d+(\.\d{1,2})?$/;
+const INTEGER_INPUT_PATTERN = /^\d*$/;
 const PRICE_INPUT_PATTERN = /^\d*(\.\d{0,2})?$/;
 const PACKAGE_LABEL_MAX_LENGTH = 30;
 const PACKAGE_LABEL_PREVIEW_LENGTH = 24;
@@ -78,7 +79,7 @@ function validateName(value, label) {
   if (!trimmedValue) return `${label} is required.`;
   const maxLength = label === 'Label' ? PACKAGE_LABEL_MAX_LENGTH : 80;
   if (trimmedValue.length < 2 || trimmedValue.length > maxLength) return `${label} must be between 2 and ${maxLength} characters.`;
-  if (!VALID_NAME_PATTERN.test(trimmedValue)) return `${label} can only contain letters, numbers, spaces, and common punctuation.`;
+  if (!VALID_NAME_PATTERN.test(trimmedValue)) return `${label} can only contain letters, numbers, and spaces.`;
   return '';
 }
 
@@ -102,6 +103,10 @@ function validateTag(value) {
 
 function updatePriceIfValid(value, updateForm) {
   if (PRICE_INPUT_PATTERN.test(value)) updateForm(value);
+}
+
+function updateIntegerIfValid(value, updateForm) {
+  if (INTEGER_INPUT_PATTERN.test(value)) updateForm(value);
 }
 
 function validatePointPackage(form) {
@@ -433,12 +438,22 @@ export function PlansPage() {
 
   const handlePointChange = (key, value) => {
     setPointForm((prev) => ({ ...prev, [key]: value }));
-    setPointErrors((prev) => ({ ...prev, [key]: '' }));
+    setPointErrors((prev) => ({
+      ...prev,
+      [key]: key === 'label' && value && !VALID_NAME_PATTERN.test(value)
+        ? 'Label can only contain letters, numbers, and spaces.'
+        : '',
+    }));
   };
 
   const handleSubscriptionChange = (key, value) => {
     setSubscriptionForm((prev) => ({ ...prev, [key]: value }));
-    setSubscriptionErrors((prev) => ({ ...prev, [key]: '' }));
+    setSubscriptionErrors((prev) => ({
+      ...prev,
+      [key]: key === 'name' && value && !VALID_NAME_PATTERN.test(value)
+        ? 'Label can only contain letters, numbers, and spaces.'
+        : '',
+    }));
   };
 
   const savePointPackage = async () => {
@@ -532,12 +547,22 @@ export function PlansPage() {
 
   const updateEditingPointForm = (key, value) => {
     setEditingPointForm((prev) => ({ ...prev, [key]: value }));
-    setEditingPointErrors((prev) => ({ ...prev, [key]: '' }));
+    setEditingPointErrors((prev) => ({
+      ...prev,
+      [key]: key === 'label' && value && !VALID_NAME_PATTERN.test(value)
+        ? 'Label can only contain letters, numbers, and spaces.'
+        : '',
+    }));
   };
 
   const updateEditingSubscriptionForm = (key, value) => {
     setEditingSubscriptionForm((prev) => ({ ...prev, [key]: value }));
-    setEditingSubscriptionErrors((prev) => ({ ...prev, [key]: '' }));
+    setEditingSubscriptionErrors((prev) => ({
+      ...prev,
+      [key]: key === 'name' && value && !VALID_NAME_PATTERN.test(value)
+        ? 'Label can only contain letters, numbers, and spaces.'
+        : '',
+    }));
   };
 
   const saveInlinePointPackage = async () => {
@@ -732,13 +757,13 @@ export function PlansPage() {
                 >
                   <div className="grid gap-4 sm:grid-cols-2">
                     <Field label="Label" error={editingPointErrors.label} hint={<LabelLengthHint value={editingPointForm.label} />} required>
-                      <input value={editingPointForm.label} onChange={(event) => updateEditingPointForm('label', event.target.value)} className={inputClassName()} placeholder="Enter label" maxLength={PACKAGE_LABEL_MAX_LENGTH} aria-label={`Package label, ${editingPointForm.label.length} of ${PACKAGE_LABEL_MAX_LENGTH} characters used`} />
+                      <input value={editingPointForm.label} onChange={(event) => updateEditingPointForm('label', event.target.value)} onBlur={() => setEditingPointErrors((prev) => ({ ...prev, label: validateName(editingPointForm.label, 'Label') }))} className={inputClassName()} placeholder="Enter label" maxLength={PACKAGE_LABEL_MAX_LENGTH} aria-label={`Package label, ${editingPointForm.label.length} of ${PACKAGE_LABEL_MAX_LENGTH} characters used`} />
                     </Field>
                     <Field label="Points" error={editingPointErrors.points} required>
-                      <input inputMode="numeric" value={editingPointForm.points} onChange={(event) => updateEditingPointForm('points', event.target.value)} className={inputClassName()} placeholder="Enter points included" />
+                      <input inputMode="numeric" value={editingPointForm.points} onChange={(event) => updateIntegerIfValid(event.target.value, (value) => updateEditingPointForm('points', value))} onBlur={() => setEditingPointErrors((prev) => ({ ...prev, points: validatePositiveInteger(editingPointForm.points, 'Points') }))} className={inputClassName()} placeholder="Enter points included" />
                     </Field>
-                    <Field label="Price (USD)" error={editingPointErrors.price} required>
-                      <input inputMode="decimal" value={editingPointForm.price} onChange={(event) => updatePriceIfValid(event.target.value, (value) => updateEditingPointForm('price', value))} className={inputClassName()} placeholder="Enter price" />
+                    <Field label="Price (USD)" error={editingPointErrors.price} hint="Use up to 2 decimal places (for example, 9.99)." required>
+                      <input inputMode="decimal" value={editingPointForm.price} onChange={(event) => updatePriceIfValid(event.target.value, (value) => updateEditingPointForm('price', value))} onBlur={() => setEditingPointErrors((prev) => ({ ...prev, price: validatePrice(editingPointForm.price, 'Price') }))} className={inputClassName()} placeholder="Enter price" />
                     </Field>
                     <Field label="Status" required>
                       <ThemedDropdown
@@ -778,14 +803,14 @@ export function PlansPage() {
             >
               <div className="space-y-4">
                 <Field label="Label" error={pointErrors.label} hint={<LabelLengthHint value={pointForm.label} />} required>
-                  <input value={pointForm.label} onChange={(event) => handlePointChange('label', event.target.value)} className={inputClassName()} placeholder="Enter label" maxLength={PACKAGE_LABEL_MAX_LENGTH} aria-label={`Package label, ${pointForm.label.length} of ${PACKAGE_LABEL_MAX_LENGTH} characters used`} />
+                  <input value={pointForm.label} onChange={(event) => handlePointChange('label', event.target.value)} onBlur={() => setPointErrors((prev) => ({ ...prev, label: validateName(pointForm.label, 'Label') }))} className={inputClassName()} placeholder="Enter label" maxLength={PACKAGE_LABEL_MAX_LENGTH} aria-label={`Package label, ${pointForm.label.length} of ${PACKAGE_LABEL_MAX_LENGTH} characters used`} />
                 </Field>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field label="Points included" error={pointErrors.points} required>
-                    <input inputMode="numeric" value={pointForm.points} onChange={(event) => handlePointChange('points', event.target.value)} className={inputClassName()} placeholder="Enter points included" />
+                    <input inputMode="numeric" value={pointForm.points} onChange={(event) => updateIntegerIfValid(event.target.value, (value) => handlePointChange('points', value))} onBlur={() => setPointErrors((prev) => ({ ...prev, points: validatePositiveInteger(pointForm.points, 'Points') }))} className={inputClassName()} placeholder="Enter points included" />
                   </Field>
-                  <Field label="Price (USD)" error={pointErrors.price} required>
-                    <input inputMode="decimal" value={pointForm.price} onChange={(event) => updatePriceIfValid(event.target.value, (value) => handlePointChange('price', value))} className={inputClassName()} placeholder="Enter price" />
+                  <Field label="Price (USD)" error={pointErrors.price} hint="Use up to 2 decimal places (for example, 9.99)." required>
+                    <input inputMode="decimal" value={pointForm.price} onChange={(event) => updatePriceIfValid(event.target.value, (value) => handlePointChange('price', value))} onBlur={() => setPointErrors((prev) => ({ ...prev, price: validatePrice(pointForm.price, 'Price') }))} className={inputClassName()} placeholder="Enter price" />
                   </Field>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -866,7 +891,7 @@ export function PlansPage() {
                 >
                   <div className="grid gap-4 sm:grid-cols-2">
                     <Field label="Label" error={editingSubscriptionErrors.name} hint={<LabelLengthHint value={editingSubscriptionForm.name} />} required>
-                      <input value={editingSubscriptionForm.name} onChange={(event) => updateEditingSubscriptionForm('name', event.target.value)} className={inputClassName()} placeholder="Enter label" maxLength={PACKAGE_LABEL_MAX_LENGTH} />
+                      <input value={editingSubscriptionForm.name} onChange={(event) => updateEditingSubscriptionForm('name', event.target.value)} onBlur={() => setEditingSubscriptionErrors((prev) => ({ ...prev, name: validateName(editingSubscriptionForm.name, 'Label') }))} className={inputClassName()} placeholder="Enter label" maxLength={PACKAGE_LABEL_MAX_LENGTH} />
                     </Field>
                     <Field label="Status" required>
                       <ThemedDropdown
@@ -877,10 +902,10 @@ export function PlansPage() {
                       />
                     </Field>
                     <Field label="Storage (GB)" error={editingSubscriptionErrors.storageLimit} required>
-                      <input inputMode="numeric" value={editingSubscriptionForm.storageLimit} onChange={(event) => updateEditingSubscriptionForm('storageLimit', event.target.value)} className={inputClassName()} placeholder="Enter storage (GB)" />
+                      <input inputMode="numeric" value={editingSubscriptionForm.storageLimit} onChange={(event) => updateIntegerIfValid(event.target.value, (value) => updateEditingSubscriptionForm('storageLimit', value))} onBlur={() => setEditingSubscriptionErrors((prev) => ({ ...prev, storageLimit: validatePositiveInteger(editingSubscriptionForm.storageLimit, 'Storage') }))} className={inputClassName()} placeholder="Enter storage (GB)" />
                     </Field>
-                    <Field label="Price (USD)" error={editingSubscriptionErrors.amount} required>
-                      <input inputMode="decimal" value={editingSubscriptionForm.amount} onChange={(event) => updatePriceIfValid(event.target.value, (value) => updateEditingSubscriptionForm('amount', value))} className={inputClassName()} placeholder="Enter price (USD)" />
+                    <Field label="Price (USD)" error={editingSubscriptionErrors.amount} hint="Use up to 2 decimal places (for example, 9.99)." required>
+                      <input inputMode="decimal" value={editingSubscriptionForm.amount} onChange={(event) => updatePriceIfValid(event.target.value, (value) => updateEditingSubscriptionForm('amount', value))} onBlur={() => setEditingSubscriptionErrors((prev) => ({ ...prev, amount: validatePrice(editingSubscriptionForm.amount, 'Price') }))} className={inputClassName()} placeholder="Enter price (USD)" />
                     </Field>
                     <Field label="Time Period" required>
                       <ThemedDropdown
@@ -891,7 +916,7 @@ export function PlansPage() {
                       />
                     </Field>
                     <Field label="Points" error={editingSubscriptionErrors.points}>
-                      <input inputMode="numeric" value={editingSubscriptionForm.points} onChange={(event) => updateEditingSubscriptionForm('points', event.target.value)} className={inputClassName()} placeholder="Enter points" />
+                      <input inputMode="numeric" value={editingSubscriptionForm.points} onChange={(event) => updateIntegerIfValid(event.target.value, (value) => updateEditingSubscriptionForm('points', value))} onBlur={() => setEditingSubscriptionErrors((prev) => ({ ...prev, points: validatePositiveInteger(editingSubscriptionForm.points, 'Points', false) }))} className={inputClassName()} placeholder="Enter points" />
                     </Field>
                     <Field label="Tag" error={editingSubscriptionErrors.tag}>
                       <ThemedDropdown
@@ -921,14 +946,14 @@ export function PlansPage() {
             >
               <div className="space-y-4">
                 <Field label="Label" error={subscriptionErrors.name} hint={<LabelLengthHint value={subscriptionForm.name} />} required>
-                  <input value={subscriptionForm.name} onChange={(event) => handleSubscriptionChange('name', event.target.value)} className={inputClassName()} placeholder="Enter label" maxLength={PACKAGE_LABEL_MAX_LENGTH} />
+                  <input value={subscriptionForm.name} onChange={(event) => handleSubscriptionChange('name', event.target.value)} onBlur={() => setSubscriptionErrors((prev) => ({ ...prev, name: validateName(subscriptionForm.name, 'Label') }))} className={inputClassName()} placeholder="Enter label" maxLength={PACKAGE_LABEL_MAX_LENGTH} />
                 </Field>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field label="Storage (GB)" error={subscriptionErrors.storageLimit} required>
-                    <input inputMode="numeric" value={subscriptionForm.storageLimit} onChange={(event) => handleSubscriptionChange('storageLimit', event.target.value)} className={inputClassName()} placeholder="Enter storage (GB)" />
+                    <input inputMode="numeric" value={subscriptionForm.storageLimit} onChange={(event) => updateIntegerIfValid(event.target.value, (value) => handleSubscriptionChange('storageLimit', value))} onBlur={() => setSubscriptionErrors((prev) => ({ ...prev, storageLimit: validatePositiveInteger(subscriptionForm.storageLimit, 'Storage') }))} className={inputClassName()} placeholder="Enter storage (GB)" />
                   </Field>
-                  <Field label="Price (USD)" error={subscriptionErrors.amount} required>
-                    <input inputMode="decimal" value={subscriptionForm.amount} onChange={(event) => updatePriceIfValid(event.target.value, (value) => handleSubscriptionChange('amount', value))} className={inputClassName()} placeholder="Enter price (USD)" />
+                  <Field label="Price (USD)" error={subscriptionErrors.amount} hint="Use up to 2 decimal places (for example, 9.99)." required>
+                    <input inputMode="decimal" value={subscriptionForm.amount} onChange={(event) => updatePriceIfValid(event.target.value, (value) => handleSubscriptionChange('amount', value))} onBlur={() => setSubscriptionErrors((prev) => ({ ...prev, amount: validatePrice(subscriptionForm.amount, 'Price') }))} className={inputClassName()} placeholder="Enter price (USD)" />
                   </Field>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -949,7 +974,7 @@ export function PlansPage() {
                     />
                   </Field>
                   <Field label="Points" error={subscriptionErrors.points}>
-                    <input inputMode="numeric" value={subscriptionForm.points} onChange={(event) => handleSubscriptionChange('points', event.target.value)} className={inputClassName()} placeholder="Enter points" />
+                    <input inputMode="numeric" value={subscriptionForm.points} onChange={(event) => updateIntegerIfValid(event.target.value, (value) => handleSubscriptionChange('points', value))} onBlur={() => setSubscriptionErrors((prev) => ({ ...prev, points: validatePositiveInteger(subscriptionForm.points, 'Points', false) }))} className={inputClassName()} placeholder="Enter points" />
                   </Field>
                   <Field label="Tag" error={subscriptionErrors.tag}>
                     <ThemedDropdown
