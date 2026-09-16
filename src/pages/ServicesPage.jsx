@@ -4,14 +4,19 @@ import { dashboardService } from '../services';
 import { useAuth } from '../app/AuthContext';
 
 const VAULT_ONLY_SERVICE_PATTERN = /vault|filebase|ipfs|storage|object.?store/i;
+const HIDDEN_SERVICE_PATTERN = /^(apify|d-?id)$/i;
 
 const statusTone = {
   'Not Configured': 'border-amber-200 bg-amber-50 text-amber-700',
+  'To be configured': 'border-amber-200 bg-amber-50 text-amber-700',
+  Unavailable: 'border-slate-200 bg-slate-100 text-slate-600',
   Error: 'border-rose-200 bg-rose-50 text-rose-700',
   Unknown: 'border-slate-200 bg-slate-50 text-slate-600',
 };
 const statusDotTone = {
   'Not Configured': 'bg-amber-500',
+  'To be configured': 'bg-amber-500',
+  Unavailable: 'bg-slate-400',
   Error: 'bg-rose-500',
   Unknown: 'bg-slate-400',
 };
@@ -139,14 +144,21 @@ export function ServicesPage() {
   }, [reloadKey]);
 
   const serviceList = services ? Object.entries(services)
-    .filter(([name]) => !VAULT_ONLY_SERVICE_PATTERN.test(name))
-    .map(([name, info]) => ({
-    name: name.charAt(0).toUpperCase() + name.slice(1),
-    key: name,
-    status: info?.status || 'Unknown',
-    data: info?.data || null,
-    message: info?.message || null,
-    })) : [];
+    .filter(([name]) => !VAULT_ONLY_SERVICE_PATTERN.test(name) && !HIDDEN_SERVICE_PATTERN.test(name))
+    .map(([name, info]) => {
+      const key = name.toLowerCase();
+      const reportedStatus = info?.status || 'Unknown';
+      const status = reportedStatus === 'Error'
+        ? (key === 'aws' ? 'To be configured' : 'Unavailable')
+        : reportedStatus;
+
+      return {
+        name: key === 'aws' ? 'AWS' : name.charAt(0).toUpperCase() + name.slice(1),
+        key: name,
+        status,
+        data: reportedStatus === 'Configured' ? (info?.data || null) : null,
+      };
+    }) : [];
 
   return (
     <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
@@ -171,7 +183,7 @@ export function ServicesPage() {
           <div className="flex min-h-56 flex-col items-center justify-center text-center">
             <span className="grid h-11 w-11 place-items-center rounded-xl bg-rose-50 text-rose-600"><AlertCircle size={20} /></span>
             <h2 className="mt-3 text-sm font-semibold text-slate-800">Unable to check services</h2>
-            <p className="mt-1 max-w-md text-sm text-slate-500">{error}</p>
+            <p className="mt-1 max-w-md text-sm text-slate-500">Service status is temporarily unavailable. Please try again.</p>
             <button type="button" onClick={() => setReloadKey((value) => value + 1)} className={`mt-4 inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold text-white ${isVault ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-indigo-600 hover:bg-indigo-700'}`}><RefreshCw size={14} />Try again</button>
           </div>
         ) : serviceList.length === 0 ? (
@@ -180,14 +192,11 @@ export function ServicesPage() {
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {serviceList.map((service) => (
               <article key={service.key} className="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-50/50 p-5 shadow-sm">
-                <span className={`absolute inset-y-0 left-0 w-1 ${service.status === 'Configured' ? (isVault ? 'bg-emerald-500' : 'bg-indigo-500') : service.status === 'Error' ? 'bg-rose-500' : 'bg-amber-400'}`} aria-hidden="true" />
+                <span className={`absolute inset-y-0 left-0 w-1 ${service.status === 'Configured' ? (isVault ? 'bg-emerald-500' : 'bg-indigo-500') : service.status === 'Unavailable' ? 'bg-slate-400' : 'bg-amber-400'}`} aria-hidden="true" />
                 <div className="flex items-start justify-between gap-3">
                   <h3 className="text-base font-semibold text-slate-900">{service.name}</h3>
                   <StatusBadge status={service.status} isVault={isVault} />
                 </div>
-                {service.message ? (
-                  <p className="mt-3 rounded-lg border border-rose-100 bg-rose-50 px-3 py-2 text-sm text-rose-700">{service.message}</p>
-                ) : null}
                 {service.data ? (
                   <div className="mt-4 space-y-2 border-t border-slate-200 pt-4">
                     {getServiceDataEntries(service).map(([k, v]) => (
