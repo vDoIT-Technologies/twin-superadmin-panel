@@ -453,12 +453,12 @@ export function AppLayout() {
                 <Columns2 size={16} />
               </button>
               <div className="min-w-0">
-                <span className="block truncate text-lg font-semibold text-slate-800">{currentTitle}</span>
+                <span className="block truncate text-base font-semibold text-slate-800 sm:text-lg">{currentTitle}</span>
               </div>
             </div>
 
             <div className={`flex min-w-0 items-center justify-end gap-2 ${isMobileSearchOpen ? 'w-full flex-1' : ''}`}>
-              <div className={`relative min-w-0 ${isMobileSearchOpen ? 'flex-1' : 'w-48 sm:w-64'}`} ref={searchRef}>
+              <div className={`relative min-w-0 ${isMobileSearchOpen ? 'flex-1' : 'w-9 sm:w-64'}`} ref={searchRef}>
                 {!isMobileSearchOpen ? (
                   <button
                     type="button"
