@@ -58,9 +58,9 @@ export function FilterToolbar({
     <>
       <div className="border-b border-slate-200 bg-white px-4 py-3 sm:px-6 lg:px-8">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
-          {showEnvironment ? <div className="flex shrink-0 items-center gap-2">
-            <span className="mr-1 text-xs font-bold uppercase tracking-[0.12em] text-slate-400">Environment</span>
-            <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 no-scrollbar">
+          {showEnvironment ? <div className="flex w-full shrink-0 flex-wrap items-center justify-center gap-2 sm:w-auto sm:flex-nowrap sm:justify-start">
+            <span className="text-center text-xs font-bold uppercase tracking-[0.12em] text-slate-400 sm:mr-1 sm:text-left">Environment</span>
+            <div className="flex max-w-full items-center justify-center gap-1.5 overflow-x-auto px-1 py-0.5 no-scrollbar">
               {ENVIRONMENTS.map((option) => {
                 const active = filters.envs.includes(option.id);
                 return (
@@ -103,22 +103,22 @@ export function FilterToolbar({
 
       {showOverviewControls ? (
         <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 bg-slate-50/60 px-4 py-2.5 sm:px-6 lg:px-8">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <div className="flex h-9 shrink-0 items-center rounded-full border border-slate-200 bg-white p-1 shadow-2xs">
+          <div className="flex w-full flex-wrap items-center justify-center gap-2.5 sm:w-auto sm:justify-start">
+            <div className="flex h-9 shrink-0 items-center rounded-full border border-slate-200 bg-white p-1 shadow-2xs" aria-label="Time range">
               {RANGES.map((range) => (
-                <button key={range} type="button" className={`h-7 rounded-full px-3 text-xs font-semibold transition ${filters.range === range ? `${isVault ? 'bg-emerald-600' : 'bg-indigo-600'} text-white shadow-xs` : 'text-slate-500 hover:text-slate-800'}`} onClick={() => updateFilters({ range })}>{range}</button>
+                <button key={range} type="button" aria-pressed={filters.range === range} className={`h-7 rounded-full px-3 text-xs font-semibold transition ${filters.range === range ? `${isVault ? 'bg-emerald-600' : 'bg-indigo-600'} text-white shadow-xs` : 'text-slate-500 hover:text-slate-800'}`} onClick={() => updateFilters({ range })}>{range}</button>
               ))}
             </div>
 
-            <button type="button" className={`inline-flex h-9 items-center gap-2 rounded-full border px-3.5 text-xs font-semibold shadow-2xs transition ${filters.compare ? (isVault ? 'border-emerald-400 bg-emerald-50 text-emerald-700' : 'border-indigo-400 bg-indigo-50 text-indigo-700') : (isVault ? 'border-slate-200 bg-white text-slate-600 hover:border-emerald-200 hover:text-emerald-700' : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:text-indigo-700')}`} onClick={() => updateFilters({ compare: !filters.compare })}>
+            <button type="button" aria-pressed={filters.compare} className={`inline-flex h-9 items-center gap-2 rounded-full border px-3.5 text-xs font-semibold shadow-2xs transition ${filters.compare ? (isVault ? 'border-emerald-400 bg-emerald-50 text-emerald-700' : 'border-indigo-400 bg-indigo-50 text-indigo-700') : (isVault ? 'border-slate-200 bg-white text-slate-600 hover:border-emerald-200 hover:text-emerald-700' : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:text-indigo-700')}`} onClick={() => updateFilters({ compare: !filters.compare })}>
               <Columns2 size={15} />
               Compare
             </button>
           </div>
 
-          <div className="flex h-9 shrink-0 items-center rounded-full border border-slate-200 bg-white p-1 shadow-2xs">
+          <div className="flex h-10 w-full shrink-0 items-center rounded-full border border-slate-200 bg-white p-1 shadow-2xs sm:h-9 sm:w-auto" aria-label="Overview metric">
             {LENSES.map((lens) => (
-              <button key={lens.id} type="button" className={`h-7 rounded-full px-3 text-xs font-semibold transition ${filters.lens === lens.id ? (isVault ? 'bg-emerald-50 font-bold text-emerald-700' : 'bg-indigo-50 font-bold text-indigo-700') : 'text-slate-500 hover:text-slate-700'}`} onClick={() => updateFilters({ lens: lens.id })}>
+              <button key={lens.id} type="button" aria-pressed={filters.lens === lens.id} className={`h-8 flex-1 rounded-full px-3 text-xs font-semibold transition sm:h-7 sm:flex-none ${filters.lens === lens.id ? (isVault ? 'bg-emerald-100 font-bold text-emerald-800 shadow-xs' : 'bg-indigo-100 font-bold text-indigo-800 shadow-xs') : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`} onClick={() => updateFilters({ lens: lens.id })}>
                 {lens.label}
               </button>
             ))}
