@@ -5,7 +5,7 @@ import { dashboardService, exportService, getClientsDropdown } from '../services
 import { useEntityFilters } from '../app/FilterContext';
 import { TruncatedText } from '../components/common/TruncatedText';
 import { FilterDropdown } from '../components/common/FilterDropdown';
-import { envBadge, formatCost, formatNumber } from '../utils/dashboardUtils';
+import { envBadge, formatCost, formatNumber, TruncatedValue } from '../utils/dashboardUtils';
 import { normalizeEntityStatus } from '../utils/status';
 import { getEntityFilterParams } from '../utils/entityFilters';
 import { superadminDemoData } from '../demo-data/superadminDemoData';
@@ -382,10 +382,10 @@ export function TwinsPage() {
                     state: { from: `${location.pathname}${location.search}` },
                   })}
                 >
-                  <td className="px-4 py-3.5">
-                    <div className="flex items-center gap-3">
+                  <td className="w-56 max-w-56 px-4 py-3.5 lg:w-64 lg:max-w-64">
+                    <div className="flex w-full min-w-0 items-center gap-3">
                       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-violet-100 text-xs font-bold text-violet-600">{getTwinInitials(twin.name)}</span>
-                      <div className="min-w-0"><strong className="block font-semibold text-slate-700"><TruncatedText value={twin.name} /></strong><span className="mt-0.5 block text-xs text-slate-400"><TruncatedText value={twin.role} /></span></div>
+                      <div className="min-w-0 flex-1"><strong className="block w-full font-semibold text-slate-700"><TruncatedText value={twin.name} className="w-full" /></strong><span className="mt-0.5 block w-full text-xs text-slate-400"><TruncatedText value={twin.role} className="w-full" /></span></div>
                     </div>
                   </td>
                   <td className="px-4 py-3.5 text-center text-slate-500">{superadminDemoData.ENV_META[twin.env] ? envBadge(twin.env) : <TruncatedText value={twin.env || '---'} />}</td>
@@ -394,7 +394,7 @@ export function TwinsPage() {
                   <td className="px-4 py-3.5 text-slate-500">
                     {twin.status ? <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${twin.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{twin.status === 'active' ? 'Active' : 'Inactive'}</span> : '---'}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3.5 text-right tabular-nums text-slate-500">{formatCost(twin.revenue)}</td>
+                  <td className="w-24 max-w-24 px-4 py-3.5 text-right tabular-nums text-slate-500 sm:w-28 sm:max-w-28 lg:w-32 lg:max-w-32"><TruncatedValue value={formatCost(twin.revenue)} /></td>
                   <td className="whitespace-nowrap px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(twin.pointsSpent)}</td>
                 </tr>
               ))}

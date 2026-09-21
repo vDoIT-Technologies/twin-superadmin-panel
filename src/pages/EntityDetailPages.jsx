@@ -17,8 +17,7 @@ import { useLocation, useNavigate, useParams, useSearchParams } from 'react-rout
 import { dashboardService } from '../services';
 import { useAuth } from '../app/AuthContext';
 import { FilterContext } from '../app/FilterContext';
-import { envBadge, formatCost, formatCurrency, formatNumber, ServiceUsageRow } from '../utils/dashboardUtils';
-import { formatCurrencyUpToTwoDecimals } from '../utils/formatters';
+import { envBadge, formatCost, formatNumber, ServiceUsageRow, TruncatedValue } from '../utils/dashboardUtils';
 
 const DETAIL_PAGE_SIZE = 10;
 
@@ -70,7 +69,7 @@ function MetricCard({ icon: Icon, label, value, meta, tone = 'indigo' }) {
           <Icon size={16} />
         </span>
       </div>
-      <h3 className="mt-4 text-2xl font-bold tracking-tight text-slate-900">{value}</h3>
+      <h3 className="mt-4 min-w-0 text-2xl font-bold tracking-tight text-slate-900"><TruncatedValue value={value} className="max-w-[10rem] sm:max-w-[12rem] xl:max-w-[14rem]" /></h3>
       <p className="mt-1 text-xs font-semibold text-slate-500">{label}</p>
       {meta ? <span className="mt-1 block text-xs text-slate-400">{meta}</span> : null}
     </article>
@@ -182,7 +181,7 @@ function firstDecimal(...values) {
   return null;
 }
 
-export const formatOptionalCurrency = (value) => value == null ? '---' : formatCurrency(value);
+export const formatOptionalCurrency = (value) => value == null ? '---' : formatCost(value);
 const formatOptionalCost = (value) => formatCost(value);
 export const formatOptionalNumber = (value) => value == null ? '---' : formatNumber(value);
 
@@ -352,10 +351,11 @@ export function ClientDetailPage() {
   const serviceCosts = kpis?.serviceCosts || {};
   const openAiCost = firstDecimal(serviceCosts?.openAi);
   const elevenLabsCost = firstDecimal(serviceCosts?.elevenLabs);
+  const storageCost = firstDecimal(serviceCosts?.storage);
   const didCost = firstDecimal(serviceCosts?.dId);
   const totalCost = firstDecimal(kpis?.cost, kpis?.totalCost, usage?.cost, usage?.totalCost, clientData?.costs?.total)
-    ?? (openAiCost != null || elevenLabsCost != null || didCost != null
-      ? (openAiCost ?? 0) + (elevenLabsCost ?? 0) + (didCost ?? 0)
+    ?? (openAiCost != null || elevenLabsCost != null || storageCost != null || didCost != null
+      ? (openAiCost ?? 0) + (elevenLabsCost ?? 0) + (storageCost ?? 0) + (didCost ?? 0)
       : null);
   const displayedTotalCost = totalCost;
   const twins = tabData.twins?.twins || [];
@@ -414,7 +414,7 @@ export function ClientDetailPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <MetricCard icon={TrendingUp} label="Revenue" value={formatCurrency(kpis?.revenue || 0)} tone="emerald" />
+          <MetricCard icon={TrendingUp} label="Revenue" value={formatCost(kpis?.revenue || 0)} tone="emerald" />
           <MetricCard icon={Wallet} label="Cost" value={formatOptionalCost(displayedTotalCost)} tone="rose" />
           <MetricCard icon={Bot} label="Twins" value={String(kpis?.twinsCount || 0)} tone="indigo" />
           <MetricCard icon={Users} label="Users" value={String(kpis?.usersCount || 0)} tone="amber" />
@@ -451,7 +451,8 @@ export function ClientDetailPage() {
                 <>
                   <ServiceUsageRow label="OpenAI" cost={openAiCost} />
                   <ServiceUsageRow label="ElevenLabs" cost={elevenLabsCost} />
-                  <div className="flex items-center justify-between bg-slate-50/70 px-5 py-3 text-xs"><span className="font-semibold text-slate-500">Total cost</span><strong className="font-bold text-slate-900">{formatOptionalCost(displayedTotalCost)}</strong></div>
+                  <ServiceUsageRow label="Storage" cost={storageCost} />
+                  <div className="flex items-center justify-between gap-4 bg-slate-50/70 px-5 py-3 text-xs"><span className="font-semibold text-slate-500">Total cost</span><strong className="w-24 min-w-0 text-right font-bold text-slate-900 sm:w-28 lg:w-32"><TruncatedValue value={formatOptionalCost(displayedTotalCost)} className="w-full text-right" /></strong></div>
                 </>
               ) : (
                 // <>
@@ -475,11 +476,12 @@ export function ClientDetailPage() {
                     </div>
                     <ServiceUsageRow label="OpenAI" cost={openAiCost} />
                     <ServiceUsageRow label="ElevenLabs" cost={elevenLabsCost} />
+                    <ServiceUsageRow label="Storage" cost={storageCost} />
                     <ServiceUsageRow label="D-ID" cost={didCost} />
                     <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-4 bg-slate-50/70 px-5 py-3 text-xs">
                       <span className="font-semibold text-slate-500">Total cost</span>
                       <span />
-                      <strong className="w-20 text-right font-bold tabular-nums text-slate-900">{formatOptionalCost(displayedTotalCost)}</strong>
+                      <strong className="w-24 min-w-0 justify-self-end text-right font-bold tabular-nums text-slate-900 sm:w-28 lg:w-32"><TruncatedValue value={formatOptionalCost(displayedTotalCost)} className="w-full text-right" /></strong>
                     </div>
                   </div>
                 </>
@@ -515,7 +517,7 @@ export function ClientDetailPage() {
                     state: { from: `${location.pathname}${location.search}` },
                   })}
                 >
-                  <span className="flex flex-1 items-center gap-3">
+                  <span className="flex min-w-0 flex-1 items-center gap-3">
                     <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-purple-100 text-xs font-bold text-purple-600">{getInitials(twin.name || '')}</span>
                     <span>
                       <strong className="block text-sm font-semibold text-slate-800">{twin.name || 'Unnamed'}</strong>
@@ -567,9 +569,9 @@ export function ClientDetailPage() {
                 >
                   <span className="flex flex-1 items-center gap-3">
                     <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-indigo-100 text-xs font-bold text-indigo-600">{getInitials(user.name || '')}</span>
-                    <span>
-                      <strong className="block text-sm font-semibold text-slate-800">{user.name || 'Unnamed'}</strong>
-                      <span className="block text-xs text-slate-400">{user.email || ''}</span>
+                    <span className="min-w-0">
+                      <strong className="block truncate text-sm font-semibold text-slate-800" title={user.name || 'Unnamed'}>{user.name || 'Unnamed'}</strong>
+                      <span className="block truncate text-xs text-slate-400" title={user.email || ''}>{user.email || ''}</span>
                     </span>
                   </span>
                   <span className="w-20">{envBadge(user.env)}</span>
@@ -707,7 +709,7 @@ export function TwinDetailPage() {
       />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <MetricCard icon={TrendingUp} label="Revenue" value={formatCurrency(kpis?.revenue || 0)} tone="emerald" />
+        <MetricCard icon={TrendingUp} label="Revenue" value={formatCost(kpis?.revenue || 0)} tone="emerald" />
         {/* <MetricCard icon={Wallet} label="Cost" value={formatCurrency(kpis?.cost || 0)} tone="rose" /> */}
         <MetricCard icon={MessagesSquare} label="Messages" value={formatNumber(kpis?.messages || kpis?.messagesCount || 0)} tone="indigo" />
         <MetricCard icon={BookOpen} label="Knowledge Files" value={formatNumber(kpis?.knowledgeFiles || kpis?.knowledgeSources || kpis?.sourcesCount || 0)} tone="amber" />
@@ -886,11 +888,15 @@ export function UserDetailPage() {
     ? ''
     : rawClientName;
 
-  const totalServiceCost = firstDecimal(kpis?.cost, usage?.totals?.cost);
   const serviceCosts = kpis?.serviceCosts || {};
   const openAiCost = firstDecimal(serviceCosts?.openAi);
   const elevenLabsCost = firstDecimal(serviceCosts?.elevenLabs);
+  const storageCost = firstDecimal(serviceCosts?.storage);
   const didCost = firstDecimal(serviceCosts?.dId);
+  const totalServiceCost = firstDecimal(kpis?.cost, usage?.totals?.cost)
+    ?? (openAiCost != null || elevenLabsCost != null || storageCost != null || didCost != null
+      ? (openAiCost ?? 0) + (elevenLabsCost ?? 0) + (storageCost ?? 0) + (didCost ?? 0)
+      : null);
 
   const primaryPackage = profile?.packageDetails?.vaultPackage ?? profile?.packageDetails?.twinPackage ?? null;
   const twinPackage = profile?.packageDetails?.twinPackage || null;
@@ -998,7 +1004,7 @@ export function UserDetailPage() {
         <MetricCard
           icon={TrendingUp}
           label="Revenue"
-          value={isVault ? (revenueValue == null ? '---' : formatCurrencyUpToTwoDecimals(revenueValue)) : formatCurrencyUpToTwoDecimals(revenue?.totalAmount)}
+          value={isVault ? (revenueValue == null ? '---' : formatCost(revenueValue)) : formatCost(revenue?.totalAmount)}
           tone="emerald"
         />
 
@@ -1267,11 +1273,13 @@ export function UserDetailPage() {
               <>
                 <ServiceUsageRow label="OpenAI" cost={openAiCost} />
                 <ServiceUsageRow label="ElevenLabs" cost={elevenLabsCost} />
+                <ServiceUsageRow label="Storage" cost={storageCost} />
               </>
             ) : (
               <>
                 <ServiceUsageRow label="OpenAI" cost={openAiCost} />
                 <ServiceUsageRow label="ElevenLabs" cost={elevenLabsCost} />
+                <ServiceUsageRow label="Storage" cost={storageCost} />
                 <ServiceUsageRow label="D-ID" cost={didCost} />
               </>
             )}
@@ -1283,10 +1291,8 @@ export function UserDetailPage() {
 
               <span />
 
-              <strong className="w-20 whitespace-nowrap text-right font-bold tabular-nums text-slate-900">
-                {totalServiceCost == null
-                  ? "---"
-                  : formatCost(totalServiceCost)}
+              <strong className="w-24 min-w-0 justify-self-end text-right font-bold tabular-nums text-slate-900 sm:w-28 lg:w-32">
+                <TruncatedValue value={totalServiceCost == null ? '---' : formatCost(totalServiceCost)} className="w-full text-right" />
               </strong>
             </div>
           </div>
