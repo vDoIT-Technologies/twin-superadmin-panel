@@ -1,8 +1,6 @@
 import { superadminDemoData } from '../demo-data/superadminDemoData';
 import { isServiceForProduct } from './productAccess';
 import { selectFacts, sumMetric, RANGE_DAYS } from '../demo-data/superadminSelectors';
-import { formatOptionalCurrency } from '../pages/EntityDetailPages';
-
 const compactFormatter = new Intl.NumberFormat('en-US', {
   notation: 'compact',
   maximumFractionDigits: 1,
@@ -20,6 +18,25 @@ const currencyFormatterTwoDecimals = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 0,
   maximumFractionDigits: 2,
 });
+
+export function getRawNumericValue(value) {
+  if (value == null || value === '') return null;
+  if (typeof value === 'object' && '$numberDecimal' in value) return String(value.$numberDecimal);
+  if (typeof value === 'number') return Number.isFinite(value) ? String(value) : null;
+  const text = String(value).trim();
+  return text && Number.isFinite(Number(text)) ? text : null;
+}
+
+function groupNumericString(value) {
+  const raw = getRawNumericValue(value);
+  if (raw == null) return null;
+  if (/e/i.test(raw)) return raw;
+  const sign = raw.startsWith('-') ? '-' : '';
+  const unsigned = sign ? raw.slice(1) : raw;
+  const [integer, decimal] = unsigned.split('.');
+  const groupedInteger = integer.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return `${sign}${groupedInteger}${decimal == null ? '' : `.${decimal}`}`;
+}
 
 export function formatCompactNumber(value) {
   return compactFormatter.format(value);
@@ -46,30 +63,33 @@ export function formatCurrencyFull(value) {
 }
 
 export function formatCost(value) {
-  if (value == null || value === '') return '---';
-  const rawValue = typeof value === 'object' && '$numberDecimal' in value
-    ? value.$numberDecimal
-    : value;
-  const amount = Number(rawValue);
-  if (!Number.isFinite(amount)) return '---';
-  if (amount === 0) return '$0.00';
+  const exactValue = groupNumericString(value);
+  if (exactValue == null) return '---';
+  if (Number(exactValue.replace(/,/g, '')) === 0) return '$0.00';
+  return `$${exactValue}`;
+}
 
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 6,
-  }).format(amount);
+export function TruncatedValue({ value, children, className = '' }) {
+  const fullValue = children ?? value ?? '---';
+  return (
+    <span
+      className={`group relative block min-w-0 max-w-full ${className}`}
+      tabIndex={0}
+      aria-label={String(fullValue)}
+    >
+      <span className="block overflow-hidden text-ellipsis whitespace-nowrap">{fullValue}</span>
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute bottom-full right-0 z-50 mb-2 hidden w-max max-w-[min(24rem,calc(100vw-2rem))] rounded-lg bg-slate-900 px-3 py-2 text-left text-xs font-medium leading-5 whitespace-normal text-white shadow-lg break-all group-hover:block group-focus:block"
+      >
+        {fullValue}
+      </span>
+    </span>
+  );
 }
 
 export function formatNumber(value) {
-  if (value == null || Number.isNaN(value)) return '0';
-  const n = Number(value);
-  const abs = Math.abs(n);
-  if (abs >= 1e9) return `${(n / 1e9).toFixed(2)}B`;
-  if (abs >= 1e6) return `${(n / 1e6).toFixed(2)}M`;
-  if (abs >= 1e3) return `${(n / 1e3).toFixed(1)}k`;
-  return Math.round(n).toLocaleString('en-US');
+  return groupNumericString(value) ?? '0';
 }
 
 export function formatActualNumber(n) {
@@ -163,8 +183,8 @@ export function ServiceUsageRow({ label, cost }) {
     <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-4 px-5 py-3 text-xs">
       <strong className="truncate font-semibold text-slate-700">{label}</strong>
       <span />
-      <strong className="w-20 text-right font-semibold tabular-nums text-slate-800">
-        {formatCost(cost)}
+      <strong className="w-24 min-w-0 justify-self-end text-right font-semibold tabular-nums text-slate-800 sm:w-28 lg:w-32">
+        <TruncatedValue value={formatCost(cost)} className="w-full text-right" />
       </strong>
     </div>
   );

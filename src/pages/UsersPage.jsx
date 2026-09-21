@@ -7,7 +7,7 @@ import { TruncatedText } from '../components/common/TruncatedText';
 import { FilterDropdown } from '../components/common/FilterDropdown';
 import { superadminDemoData } from '../demo-data/superadminDemoData';
 import { dashboardService, dropdownApiAvailable, exportService, getClientsDropdown, getUsersDropdown } from '../services';
-import { envBadge, formatCost, formatNumber } from '../utils/dashboardUtils';
+import { envBadge, formatCost, formatNumber, TruncatedValue } from '../utils/dashboardUtils';
 import { normalizeEntityStatus } from '../utils/status';
 import { getEntityFilterParams } from '../utils/entityFilters';
 import { isNumericTableSearch, matchesTableSearch, TABLE_SEARCH_DATASET_LIMIT } from '../utils/tableSearch';
@@ -660,20 +660,20 @@ export function UsersPage() {
                       state: { from: `${location.pathname}${location.search}` },
                     })}
                   >
-                    <td className="px-4 py-3.5">
-                      <div className="flex min-w-0 items-center gap-3">
+                    <td className="w-56 max-w-56 px-4 py-3.5 lg:w-64 lg:max-w-64">
+                      <div className="flex w-full min-w-0 items-center gap-3">
                         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-amber-100 text-xs font-bold text-amber-600">{getUserInitials(user.name || '?')}</span>
-                        <strong className="font-semibold text-slate-700"><TruncatedText value={user.name} /></strong>
+                        <strong className="block min-w-0 flex-1 font-semibold text-slate-700"><TruncatedText value={user.name} className="w-full" /></strong>
                       </div>
                     </td>
                     <td className="px-4 py-3.5 text-center text-slate-500">{superadminDemoData.ENV_META[user.env] ? envBadge(user.env) : getEnvLabel(user.env)}</td>
                     <td className="px-4 py-3.5 text-slate-500"><TruncatedText value={user.client || '---'} /></td>
-                    <td className="whitespace-nowrap px-4 py-3.5 text-right tabular-nums text-slate-500">{formatCost(user.cost)}</td>
-                    <td className="whitespace-nowrap px-4 py-3.5 text-right tabular-nums text-slate-500">{formatCost(user.revenue)}</td>
-                    <td className="whitespace-nowrap px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(user.totalPoints)}</td>
-                    <td className="whitespace-nowrap px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(user.pointsSpent)}</td>
-                    <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(user.messages)}</td>
-                    <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(user.sessions)}</td>
+                    <td className="w-24 max-w-24 px-4 py-3.5 text-right tabular-nums text-slate-500 lg:w-28 lg:max-w-28"><TruncatedValue value={formatCost(user.cost)} /></td>
+                    <td className="w-24 max-w-24 px-4 py-3.5 text-right tabular-nums text-slate-500 lg:w-28 lg:max-w-28"><TruncatedValue value={formatCost(user.revenue)} /></td>
+                    <td className="w-24 max-w-24 px-4 py-3.5 text-right tabular-nums text-slate-500 lg:w-28 lg:max-w-28"><TruncatedValue value={formatOptionalNumber(user.totalPoints)} /></td>
+                    <td className="w-24 max-w-24 px-4 py-3.5 text-right tabular-nums text-slate-500 lg:w-28 lg:max-w-28"><TruncatedValue value={formatOptionalNumber(user.pointsSpent)} /></td>
+                    <td className="w-24 max-w-24 px-4 py-3.5 text-right tabular-nums text-slate-500 lg:w-28 lg:max-w-28"><TruncatedValue value={formatOptionalNumber(user.messages)} /></td>
+                    <td className="w-24 max-w-24 px-4 py-3.5 text-right tabular-nums text-slate-500 lg:w-28 lg:max-w-28"><TruncatedValue value={formatOptionalNumber(user.sessions)} /></td>
                   </tr>
                 ))
               )}
