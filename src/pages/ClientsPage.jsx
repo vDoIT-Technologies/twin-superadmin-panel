@@ -6,7 +6,7 @@ import { useEntityFilters } from "../app/FilterContext";
 import { TruncatedText } from "../components/common/TruncatedText";
 import { FilterDropdown } from "../components/common/FilterDropdown";
 import { dashboardService, exportService } from "../services";
-import { envBadge, formatCost } from "../utils/dashboardUtils";
+import { envBadge, formatCost, TruncatedValue } from "../utils/dashboardUtils";
 import { normalizeEntityStatus } from "../utils/status";
 import { getEntityFilterParams } from "../utils/entityFilters";
 import { isNumericTableSearch, matchesTableSearch, TABLE_SEARCH_DATASET_LIMIT } from "../utils/tableSearch";
@@ -427,14 +427,35 @@ export function ClientsPage() {
 
         <div className="relative">
           <div className="max-h-[65vh] overflow-auto">
-          <table key={isVault ? "clients-vault-layout" : "clients-twin-layout"} className="w-full min-w-[960px] border-collapse text-sm [&_td]:!text-left [&_td>div]:justify-start [&_th]:!text-left">
+          <table key={isVault ? "clients-vault-layout" : "clients-twin-layout"} className="w-full min-w-[960px] table-fixed border-collapse text-sm">
+            <colgroup>
+              {isVault ? (
+                <>
+                  <col className="w-[32%]" />
+                  <col className="w-[18%]" />
+                  <col className="w-[14%]" />
+                  <col className="w-[16%]" />
+                  <col className="w-[20%]" />
+                </>
+              ) : (
+                <>
+                  <col className="w-[24%]" />
+                  <col className="w-[13%]" />
+                  <col className="w-[12%]" />
+                  <col className="w-[10%]" />
+                  <col className="w-[10%]" />
+                  <col className="w-[15.5%]" />
+                  <col className="w-[15.5%]" />
+                </>
+              )}
+            </colgroup>
             <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_0_0_rgba(226,232,240,1)]">
               <tr>
                 {clientTableColumns.map(([key, label]) => (
                   <th key={key} className={`px-4 py-4 text-xs font-bold uppercase tracking-wide text-slate-400 ${key === 'client' ? 'text-left' : key === 'env' ? 'text-center' : 'text-right'}`}>
                     <button
                       type="button"
-                      className="inline-flex items-center gap-1 transition hover:text-slate-700"
+                      className={`flex w-full items-center gap-1 transition hover:text-slate-700 ${key === 'client' ? 'justify-start' : key === 'env' ? 'justify-center' : 'justify-end'}`}
                       onClick={() => toggleSort(key)}
                     >
                       <span>{label}</span>
@@ -474,15 +495,15 @@ export function ClientsPage() {
                       state: { from: `${location.pathname}${location.search}` },
                     })}
                   >
-                    <td className="px-4 py-3.5 text-left">
-                      <div className="flex items-center gap-3">
+                    <td className="overflow-visible px-4 py-3.5 text-left">
+                      <div className="flex w-full min-w-0 items-center gap-3">
                         <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-bold ${isVault ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-600'}`}>
                           {getClientInitials(client.name)}
                         </span>
-                        <div className="min-w-0">
-                          <strong className="block font-semibold text-slate-700"><TruncatedText value={client.name} /></strong>
+                        <div className="min-w-0 flex-1">
+                          <strong className="block w-full min-w-0 font-semibold text-slate-700"><TruncatedText value={client.name} className="w-full" /></strong>
                           {isVault && client.plan ? (
-                            <span className="mt-0.5 block text-xs text-slate-400"><TruncatedText value={client.plan} /></span>
+                            <span className="mt-0.5 block w-full min-w-0 text-xs text-slate-400"><TruncatedText value={client.plan} className="w-full" /></span>
                           ) : null}
                         </div>
                       </div>
@@ -507,8 +528,8 @@ export function ClientsPage() {
                     ) : null}
                     {!isVault ? <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(client.twins)}</td> : null}
                     <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(client.users)}</td>
-                    <td className="whitespace-nowrap px-4 py-3.5 text-right tabular-nums">{formatCost(client.cost)}</td>
-                    <td className="whitespace-nowrap px-4 py-3.5 text-right tabular-nums">{formatCost(client.revenue)}</td>
+                    <td className="px-4 py-3.5 text-right tabular-nums"><TruncatedValue value={formatCost(client.cost)} className="ml-auto max-w-40 text-right" /></td>
+                    <td className="px-4 py-3.5 text-right tabular-nums"><TruncatedValue value={formatCost(client.revenue)} className="ml-auto max-w-40 text-right" /></td>
                   </tr>
                 ))
               )}
