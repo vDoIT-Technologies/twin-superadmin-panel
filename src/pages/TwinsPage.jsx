@@ -195,7 +195,7 @@ export function TwinsPage() {
       status,
     };
   }), [apiTwins, clientNamesById]);
- 
+
 
   const filteredRows = useMemo(() => {
     const selectedClientId = getId(filters.client);
@@ -218,7 +218,7 @@ export function TwinsPage() {
         twin.cost,
         formatCost(twin.cost),
         twin.revenue,
-        formatCost(twin.revenue),
+       formatRevenue(twin.revenue),
         twin.totalPoints,
         formatOptionalNumber(twin.totalPoints),
         twin.pointsSpent,
@@ -285,121 +285,121 @@ export function TwinsPage() {
       <section className="overflow-visible rounded-2xl border border-slate-200 bg-white shadow-panel">
         <div className="border-b border-slate-100 px-5 py-4">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
-          <label className="flex h-10 w-full shrink-0 items-center gap-2 rounded-xl bg-slate-50 px-3 text-slate-400 xl:w-64">
-            <Search size={15} />
-            <input
-              className="min-w-0 flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
-              type="text"
-              value={query}
-              onChange={(event) => {
-                setQuery(event.target.value);
-                setPage(1);
-              }}
-              placeholder="Search twins..."
-            />
-          </label>
+            <label className="flex h-10 w-full shrink-0 items-center gap-2 rounded-xl bg-slate-50 px-3 text-slate-400 xl:w-64">
+              <Search size={15} />
+              <input
+                className="min-w-0 flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
+                type="text"
+                value={query}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  setPage(1);
+                }}
+                placeholder="Search twins..."
+              />
+            </label>
 
-          <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
-            <FilterDropdown
-              value={filters.envs.length === 1 ? filters.envs[0] : null}
-              onChange={(value) => updateTableFilter('envs', value ? [value] : ['dev', 'staging', 'prod'])}
-              options={[{ value: 'dev', label: 'Development' }, { value: 'staging', label: 'Staging' }, { value: 'prod', label: 'Production' }]}
-              placeholder="All environments"
-              searchable={false}
-              tone="twin"
-            />
-            <FilterDropdown
-              value={filters.status}
-              onChange={(value) => updateTableFilter('status', value)}
-              options={[{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]}
-              placeholder="All Status"
-              searchable={false}
-              tone="twin"
-            />
-            <FilterDropdown
-              value={filters.entityRange === 'all' ? null : filters.entityRange}
-              onChange={(value) => updateTableFilter('entityRange', value || 'all')}
-              options={[
-                { value: '7days', label: 'Last 7 Days' },
-                { value: '1month', label: 'Last 1 Month' },
-                { value: '6months', label: 'Last 6 Months' },
-                { value: '1year', label: 'Last 1 Year' },
-                { value: 'morethan1year', label: 'More Than 1 Year' },
-              ]}
-              placeholder="Created: All time"
-              searchable={false}
-              align="right"
-              tone="twin"
-            />
-            <FilterDropdown
-              value={filters.client}
-              onChange={(value) => updateTableFilter('client', value)}
-              options={clientFilterOptions}
-              placeholder="All clients"
-              searchPlaceholder="Search client..."
-              align="right"
-              tone="twin"
-            />
-          </div>
+            <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+              <FilterDropdown
+                value={filters.envs.length === 1 ? filters.envs[0] : null}
+                onChange={(value) => updateTableFilter('envs', value ? [value] : ['dev', 'staging', 'prod'])}
+                options={[{ value: 'dev', label: 'Development' }, { value: 'staging', label: 'Staging' }, { value: 'prod', label: 'Production' }]}
+                placeholder="All environments"
+                searchable={false}
+                tone="twin"
+              />
+              <FilterDropdown
+                value={filters.status}
+                onChange={(value) => updateTableFilter('status', value)}
+                options={[{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]}
+                placeholder="All Status"
+                searchable={false}
+                tone="twin"
+              />
+              <FilterDropdown
+                value={filters.entityRange === 'all' ? null : filters.entityRange}
+                onChange={(value) => updateTableFilter('entityRange', value || 'all')}
+                options={[
+                  { value: '7days', label: 'Last 7 Days' },
+                  { value: '1month', label: 'Last 1 Month' },
+                  { value: '6months', label: 'Last 6 Months' },
+                  { value: '1year', label: 'Last 1 Year' },
+                  { value: 'morethan1year', label: 'More Than 1 Year' },
+                ]}
+                placeholder="Created: All time"
+                searchable={false}
+                align="right"
+                tone="twin"
+              />
+              <FilterDropdown
+                value={filters.client}
+                onChange={(value) => updateTableFilter('client', value)}
+                options={clientFilterOptions}
+                placeholder="All clients"
+                searchPlaceholder="Search client..."
+                align="right"
+                tone="twin"
+              />
+            </div>
 
-          <button type="button" disabled={isExporting} className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 px-3.5 text-sm font-semibold text-slate-600 transition hover:border-indigo-300 hover:text-indigo-600 disabled:cursor-not-allowed disabled:opacity-60" onClick={exportCsv}>
-            <Download size={14} /> {isExporting ? 'Exporting...' : 'Export CSV'}
-          </button>
+            <button type="button" disabled={isExporting} className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 px-3.5 text-sm font-semibold text-slate-600 transition hover:border-indigo-300 hover:text-indigo-600 disabled:cursor-not-allowed disabled:opacity-60" onClick={exportCsv}>
+              <Download size={14} /> {isExporting ? 'Exporting...' : 'Export CSV'}
+            </button>
           </div>
         </div>
 
         <div className="relative">
           <div className="max-h-[65vh] overflow-auto">
-          <table key="twins-nine-column-layout" className="w-full min-w-[1120px] border-collapse text-sm [&_td]:!text-left [&_td>div]:justify-start [&_th]:!text-left">
-            <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_0_0_rgba(226,232,240,1)]">
-              <tr>
-                {[['twin','Twin'],['env','Env'],['client','Client'],['users','Users'],['status','Status'],['revenue','Revenue'],['pointsSpent','Points Spent']].map(([key,label]) => (
-                  <th key={key} className={`px-4 py-4 text-xs font-bold uppercase tracking-wide text-slate-400 ${key === 'twin' || key === 'client' || key === 'status' ? 'text-left' : key === 'env' ? 'text-center' : 'text-right'}`}>
-                    <button type="button" className="inline-flex items-center gap-1 transition hover:text-slate-700" onClick={() => toggleSort(key)}>
-                      <span>{label}</span>
-                      <span className={`text-xs text-slate-300 ${sortConfig.key === key ? 'text-indigo-600' : ''}`}>
-                        {sortConfig.key === key ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}
-                      </span>
-                    </button>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
+            <table key="twins-nine-column-layout" className="w-full min-w-[1120px] border-collapse text-sm [&_td]:!text-left [&_td>div]:justify-start [&_th]:!text-left">
+              <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_0_0_rgba(226,232,240,1)]">
                 <tr>
-                  <td colSpan={7} className="p-0 text-sm text-slate-400">
-                    <div className="min-h-40" />
-                  </td>
+                  {[['twin', 'Twin'], ['env', 'Env'], ['client', 'Client'], ['users', 'Users'], ['status', 'Status'], ['revenue', 'Revenue'], ['pointsSpent', 'Points Spent']].map(([key, label]) => (
+                    <th key={key} className={`px-4 py-4 text-xs font-bold uppercase tracking-wide text-slate-400 ${key === 'twin' || key === 'client' || key === 'status' ? 'text-left' : key === 'env' ? 'text-center' : 'text-right'}`}>
+                      <button type="button" className="inline-flex items-center gap-1 transition hover:text-slate-700" onClick={() => toggleSort(key)}>
+                        <span>{label}</span>
+                        <span className={`text-xs text-slate-300 ${sortConfig.key === key ? 'text-indigo-600' : ''}`}>
+                          {sortConfig.key === key ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}
+                        </span>
+                      </button>
+                    </th>
+                  ))}
                 </tr>
-              ) : sortedRows.length === 0 ? (
-                <tr><td colSpan={7} className="px-5 py-12 text-center text-sm text-slate-400">No twins found</td></tr>
-              ) : sortedRows.map((twin) => (
-                <tr
-                  key={twin.rowKey}
-                  className="cursor-pointer border-t border-slate-100 transition hover:bg-slate-50"
-                  onClick={() => navigate(twin.detailRoute, {
-                    state: { from: `${location.pathname}${location.search}` },
-                  })}
-                >
-                  <td className="w-56 max-w-56 px-4 py-3.5 lg:w-64 lg:max-w-64">
-                    <div className="flex w-full min-w-0 items-center gap-3">
-                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-violet-100 text-xs font-bold text-violet-600">{getTwinInitials(twin.name)}</span>
-                      <div className="min-w-0 flex-1"><strong className="block w-full font-semibold text-slate-700"><TruncatedText value={twin.name} className="w-full" /></strong><span className="mt-0.5 block w-full text-xs text-slate-400"><TruncatedText value={twin.role} className="w-full" /></span></div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3.5 text-center text-slate-500">{superadminDemoData.ENV_META[twin.env] ? envBadge(twin.env) : <TruncatedText value={twin.env || '---'} />}</td>
-                  <td className="px-4 py-3.5 text-slate-500"><TruncatedText value={twin.client || '---'} /></td>
-                  <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(twin.usersCount)}</td>
-                  <td className="px-4 py-3.5 text-slate-500">
-                    {twin.status ? <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${twin.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{twin.status === 'active' ? 'Active' : 'Inactive'}</span> : '---'}
-                  </td>
-                  <td className="w-24 max-w-24 px-4 py-3.5 text-right tabular-nums text-slate-500 sm:w-28 sm:max-w-28 lg:w-32 lg:max-w-32"><TruncatedValue value={formatCost(twin.revenue)} /></td>
-                  <td className="whitespace-nowrap px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(twin.pointsSpent)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={7} className="p-0 text-sm text-slate-400">
+                      <div className="min-h-40" />
+                    </td>
+                  </tr>
+                ) : sortedRows.length === 0 ? (
+                  <tr><td colSpan={7} className="px-5 py-12 text-center text-sm text-slate-400">No twins found</td></tr>
+                ) : sortedRows.map((twin) => (
+                  <tr
+                    key={twin.rowKey}
+                    className="cursor-pointer border-t border-slate-100 transition hover:bg-slate-50"
+                    onClick={() => navigate(twin.detailRoute, {
+                      state: { from: `${location.pathname}${location.search}` },
+                    })}
+                  >
+                    <td className="w-56 max-w-56 px-4 py-3.5 lg:w-64 lg:max-w-64">
+                      <div className="flex w-full min-w-0 items-center gap-3">
+                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-violet-100 text-xs font-bold text-violet-600">{getTwinInitials(twin.name)}</span>
+                        <div className="min-w-0 flex-1"><strong className="block w-full font-semibold text-slate-700"><TruncatedText value={twin.name} className="w-full" /></strong><span className="mt-0.5 block w-full text-xs text-slate-400"><TruncatedText value={twin.role} className="w-full" /></span></div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3.5 text-center text-slate-500">{superadminDemoData.ENV_META[twin.env] ? envBadge(twin.env) : <TruncatedText value={twin.env || '---'} />}</td>
+                    <td className="px-4 py-3.5 text-slate-500"><TruncatedText value={twin.client || '---'} /></td>
+                    <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(twin.usersCount)}</td>
+                    <td className="px-4 py-3.5 text-slate-500">
+                      {twin.status ? <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${twin.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{twin.status === 'active' ? 'Active' : 'Inactive'}</span> : '---'}
+                    </td>
+                    <td className="w-24 max-w-24 px-4 py-3.5 text-right tabular-nums text-slate-500 sm:w-28 sm:max-w-28 lg:w-32 lg:max-w-32"><TruncatedValue value={formatRevenue(twin.revenue)} /></td>
+                    <td className="whitespace-nowrap px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(twin.pointsSpent)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
           {isLoading ? (
             <div className="pointer-events-none absolute inset-x-0 top-14 flex h-40 items-center justify-center gap-2 text-sm text-slate-400">
