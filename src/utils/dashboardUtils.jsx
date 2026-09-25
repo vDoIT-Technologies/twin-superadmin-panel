@@ -79,10 +79,36 @@ export function formatCost(value) {
   return `$${num.toFixed(6)}`;
 }
 export function formatRevenue(value) {
-  const exactValue = groupNumericString(value);
-  if (exactValue == null) return '---';
-  if (Number(exactValue.replace(/,/g, '')) === 0) return '$0.00';
-  return `$${exactValue}`;
+  if (value == null || value === '') return '---';
+  const num = Number(
+    typeof value === 'object' && '$numberDecimal' in value
+      ? value.$numberDecimal
+      : value,
+  );
+  if (!Number.isFinite(num)) return '---';
+  if (num === 0) return '$0.00';
+
+  const abs = Math.abs(num);
+  if (abs >= 1e9) return `$${(num / 1e9).toFixed(2)}B`;
+  if (abs >= 1e6) return `$${(num / 1e6).toFixed(2)}M`;
+  if (abs >= 1e3) return `$${(num / 1e3).toFixed(2)}k`;
+  return `$${num.toFixed(2)}`;
+}
+export function formatRevenueWhole(value) {
+  if (value == null || value === '') return '---';
+  const num = Number(
+    typeof value === 'object' && '$numberDecimal' in value
+      ? value.$numberDecimal
+      : value,
+  );
+  if (!Number.isFinite(num)) return '---';
+  if (num === 0) return '$0';
+
+  const abs = Math.abs(num);
+  if (abs >= 1e9) return `$${(num / 1e9).toFixed(1)}B`;
+  if (abs >= 1e6) return `$${(num / 1e6).toFixed(1)}M`;
+  if (abs >= 1e3) return `$${(num / 1e3).toFixed(1)}k`;
+  return `$${Math.round(num)}`;
 }
 export function TruncatedValue({ value, children, className = '' }) {
   const fullValue = children ?? value ?? '---';
