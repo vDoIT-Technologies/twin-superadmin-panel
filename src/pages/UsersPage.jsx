@@ -7,7 +7,7 @@ import { TruncatedText } from '../components/common/TruncatedText';
 import { FilterDropdown } from '../components/common/FilterDropdown';
 import { superadminDemoData } from '../demo-data/superadminDemoData';
 import { dashboardService, dropdownApiAvailable, exportService, getClientsDropdown, getUsersDropdown } from '../services';
-import { envBadge, formatCost, formatNumber, TruncatedValue } from '../utils/dashboardUtils';
+import { envBadge, formatCost, formatNumber, formatRevenue, TruncatedValue } from '../utils/dashboardUtils';
 import { normalizeEntityStatus } from '../utils/status';
 import { getEntityFilterParams } from '../utils/entityFilters';
 import { isNumericTableSearch, matchesTableSearch, TABLE_SEARCH_DATASET_LIMIT } from '../utils/tableSearch';
@@ -349,11 +349,11 @@ export function UsersPage() {
           : environment?.id ?? environment?.name ?? environment?.slug ?? '';
         const clientId = getId(user?.clientId ?? user?.client?._id ?? user?.client?.id ?? enrichment?.clientId);
         const clientName = user?.clientName
-        //   ?? user?.client?.name
-        //   ?? user?.client?.clientName
-        //   ?? enrichment?.clientName
-        //   ?? enrichment?.client?.name
-        //   ?? clientNamesById[clientId]
+          //   ?? user?.client?.name
+          //   ?? user?.client?.clientName
+          //   ?? enrichment?.clientName
+          //   ?? enrichment?.client?.name
+          //   ?? clientNamesById[clientId]
           ?? '';
         const totalPoints = parseDecimal(
           user?.totalPoints
@@ -442,8 +442,8 @@ export function UsersPage() {
           lastActiveLabel,
         };
       })
-          .filter((user) => (user.env ? filters.envs.includes(user.env) : true));
-      
+      .filter((user) => (user.env ? filters.envs.includes(user.env) : true));
+
   }, [apiUsers, clientNamesById, filters.envs, userEnrichmentByKey]);
 
   const filteredRows = useMemo(() => {
@@ -466,7 +466,7 @@ export function UsersPage() {
         user.cost,
         formatCost(user.cost),
         user.revenue,
-        formatCost(user.revenue),
+        formatCost(user.revenue), 
         user.totalPoints,
         formatOptionalNumber(user.totalPoints),
         user.pointsSpent,
@@ -562,31 +562,31 @@ export function UsersPage() {
       <section className="overflow-visible rounded-2xl border border-slate-200 bg-white shadow-panel">
         <div className="border-b border-slate-100 px-5 py-4">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
-          <label className="flex h-10 w-full shrink-0 items-center gap-2 rounded-xl bg-slate-50 px-3 text-slate-400 xl:w-64">
-            <Search size={15} />
-           <input
-              className="min-w-0 flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
-              type="text"
-              value={query}
-              onChange={(event) => {
-                setQuery(event.target.value);
-                setPage(1);
-              }}
-              placeholder="Search users..."
-            />
-          </label>
+            <label className="flex h-10 w-full shrink-0 items-center gap-2 rounded-xl bg-slate-50 px-3 text-slate-400 xl:w-64">
+              <Search size={15} />
+              <input
+                className="min-w-0 flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
+                type="text"
+                value={query}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  setPage(1);
+                }}
+                placeholder="Search users..."
+              />
+            </label>
 
-          <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
-            <FilterDropdown
-              value={filters.envs.length === 1 ? filters.envs[0] : null}
-              onChange={(value) => updateTableFilter('envs', value ? [value] : ['dev', 'staging', 'prod'])}
-              options={[{ value: 'dev', label: 'Development' }, { value: 'staging', label: 'Staging' }, { value: 'prod', label: 'Production' }]}
-              placeholder="All environments"
-              searchable={false}
-              tone={isVault ? 'vault' : 'twin'}
-            />
-            
-            <FilterDropdown
+            <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+              <FilterDropdown
+                value={filters.envs.length === 1 ? filters.envs[0] : null}
+                onChange={(value) => updateTableFilter('envs', value ? [value] : ['dev', 'staging', 'prod'])}
+                options={[{ value: 'dev', label: 'Development' }, { value: 'staging', label: 'Staging' }, { value: 'prod', label: 'Production' }]}
+                placeholder="All environments"
+                searchable={false}
+                tone={isVault ? 'vault' : 'twin'}
+              />
+
+              <FilterDropdown
                 value={filters.entityRange === 'all' ? null : filters.entityRange}
                 onChange={(value) => updateTableFilter('entityRange', value || 'all')}
                 options={[
@@ -595,90 +595,90 @@ export function UsersPage() {
                   { value: '6months', label: 'Last 6 Months' },
                   { value: '1year', label: 'Last 1 Year' },
                   { value: 'morethan1year', label: 'More Than 1 Year' },
-              ]}
-              placeholder="Created: All time"
-              searchable={false}
-              align="right"
-              tone={isVault ? 'vault' : 'twin'}
-            />
-            <FilterDropdown value={filters.client} onChange={(value) => updateTableFilter('client', value)} options={clientFilterOptions} placeholder="All clients" searchPlaceholder="Search client..." tone={isVault ? 'vault' : 'twin'} />
-          </div>
+                ]}
+                placeholder="Created: All time"
+                searchable={false}
+                align="right"
+                tone={isVault ? 'vault' : 'twin'}
+              />
+              <FilterDropdown value={filters.client} onChange={(value) => updateTableFilter('client', value)} options={clientFilterOptions} placeholder="All clients" searchPlaceholder="Search client..." tone={isVault ? 'vault' : 'twin'} />
+            </div>
 
-          <button type="button" disabled={isExporting} className={`inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 px-3.5 text-sm font-semibold text-slate-600 transition disabled:cursor-not-allowed disabled:opacity-60 ${isVault ? 'hover:border-emerald-300 hover:text-emerald-700' : 'hover:border-indigo-300 hover:text-indigo-600'}`} onClick={exportCsv}>
-            <Download size={14} />
-            {isExporting ? 'Exporting...' : 'Export CSV'}
-          </button>
+            <button type="button" disabled={isExporting} className={`inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 px-3.5 text-sm font-semibold text-slate-600 transition disabled:cursor-not-allowed disabled:opacity-60 ${isVault ? 'hover:border-emerald-300 hover:text-emerald-700' : 'hover:border-indigo-300 hover:text-indigo-600'}`} onClick={exportCsv}>
+              <Download size={14} />
+              {isExporting ? 'Exporting...' : 'Export CSV'}
+            </button>
           </div>
         </div>
 
         <div className="relative">
           <div className="max-h-[65vh] overflow-auto">
-          <table className="min-w-[1380px] w-full border-collapse text-sm [&_td]:!text-left [&_td>div]:justify-start [&_th]:!text-left">
-            <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_0_0_rgba(226,232,240,1)]">
-              <tr>
-                {[
-                  ['user', 'User'],
-                  ['env', 'Env'],
-                  ['client', 'Client'],
-                  ['cost', 'Cost'],
-                  ['revenue', 'Revenue'],
-                  ['totalPoints', 'Balance Points'],
-                  ['pointsSpent', 'Points spent'],
-                  ['messages', 'Messages'],
-                  ['sessions', 'Sessions'],
-                ].map(([key, label]) => (
-                  <th key={key} className={`px-4 py-4 text-xs font-bold uppercase tracking-wide text-slate-400 ${key === 'user' || key === 'client' ? 'text-left' : key === 'env' ? 'text-center' : 'text-right'}`}>
-                    <button type="button" className="inline-flex items-center gap-1 transition hover:text-slate-700" onClick={() => toggleSort(key)}>
-                      <span>{label}</span>
-                      <span className={`text-xs text-slate-300 ${sortConfig.key === key ? 'text-indigo-600' : ''}`}>
-                        {sortConfig.key === key ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}
-                      </span>
-                    </button>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {isTableLoading ? (
+            <table className="min-w-[1380px] w-full border-collapse text-sm [&_td]:!text-left [&_td>div]:justify-start [&_th]:!text-left">
+              <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_0_0_rgba(226,232,240,1)]">
                 <tr>
-                  <td colSpan={9} className="p-0 text-sm text-slate-400">
-                    <div className="min-h-40" />
-                  </td>
+                  {[
+                    ['user', 'User'],
+                    ['env', 'Env'],
+                    ['client', 'Client'],
+                    ['cost', 'Cost'],
+                    ['revenue', 'Revenue'],
+                    ['totalPoints', 'Balance Points'],
+                    ['pointsSpent', 'Points spent'],
+                    ['messages', 'Messages'],
+                    ['sessions', 'Sessions'],
+                  ].map(([key, label]) => (
+                    <th key={key} className={`px-4 py-4 text-xs font-bold uppercase tracking-wide text-slate-400 ${key === 'user' || key === 'client' ? 'text-left' : key === 'env' ? 'text-center' : 'text-right'}`}>
+                      <button type="button" className="inline-flex items-center gap-1 transition hover:text-slate-700" onClick={() => toggleSort(key)}>
+                        <span>{label}</span>
+                        <span className={`text-xs text-slate-300 ${sortConfig.key === key ? 'text-indigo-600' : ''}`}>
+                          {sortConfig.key === key ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}
+                        </span>
+                      </button>
+                    </th>
+                  ))}
                 </tr>
-              ) : paginatedRows.length === 0 ? (
-                <tr>
-                  <td colSpan={9} className="px-5 py-12 text-center text-sm text-slate-400">
-                    No users found
-                  </td>
-                </tr>
-              ) : (
-                paginatedRows.map((user) => (
-                  <tr
-                    key={user.rowKey}
-                    className="cursor-pointer border-t border-slate-100 transition hover:bg-slate-50"
-                    onClick={() => navigate(user.detailRoute, {
-                      state: { from: `${location.pathname}${location.search}` },
-                    })}
-                  >
-                    <td className="w-56 max-w-56 px-4 py-3.5 lg:w-64 lg:max-w-64">
-                      <div className="flex w-full min-w-0 items-center gap-3">
-                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-amber-100 text-xs font-bold text-amber-600">{getUserInitials(user.name || '?')}</span>
-                        <strong className="block min-w-0 flex-1 font-semibold text-slate-700"><TruncatedText value={user.name} className="w-full" /></strong>
-                      </div>
+              </thead>
+              <tbody>
+                {isTableLoading ? (
+                  <tr>
+                    <td colSpan={9} className="p-0 text-sm text-slate-400">
+                      <div className="min-h-40" />
                     </td>
-                    <td className="px-4 py-3.5 text-center text-slate-500">{superadminDemoData.ENV_META[user.env] ? envBadge(user.env) : getEnvLabel(user.env)}</td>
-                    <td className="px-4 py-3.5 text-slate-500"><TruncatedText value={user.client || '---'} /></td>
-                    <td className="w-24 max-w-24 px-4 py-3.5 text-right tabular-nums text-slate-500 lg:w-28 lg:max-w-28"><TruncatedValue value={formatCost(user.cost)} /></td>
-                    <td className="w-24 max-w-24 px-4 py-3.5 text-right tabular-nums text-slate-500 lg:w-28 lg:max-w-28"><TruncatedValue value={formatCost(user.revenue)} /></td>
-                    <td className="w-24 max-w-24 px-4 py-3.5 text-right tabular-nums text-slate-500 lg:w-28 lg:max-w-28"><TruncatedValue value={formatOptionalNumber(user.totalPoints)} /></td>
-                    <td className="w-24 max-w-24 px-4 py-3.5 text-right tabular-nums text-slate-500 lg:w-28 lg:max-w-28"><TruncatedValue value={formatOptionalNumber(user.pointsSpent)} /></td>
-                    <td className="w-24 max-w-24 px-4 py-3.5 text-right tabular-nums text-slate-500 lg:w-28 lg:max-w-28"><TruncatedValue value={formatOptionalNumber(user.messages)} /></td>
-                    <td className="w-24 max-w-24 px-4 py-3.5 text-right tabular-nums text-slate-500 lg:w-28 lg:max-w-28"><TruncatedValue value={formatOptionalNumber(user.sessions)} /></td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : paginatedRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="px-5 py-12 text-center text-sm text-slate-400">
+                      No users found
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedRows.map((user) => (
+                    <tr
+                      key={user.rowKey}
+                      className="cursor-pointer border-t border-slate-100 transition hover:bg-slate-50"
+                      onClick={() => navigate(user.detailRoute, {
+                        state: { from: `${location.pathname}${location.search}` },
+                      })}
+                    >
+                      <td className="w-56 max-w-56 px-4 py-3.5 lg:w-64 lg:max-w-64">
+                        <div className="flex w-full min-w-0 items-center gap-3">
+                          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-amber-100 text-xs font-bold text-amber-600">{getUserInitials(user.name || '?')}</span>
+                          <strong className="block min-w-0 flex-1 font-semibold text-slate-700"><TruncatedText value={user.name} className="w-full" /></strong>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3.5 text-center text-slate-500">{superadminDemoData.ENV_META[user.env] ? envBadge(user.env) : getEnvLabel(user.env)}</td>
+                      <td className="px-4 py-3.5 text-slate-500"><TruncatedText value={user.client || '---'} /></td>
+                      <td className="w-24 max-w-24 px-4 py-3.5 text-right tabular-nums text-slate-500 lg:w-28 lg:max-w-28"><TruncatedValue value={formatCost(user.cost)} /></td>
+                      <td className="w-24 max-w-24 px-4 py-3.5 text-right tabular-nums text-slate-500 lg:w-28 lg:max-w-28"><TruncatedValue value={formatRevenue(user.revenue)} /></td>
+                      <td className="w-24 max-w-24 px-4 py-3.5 text-right tabular-nums text-slate-500 lg:w-28 lg:max-w-28"><TruncatedValue value={formatOptionalNumber(user.totalPoints)} /></td>
+                      <td className="w-24 max-w-24 px-4 py-3.5 text-right tabular-nums text-slate-500 lg:w-28 lg:max-w-28"><TruncatedValue value={formatOptionalNumber(user.pointsSpent)} /></td>
+                      <td className="w-24 max-w-24 px-4 py-3.5 text-right tabular-nums text-slate-500 lg:w-28 lg:max-w-28"><TruncatedValue value={formatOptionalNumber(user.messages)} /></td>
+                      <td className="w-24 max-w-24 px-4 py-3.5 text-right tabular-nums text-slate-500 lg:w-28 lg:max-w-28"><TruncatedValue value={formatOptionalNumber(user.sessions)} /></td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
           {isTableLoading ? (
             <div className="pointer-events-none absolute inset-x-0 top-14 flex h-40 items-center justify-center gap-2 text-sm text-slate-400">
