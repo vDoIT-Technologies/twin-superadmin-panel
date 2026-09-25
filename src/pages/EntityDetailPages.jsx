@@ -17,8 +17,7 @@ import { useLocation, useNavigate, useParams, useSearchParams } from 'react-rout
 import { dashboardService } from '../services';
 import { useAuth } from '../app/AuthContext';
 import { FilterContext } from '../app/FilterContext';
-import { envBadge, formatCost, formatNumber, ServiceUsageRow, TruncatedValue } from '../utils/dashboardUtils';
-
+import { envBadge, formatCost, formatNumber, formatRevenueWhole, ServiceUsageRow, TruncatedValue } from '../utils/dashboardUtils';
 const DETAIL_PAGE_SIZE = 10;
 
 function getInitials(name) {
@@ -354,8 +353,8 @@ export function ClientDetailPage() {
   const storageCost = firstDecimal(serviceCosts?.storage);
   const didCost = firstDecimal(serviceCosts?.dId);
   const totalCost = firstDecimal(kpis?.cost, kpis?.totalCost, usage?.cost, usage?.totalCost, clientData?.costs?.total)
-    ?? (openAiCost != null || elevenLabsCost != null || storageCost != null || didCost != null
-      ? (openAiCost ?? 0) + (elevenLabsCost ?? 0) + (storageCost ?? 0) + (didCost ?? 0)
+    ?? (openAiCost != null || elevenLabsCost != null || didCost != null
+      ? (openAiCost ?? 0) + (elevenLabsCost ?? 0) + (didCost ?? 0)
       : null);
   const displayedTotalCost = totalCost;
   const twins = tabData.twins?.twins || [];
@@ -408,13 +407,13 @@ export function ClientDetailPage() {
 
       {adminProduct === 'vault' ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <MetricCard icon={TrendingUp} label="Revenue" value={formatOptionalCurrency(clientRevenue)} tone="emerald" />
+          <MetricCard icon={TrendingUp} label="Revenue" value={formatRevenueWhole(clientRevenue)} tone="emerald" />
           <MetricCard icon={Wallet} label="Cost" value={formatOptionalCost(clientCost)} tone="rose" />
           <MetricCard icon={Users} label="Users" value={formatOptionalNumber(clientUsersCount)} tone="indigo" />
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <MetricCard icon={TrendingUp} label="Revenue" value={formatCost(kpis?.revenue || 0)} tone="emerald" />
+          <MetricCard icon={TrendingUp} label="Revenue" value={formatRevenueWhole(kpis?.revenue || 0)} tone="emerald" />
           <MetricCard icon={Wallet} label="Cost" value={formatOptionalCost(displayedTotalCost)} tone="rose" />
           <MetricCard icon={Bot} label="Twins" value={String(kpis?.twinsCount || 0)} tone="indigo" />
           <MetricCard icon={Users} label="Users" value={String(kpis?.usersCount || 0)} tone="amber" />
@@ -476,7 +475,6 @@ export function ClientDetailPage() {
                     </div>
                     <ServiceUsageRow label="OpenAI" cost={openAiCost} />
                     <ServiceUsageRow label="ElevenLabs" cost={elevenLabsCost} />
-                    <ServiceUsageRow label="Storage" cost={storageCost} />
                     <ServiceUsageRow label="D-ID" cost={didCost} />
                     <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-4 bg-slate-50/70 px-5 py-3 text-xs">
                       <span className="font-semibold text-slate-500">Total cost</span>
@@ -709,8 +707,7 @@ export function TwinDetailPage() {
       />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <MetricCard icon={TrendingUp} label="Revenue" value={formatCost(kpis?.revenue || 0)} tone="emerald" />
-        {/* <MetricCard icon={Wallet} label="Cost" value={formatCurrency(kpis?.cost || 0)} tone="rose" /> */}
+        <MetricCard icon={TrendingUp} label="Revenue" value={formatRevenueWhole(kpis?.revenue || 0)} tone="emerald" />{/* <MetricCard icon={Wallet} label="Cost" value={formatCurrency(kpis?.cost || 0)} tone="rose" /> */}
         <MetricCard icon={MessagesSquare} label="Messages" value={formatNumber(kpis?.messages || kpis?.messagesCount || 0)} tone="indigo" />
         <MetricCard icon={BookOpen} label="Knowledge Files" value={formatNumber(kpis?.knowledgeFiles || kpis?.knowledgeSources || kpis?.sourcesCount || 0)} tone="amber" />
       </div>
@@ -786,9 +783,9 @@ export function UserDetailPage() {
               const users = Array.isArray(listPayload)
                 ? listPayload
                 : listPayload?.users ||
-                  listPayload?.items ||
-                  listPayload?.data ||
-                  [];
+                listPayload?.items ||
+                listPayload?.data ||
+                [];
 
               response =
                 users.find(
@@ -822,24 +819,24 @@ export function UserDetailPage() {
           payload.profile
             ? payload
             : {
+              ...payload,
+
+              profile: {
                 ...payload,
-
-                profile: {
-                  ...payload,
-                  name:
-                    payload.name ||
-                    payload.fullName ||
-                    fullName ||
-                    payload.email ||
-                    "",
-                  clientName: payload.clientName || payload.client?.name || "",
-                  env:
-                    payload.__env || payload.env || payload.environment || "",
-                },
-
-                kpis:
-                  payload.kpis || payload.metrics || payload.usage || payload,
+                name:
+                  payload.name ||
+                  payload.fullName ||
+                  fullName ||
+                  payload.email ||
+                  "",
+                clientName: payload.clientName || payload.client?.name || "",
+                env:
+                  payload.__env || payload.env || payload.environment || "",
               },
+
+              kpis:
+                payload.kpis || payload.metrics || payload.usage || payload,
+            },
         );
       } catch (err) {
         console.error("GET user detail failed:", err);
@@ -1004,7 +1001,9 @@ export function UserDetailPage() {
         <MetricCard
           icon={TrendingUp}
           label="Revenue"
-          value={isVault ? (revenueValue == null ? '---' : formatCost(revenueValue)) : formatCost(revenue?.totalAmount)}
+          value={isVault
+            ? (revenueValue == null ? '---' : formatRevenueWhole(revenueValue))
+            : formatRevenueWhole(revenue?.totalAmount)}
           tone="emerald"
         />
 
@@ -1029,28 +1028,31 @@ export function UserDetailPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <CardSection title="User Info" flush>
           <div className="divide-y divide-slate-100">
-            <div className="flex items-center justify-between px-5 py-3 text-xs">
-              <span className="text-slate-400">Email</span>
-
-              <strong className="font-semibold text-slate-700">
-                {profile?.email || "-"}
-              </strong>
+            <div className="flex items-center justify-between gap-4 px-5 py-3 text-xs">
+              <span className="shrink-0 text-slate-400">Email</span>
+              <div className="flex min-w-0 flex-1 justify-end">
+                <strong className="min-w-0 max-w-full truncate font-semibold text-slate-700" title={profile?.email || '-'}>
+                  {profile?.email || "-"}
+                </strong>
+              </div>
             </div>
 
-            <div className="flex items-center justify-between px-5 py-3 text-xs">
-              <span className="text-slate-400">Client</span>
-
-              <strong className="font-semibold text-slate-700">
-                {clientName || "-"}
-              </strong>
+            <div className="flex items-center justify-between gap-4 px-5 py-3 text-xs">
+              <span className="shrink-0 text-slate-400">Client</span>
+              <div className="flex min-w-0 flex-1 justify-end">
+                <strong className="min-w-0 max-w-full truncate font-semibold text-slate-700" title={clientName || '-'}>
+                  {clientName || "-"}
+                </strong>
+              </div>
             </div>
 
-            <div className="flex items-center justify-between px-5 py-3 text-xs">
-              <span className="text-slate-400">Environment</span>
-
-              <strong className="font-semibold text-slate-700">
-                {profile?.env || "-"}
-              </strong>
+            <div className="flex items-center justify-between gap-4 px-5 py-3 text-xs">
+              <span className="shrink-0 text-slate-400">Environment</span>
+              <div className="flex min-w-0 flex-1 justify-end">
+                <strong className="min-w-0 max-w-full truncate font-semibold text-slate-700" title={profile?.env || '-'}>
+                  {profile?.env || "-"}
+                </strong>
+              </div>
             </div>
           </div>
         </CardSection>
@@ -1068,7 +1070,7 @@ export function UserDetailPage() {
                 </span>
                 <div className="min-w-0">
                   <p className="text-xs font-medium text-slate-500">Total bots used</p>
-                  <strong className="mt-0.5 block text-2xl font-bold tracking-tight text-slate-900">
+                  <strong className="mt-0.5 block min-w-0 truncate text-2xl font-bold tracking-tight text-slate-900">
                     {formatOptionalNumber(displayedBotsCount)}
                   </strong>
                 </div>
@@ -1183,52 +1185,52 @@ export function UserDetailPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* Packages */}
         {isVault ? (
-        <CardSection title="Packages" flush>
-          {primaryPackage || subscriptionPackages.length ? (
-            <div className="divide-y divide-slate-100">
-              {primaryPackage ? (
-                <div className="flex items-center justify-between gap-4 px-5 py-3">
-                  <div className="min-w-0">
-                    <div className="truncate text-xs font-semibold text-slate-700">{primaryPackage.planName ?? primaryPackage.packagename ?? 'Vault package'}</div>
-                    <div className="mt-0.5 text-[11px] text-slate-400">Vault package</div>
-                  </div>
-                  <strong className="shrink-0 text-xs font-semibold tabular-nums text-slate-700">{primaryPackage.price != null ? `$${formatNumber(primaryPackage.price)}` : '---'}</strong>
-                </div>
-              ) : null}
-              {subscriptionPackages.map((pkg, index) => {
-                const status = pkg?.status ?? 'unknown';
-                const isActive = String(status).toLowerCase() === 'active';
-                return (
-                  <div key={pkg?.id ?? `${pkg?.planName ?? pkg?.packagename ?? 'package'}-${index}`} className="flex items-center justify-between gap-4 px-5 py-3">
+          <CardSection title="Packages" flush>
+            {primaryPackage || subscriptionPackages.length ? (
+              <div className="divide-y divide-slate-100">
+                {primaryPackage ? (
+                  <div className="flex items-center justify-between gap-4 px-5 py-3">
                     <div className="min-w-0">
-                      <div className="truncate text-xs font-semibold text-slate-700">{pkg?.planName ?? pkg?.packagename ?? 'Unnamed subscription'}</div>
-                      <div className="mt-1 flex flex-wrap items-center gap-2">
-                        <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-600">Storage package</span>
-                        {pkg?.currentPeriodEnd ? <span className="text-[11px] text-slate-400">Ends on {formatPackageDate(pkg.currentPeriodEnd)}</span> : null}
+                      <div className="truncate text-xs font-semibold text-slate-700">{primaryPackage.planName ?? primaryPackage.packagename ?? 'Vault package'}</div>
+                      <div className="mt-0.5 text-[11px] text-slate-400">Vault package</div>
+                    </div>
+                    <strong className="shrink-0 text-xs font-semibold tabular-nums text-slate-700">{primaryPackage.price != null ? `$${formatNumber(primaryPackage.price)}` : '---'}</strong>
+                  </div>
+                ) : null}
+                {subscriptionPackages.map((pkg, index) => {
+                  const status = pkg?.status ?? 'unknown';
+                  const isActive = String(status).toLowerCase() === 'active';
+                  return (
+                    <div key={pkg?.id ?? `${pkg?.planName ?? pkg?.packagename ?? 'package'}-${index}`} className="flex items-center justify-between gap-4 px-5 py-3">
+                      <div className="min-w-0">
+                        <div className="truncate text-xs font-semibold text-slate-700">{pkg?.planName ?? pkg?.packagename ?? 'Unnamed subscription'}</div>
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                          <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-600">Storage package</span>
+                          {pkg?.currentPeriodEnd ? <span className="text-[11px] text-slate-400">Ends on {formatPackageDate(pkg.currentPeriodEnd)}</span> : null}
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{String(status).charAt(0).toUpperCase() + String(status).slice(1)}</span>
+                        <strong className="text-xs font-semibold tabular-nums text-slate-700">{pkg?.price != null ? `$${formatNumber(pkg.price)}` : '---'}</strong>
                       </div>
                     </div>
-                    <div className="flex shrink-0 flex-col items-end gap-1">
-                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{String(status).charAt(0).toUpperCase() + String(status).slice(1)}</span>
-                      <strong className="text-xs font-semibold tabular-nums text-slate-700">{pkg?.price != null ? `$${formatNumber(pkg.price)}` : '---'}</strong>
-                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex min-h-36 items-center justify-center px-5 py-8">
+                <div className="flex items-center gap-3.5 text-left">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-50 text-slate-400">
+                    <BookOpen size={18} />
+                  </span>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-600">No packages assigned</p>
+                    <p className="mt-0.5 text-xs text-slate-400">This user does not have an active Vault package or subscription.</p>
                   </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="flex min-h-36 items-center justify-center px-5 py-8">
-              <div className="flex items-center gap-3.5 text-left">
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-50 text-slate-400">
-                  <BookOpen size={18} />
-                </span>
-                <div>
-                  <p className="text-sm font-semibold text-slate-600">No packages assigned</p>
-                  <p className="mt-0.5 text-xs text-slate-400">This user does not have an active Vault package or subscription.</p>
                 </div>
               </div>
-            </div>
-          )}
-        </CardSection>
+            )}
+          </CardSection>
         ) : (
           <CardSection title="Packages" flush>
             {twinPackage || subscriptionPackages.length ? (
@@ -1279,7 +1281,6 @@ export function UserDetailPage() {
               <>
                 <ServiceUsageRow label="OpenAI" cost={openAiCost} />
                 <ServiceUsageRow label="ElevenLabs" cost={elevenLabsCost} />
-                <ServiceUsageRow label="Storage" cost={storageCost} />
                 <ServiceUsageRow label="D-ID" cost={didCost} />
               </>
             )}
