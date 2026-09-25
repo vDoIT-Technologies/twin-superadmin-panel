@@ -5,7 +5,7 @@ import { dashboardService, exportService, getClientsDropdown } from '../services
 import { useEntityFilters } from '../app/FilterContext';
 import { TruncatedText } from '../components/common/TruncatedText';
 import { FilterDropdown } from '../components/common/FilterDropdown';
-import { envBadge, formatCost, formatNumber, TruncatedValue } from '../utils/dashboardUtils';
+import { envBadge, formatCost, formatNumber, formatRevenue, TruncatedValue } from '../utils/dashboardUtils';
 import { normalizeEntityStatus } from '../utils/status';
 import { getEntityFilterParams } from '../utils/entityFilters';
 import { superadminDemoData } from '../demo-data/superadminDemoData';
