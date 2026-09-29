@@ -466,7 +466,7 @@ export function UsersPage() {
         user.cost,
         formatCost(user.cost),
         user.revenue,
-        formatCost(user.revenue), 
+        formatCost(user.revenue),
         user.totalPoints,
         formatOptionalNumber(user.totalPoints),
         user.pointsSpent,
@@ -667,13 +667,29 @@ export function UsersPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3.5 text-center text-slate-500">{superadminDemoData.ENV_META[user.env] ? envBadge(user.env) : getEnvLabel(user.env)}</td>
-                      <td className="px-4 py-3.5 text-slate-500"><TruncatedText value={user.client || '---'} /></td>
-                      <td className="w-24 max-w-24 px-4 py-3.5 text-right tabular-nums text-slate-500 lg:w-28 lg:max-w-28"><TruncatedValue value={formatCost(user.cost)} /></td>
-                      <td className="w-24 max-w-24 px-4 py-3.5 text-right tabular-nums text-slate-500 lg:w-28 lg:max-w-28"><TruncatedValue value={formatRevenue(user.revenue)} /></td>
-                      <td className="w-24 max-w-24 px-4 py-3.5 text-right tabular-nums text-slate-500 lg:w-28 lg:max-w-28"><TruncatedValue value={formatOptionalNumber(user.totalPoints)} /></td>
-                      <td className="w-24 max-w-24 px-4 py-3.5 text-right tabular-nums text-slate-500 lg:w-28 lg:max-w-28"><TruncatedValue value={formatOptionalNumber(user.pointsSpent)} /></td>
-                      <td className="w-24 max-w-24 px-4 py-3.5 text-right tabular-nums text-slate-500 lg:w-28 lg:max-w-28"><TruncatedValue value={formatOptionalNumber(user.messages)} /></td>
-                      <td className="w-24 max-w-24 px-4 py-3.5 text-right tabular-nums text-slate-500 lg:w-28 lg:max-w-28"><TruncatedValue value={formatOptionalNumber(user.sessions)} /></td>
+                      <td className="px-4 py-3.5 text-slate-500">
+                        <div className="min-w-0 max-w-[200px] overflow-hidden">
+                          <TruncatedText value={user.client || '---'} className="w-full" breakMode="ellipsis" />
+                        </div>
+                      </td>
+                      <td className="w-24 max-w-24 min-w-0 overflow-hidden px-4 py-3.5 text-right tabular-nums text-slate-500 lg:w-28 lg:max-w-28">
+                        <TruncatedValue value={formatCost(user.cost)} className="block w-full text-right" />
+                      </td>
+                      <td className="w-24 max-w-24 min-w-0 overflow-hidden px-4 py-3.5 text-right tabular-nums text-slate-500 lg:w-28 lg:max-w-28">
+                        <TruncatedValue value={formatRevenue(user.revenue)} className="block w-full text-right" />
+                      </td>
+                      <td className="w-24 max-w-24 min-w-0 overflow-hidden px-4 py-3.5 text-right tabular-nums text-slate-500 lg:w-28 lg:max-w-28">
+                        <TruncatedValue value={formatOptionalNumber(user.totalPoints)} className="block w-full text-right" />
+                      </td>
+                      <td className="w-24 max-w-24 min-w-0 overflow-hidden px-4 py-3.5 text-right tabular-nums text-slate-500 lg:w-28 lg:max-w-28">
+                        <TruncatedValue value={formatOptionalNumber(user.pointsSpent)} className="block w-full text-right" />
+                      </td>
+                      <td className="w-24 max-w-24 min-w-0 overflow-hidden px-4 py-3.5 text-right tabular-nums text-slate-500 lg:w-28 lg:max-w-28">
+                        <TruncatedValue value={formatOptionalNumber(user.messages)} className="block w-full text-right" />
+                      </td>
+                      <td className="w-24 max-w-24 min-w-0 overflow-hidden px-4 py-3.5 text-right tabular-nums text-slate-500 lg:w-28 lg:max-w-28">
+                        <TruncatedValue value={formatOptionalNumber(user.sessions)} className="block w-full text-right" />
+                      </td>
                     </tr>
                   ))
                 )}

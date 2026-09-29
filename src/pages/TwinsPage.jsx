@@ -218,7 +218,7 @@ export function TwinsPage() {
         twin.cost,
         formatCost(twin.cost),
         twin.revenue,
-       formatRevenue(twin.revenue),
+        formatRevenue(twin.revenue),
         twin.totalPoints,
         formatOptionalNumber(twin.totalPoints),
         twin.pointsSpent,
@@ -384,18 +384,54 @@ export function TwinsPage() {
                   >
                     <td className="w-56 max-w-56 px-4 py-3.5 lg:w-64 lg:max-w-64">
                       <div className="flex w-full min-w-0 items-center gap-3">
-                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-violet-100 text-xs font-bold text-violet-600">{getTwinInitials(twin.name)}</span>
-                        <div className="min-w-0 flex-1"><strong className="block w-full font-semibold text-slate-700"><TruncatedText value={twin.name} className="w-full" /></strong><span className="mt-0.5 block w-full text-xs text-slate-400"><TruncatedText value={twin.role} className="w-full" /></span></div>
+                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-violet-100 text-xs font-bold text-violet-600">
+                          {getTwinInitials(twin.name)}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <strong className="block w-full font-semibold text-slate-700">
+                            <TruncatedText value={twin.name} className="w-full" />
+                          </strong>
+                          <span className="mt-0.5 block w-full text-xs text-slate-400">
+                            <TruncatedText value={twin.role} className="w-full" />
+                          </span>
+                        </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3.5 text-center text-slate-500">{superadminDemoData.ENV_META[twin.env] ? envBadge(twin.env) : <TruncatedText value={twin.env || '---'} />}</td>
-                    <td className="px-4 py-3.5 text-slate-500"><TruncatedText value={twin.client || '---'} /></td>
-                    <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(twin.usersCount)}</td>
-                    <td className="px-4 py-3.5 text-slate-500">
-                      {twin.status ? <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${twin.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{twin.status === 'active' ? 'Active' : 'Inactive'}</span> : '---'}
+
+                    <td className="px-4 py-3.5 text-center text-slate-500">
+                      {superadminDemoData.ENV_META[twin.env] ? envBadge(twin.env) : <TruncatedText value={twin.env || '---'} />}
                     </td>
-                    <td className="w-24 max-w-24 px-4 py-3.5 text-right tabular-nums text-slate-500 sm:w-28 sm:max-w-28 lg:w-32 lg:max-w-32"><TruncatedValue value={formatRevenue(twin.revenue)} /></td>
-                    <td className="whitespace-nowrap px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(twin.pointsSpent)}</td>
+
+                    <td className="px-4 py-3.5 text-slate-500">
+                      <div className="max-w-[180px] min-w-0 overflow-hidden">
+                        <TruncatedText value={twin.client || '---'} className="w-full" />
+                      </div>
+                    </td>
+
+                    <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">
+                      <div className="ml-auto max-w-[120px] min-w-0 overflow-hidden">
+                        <TruncatedValue value={formatOptionalNumber(twin.usersCount)} className="block w-full text-right" />
+                      </div>
+                    </td>
+
+                    <td className="px-4 py-3.5 text-slate-500">
+                      {twin.status ? (
+                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${twin.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                          {twin.status === 'active' ? 'Active' : 'Inactive'}
+                        </span>
+                      ) : '---'}
+                    </td>
+                    <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">
+                      <div className="ml-auto max-w-[120px] min-w-0 overflow-hidden">
+                        <TruncatedValue value={formatRevenue(twin.revenue)} className="block w-full text-right" />
+                      </div>
+                    </td>
+
+                    <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">
+                      <div className="ml-auto max-w-[120px] min-w-0 overflow-hidden">
+                        <TruncatedValue value={formatOptionalNumber(twin.pointsSpent)} className="block w-full text-right" />
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
