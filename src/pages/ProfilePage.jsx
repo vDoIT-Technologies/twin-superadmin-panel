@@ -7,6 +7,10 @@ function getDisplayValue(value, fallback = '') {
   return value?.name ?? value?.label ?? value?.title ?? fallback;
 }
 
+const NAME_MAX_LENGTH = 100;
+const EMAIL_MAX_LENGTH = 200;
+const COMPANY_MAX_LENGTH = 250;
+const ROLE_MAX_LENGTH = 50;
 const BIO_MAX_LENGTH = 300;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -20,11 +24,11 @@ function validateProfile(values) {
 
   if (!name) errors.name = 'Full name is required.';
   else if (name.length < 2) errors.name = 'Full name must contain at least 2 characters.';
-  else if (name.length > 60) errors.name = 'Full name cannot exceed 60 characters.';
+  else if (name.length > NAME_MAX_LENGTH) errors.name = `Full name cannot exceed ${NAME_MAX_LENGTH} characters.`;
   else if (!/^[\p{L}\p{M}.'’ -]+$/u.test(name)) errors.name = 'Full name contains unsupported characters.';
 
   if (!email) errors.email = 'Email is required.';
-  else if (email.length > 254) errors.email = 'Email cannot exceed 254 characters.';
+  else if (email.length > EMAIL_MAX_LENGTH) errors.email = `Email cannot exceed ${EMAIL_MAX_LENGTH} characters.`;
   else if (!EMAIL_PATTERN.test(email)) errors.email = 'Enter a valid email address.';
 
   if (phone && !/^\d+$/.test(phone)) {
@@ -34,7 +38,7 @@ function validateProfile(values) {
   }
 
   if (company && company.length < 2) errors.company = 'Company must contain at least 2 characters.';
-  else if (company.length > 100) errors.company = 'Company cannot exceed 100 characters.';
+  else if (company.length > COMPANY_MAX_LENGTH) errors.company = `Company cannot exceed ${COMPANY_MAX_LENGTH} characters.`;
 
   if (bio.length > BIO_MAX_LENGTH) errors.bio = `Bio cannot exceed ${BIO_MAX_LENGTH} characters.`;
 
@@ -45,6 +49,13 @@ function fieldClass(hasError) {
   return `w-full rounded-xl border bg-white px-3.5 text-xs font-medium text-slate-800 outline-none transition ${hasError
     ? 'border-rose-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-100'
     : 'border-slate-200 hover:border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100'}`;
+}
+
+function CharCount({ value, max }) {
+  const len = String(value || '').length;
+  if (len === 0) return null;
+  const tone = len >= max ? 'text-rose-600' : len >= max * 0.8 ? 'text-amber-600' : 'text-slate-400';
+  return <span className={`text-[11px] font-medium ${tone}`}>{len}/{max}</span>;
 }
 
 export function ProfilePage() {
@@ -87,11 +98,11 @@ export function ProfilePage() {
 
   const initials = draft?.name
     ? draft.name
-        .split(' ')
-        .map((part) => part[0])
-        .join('')
-        .slice(0, 2)
-        .toUpperCase()
+      .split(' ')
+      .map((part) => part[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase()
     : 'AD';
   const roleLabel = getDisplayValue(draft?.role, adminProduct === 'vault' ? 'Vault SuperAdmin' : 'Twin SuperAdmin');
   const companyLabel = getDisplayValue(draft?.company, adminProduct === 'vault' ? 'Vault' : 'Twin Protocol');
@@ -116,7 +127,7 @@ export function ProfilePage() {
             </div>
 
             <div className="mt-4">
-              <h2 className="text-xl font-bold text-slate-900">{draft.name}</h2>
+              <h2 className="break-words text-xl font-bold text-slate-900">{draft.name}</h2>
               <span className={`mt-1 inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-semibold ${adminProduct === 'vault' ? 'bg-emerald-50 text-emerald-700' : 'bg-indigo-50 text-indigo-700'}`}>
                 {roleLabel}
               </span>
@@ -125,15 +136,15 @@ export function ProfilePage() {
             <div className="mt-6 space-y-3">
               <div className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/80 px-3.5 py-2.5 text-xs font-medium text-slate-700">
                 <Mail size={16} className="shrink-0 text-slate-400" />
-                <span className="truncate">{draft.email}</span>
+                <span className="min-w-0 break-all">{draft.email}</span>
               </div>
               <div className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/80 px-3.5 py-2.5 text-xs font-medium text-slate-700">
                 <Phone size={16} className="shrink-0 text-slate-400" />
-                <span className="truncate">{draft.phone || 'Add a contact number'}</span>
+                <span className="min-w-0 break-words">{draft.phone || 'Add a contact number'}</span>
               </div>
               <div className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/80 px-3.5 py-2.5 text-xs font-medium text-slate-700">
                 <Shield size={16} className="shrink-0 text-slate-400" />
-                <span className="truncate">{companyLabel}</span>
+                <span className="min-w-0 break-words">{companyLabel}</span>
               </div>
             </div>
           </div>
@@ -155,14 +166,17 @@ export function ProfilePage() {
 
           <div className="grid grid-cols-1 gap-5 p-6 sm:grid-cols-2">
             <label className="grid gap-1.5">
-              <span className="text-xs font-semibold text-slate-700">Full Name</span>
+              <span className="flex items-center justify-between gap-3 text-xs font-semibold text-slate-700">
+                <span>Full Name</span>
+                <CharCount value={draft.name} max={NAME_MAX_LENGTH} />
+              </span>
               <input
                 className={`h-10 ${fieldClass(Boolean(errors.name))}`}
                 value={draft.name || ''}
                 onChange={(event) => updateField('name', event.target.value)}
                 onBlur={() => validateField('name')}
                 placeholder="e.g. Sushant Singh"
-                maxLength={60}
+                maxLength={NAME_MAX_LENGTH}
                 aria-invalid={Boolean(errors.name)}
                 aria-describedby={errors.name ? 'name-error' : undefined}
               />
@@ -174,13 +188,17 @@ export function ProfilePage() {
               <input
                 className={`h-10 ${fieldClass(false)}`}
                 value={roleLabel}
+                maxLength={ROLE_MAX_LENGTH}
                 readOnly
                 aria-readonly="true"
               />
             </label>
 
             <label className="grid gap-1.5">
-              <span className="text-xs font-semibold text-slate-700">Email</span>
+              <span className="flex items-center justify-between gap-3 text-xs font-semibold text-slate-700">
+                <span>Email</span>
+                <CharCount value={draft.email} max={EMAIL_MAX_LENGTH} />
+              </span>
               <input
                 className={`h-10 ${fieldClass(Boolean(errors.email))}`}
                 type="email"
@@ -188,7 +206,7 @@ export function ProfilePage() {
                 onChange={(event) => updateField('email', event.target.value)}
                 onBlur={() => validateField('email')}
                 placeholder="name@company.com"
-                maxLength={254}
+                maxLength={EMAIL_MAX_LENGTH}
                 autoComplete="email"
                 aria-invalid={Boolean(errors.email)}
                 aria-describedby={errors.email ? 'email-error' : undefined}
@@ -217,14 +235,17 @@ export function ProfilePage() {
             </label>
 
             <label className="grid gap-1.5 sm:col-span-2">
-              <span className="text-xs font-semibold text-slate-700">Company</span>
+              <span className="flex items-center justify-between gap-3 text-xs font-semibold text-slate-700">
+                <span>Company</span>
+                <CharCount value={companyLabel} max={COMPANY_MAX_LENGTH} />
+              </span>
               <input
                 className={`h-10 ${fieldClass(Boolean(errors.company))}`}
                 value={companyLabel}
                 onChange={(event) => updateField('company', event.target.value)}
                 onBlur={() => validateField('company')}
                 placeholder="Company or Organization"
-                maxLength={100}
+                maxLength={COMPANY_MAX_LENGTH}
                 autoComplete="organization"
                 aria-invalid={Boolean(errors.company)}
                 aria-describedby={errors.company ? 'company-error' : undefined}

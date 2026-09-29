@@ -17,6 +17,7 @@ import { useLocation, useNavigate, useParams, useSearchParams } from 'react-rout
 import { dashboardService } from '../services';
 import { useAuth } from '../app/AuthContext';
 import { FilterContext } from '../app/FilterContext';
+import { TruncatedText } from '../components/common/TruncatedText';
 import { envBadge, formatCost, formatNumber, formatRevenueWhole, ServiceUsageRow, TruncatedValue } from '../utils/dashboardUtils';
 const DETAIL_PAGE_SIZE = 10;
 
@@ -68,7 +69,7 @@ function MetricCard({ icon: Icon, label, value, meta, tone = 'indigo' }) {
           <Icon size={16} />
         </span>
       </div>
-      <h3 className="mt-4 min-w-0 text-2xl font-bold tracking-tight text-slate-900"><TruncatedValue value={value} className="max-w-[10rem] sm:max-w-[12rem] xl:max-w-[14rem]" /></h3>
+      <h3 className="mt-4 min-w-0 break-words text-2xl font-bold tracking-tight text-slate-900"><TruncatedValue value={value} className="max-w-[10rem] sm:max-w-[12rem] xl:max-w-[14rem]" /></h3>
       <p className="mt-1 text-xs font-semibold text-slate-500">{label}</p>
       {meta ? <span className="mt-1 block text-xs text-slate-400">{meta}</span> : null}
     </article>
@@ -83,10 +84,10 @@ function DetailHeader({ avatarClassName, initials, title, subtitle, onBack }) {
           <ArrowLeft size={15} />
           Back
         </button>
-        <div className="flex min-w-0 items-center gap-3.5">
+        <div className="flex min-w-0 flex-1 items-center gap-3.5">
           <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl text-base font-bold shadow-sm ${avatarTone[avatarClassName] || avatarClassName}`}>{initials}</span>
-          <div className="min-w-0">
-            <h1 className="truncate text-xl font-bold tracking-tight text-slate-900">{title}</h1>
+          <div className="min-w-0 flex-1">
+            <h1 className="min-w-0 break-words text-xl font-bold tracking-tight text-slate-900">{title}</h1>
             <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">{subtitle}</div>
           </div>
         </div>
@@ -437,11 +438,46 @@ export function ClientDetailPage() {
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <CardSection title="Client info" flush>
             <div className="divide-y divide-slate-100">
-              <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Name</span><strong className="font-semibold text-slate-700">{clientName || '-'}</strong></div>
-              {adminProduct !== 'vault' ? <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Organization</span><strong className="font-semibold text-slate-700">{profile?.organizationName || '-'}</strong></div> : null}
-              {adminProduct !== 'vault' ? <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Email</span><strong className="font-semibold text-slate-700">{profile?.email || '-'}</strong></div> : null}
-              {adminProduct !== 'vault' ? <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Plan</span><strong className="font-semibold text-slate-700">{plan || '-'}</strong></div> : null}
-              <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Environment</span><strong className="font-semibold text-slate-700">{profile?.env || '-'}</strong></div>
+              <div className="flex items-center justify-between gap-4 overflow-hidden px-5 py-3 text-xs">
+                <span className="shrink-0 text-slate-400">Name</span>
+                <strong className="min-w-0 flex-1 truncate text-right font-semibold text-slate-700">
+                  {clientName || '-'}
+                </strong>
+              </div>
+
+              {adminProduct !== 'vault' ? (
+                <div className="flex items-center justify-between gap-4 overflow-hidden px-5 py-3 text-xs">
+                  <span className="shrink-0 text-slate-400">Organization</span>
+                  <strong className="min-w-0 flex-1 truncate text-right font-semibold text-slate-700">
+                    {profile?.organizationName || '-'}
+                  </strong>
+                </div>
+              ) : null}
+
+              {adminProduct !== 'vault' ? (
+                <div className="flex items-center justify-between gap-4 overflow-hidden px-5 py-3 text-xs">
+                  <span className="shrink-0 text-slate-400">Email</span>
+                  <strong className="min-w-0 flex-1 truncate text-right font-semibold text-slate-700">
+                    {profile?.email || '-'}
+                  </strong>
+                </div>
+              ) : null}
+
+              {adminProduct !== 'vault' ? (
+                <div className="flex items-center justify-between gap-4 overflow-hidden px-5 py-3 text-xs">
+                  <span className="shrink-0 text-slate-400">Plan</span>
+                  <strong className="min-w-0 flex-1 truncate text-right font-semibold text-slate-700">
+                    {plan || '-'}
+                  </strong>
+                </div>
+              ) : null}
+
+              <div className="flex items-center justify-between gap-4 overflow-hidden px-5 py-3 text-xs">
+                <span className="shrink-0 text-slate-400">Environment</span>
+                <strong className="min-w-0 flex-1 truncate text-right font-semibold text-slate-700">
+                  {profile?.env || '-'}
+                </strong>
+              </div>
             </div>
           </CardSection>
           <CardSection title="All-service usage & cost" flush>
@@ -565,11 +601,11 @@ export function ClientDetailPage() {
                     state: { from: `${location.pathname}${location.search}` },
                   })}
                 >
-                  <span className="flex flex-1 items-center gap-3">
+                  <span className="flex min-w-0 flex-1 items-center gap-3">
                     <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-indigo-100 text-xs font-bold text-indigo-600">{getInitials(user.name || '')}</span>
-                    <span className="min-w-0">
-                      <strong className="block truncate text-sm font-semibold text-slate-800" title={user.name || 'Unnamed'}>{user.name || 'Unnamed'}</strong>
-                      <span className="block truncate text-xs text-slate-400" title={user.email || ''}>{user.email || ''}</span>
+                    <span className="min-w-0 flex-1">
+                      <strong className="block break-words text-sm font-semibold text-slate-800">{user.name || 'Unnamed'}</strong>
+                      <span className="block break-all text-xs text-slate-400">{user.email || ''}</span>
                     </span>
                   </span>
                   <span className="w-20">{envBadge(user.env)}</span>
@@ -621,8 +657,9 @@ export function ClientDetailPage() {
               </div>
               {paginatedVault.map((drive, index) => (
                 <div key={drive._id || drive.userId || index} className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 transition hover:bg-slate-50">
-                  <span className="flex-1 font-semibold text-slate-800">{drive.name || drive.userName || drive.email || drive.vaultId || 'Vault drive'}</span>
-                  <span className="w-28 text-right font-semibold text-slate-700">{formatBytes(drive.storageUsed || 0)}</span>
+                  <span className="min-w-0 flex-1 break-words font-semibold text-slate-800">
+                    {drive.name || drive.userName || drive.email || drive.vaultId || 'Vault drive'}
+                  </span>                  <span className="w-28 text-right font-semibold text-slate-700">{formatBytes(drive.storageUsed || 0)}</span>
                   <span className="w-28 text-right text-slate-500">{formatBytes(drive.storageLimit || 0)}</span>
                   <span className="w-24 text-right text-slate-500">{formatNumber(drive.filesCount || 0)}</span>
                 </div>
@@ -715,15 +752,30 @@ export function TwinDetailPage() {
       <div className="grid grid-cols-1 gap-4">
         <CardSection title="Twin Info" flush>
           <div className="divide-y divide-slate-100">
-            <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Name</span><strong className="font-semibold text-slate-700">{profile?.name || '-'}</strong></div>
-            <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Role</span><strong className="font-semibold text-slate-700">{profile?.role || '-'}</strong></div>
-            <div className="flex items-center justify-between px-5 py-3 text-xs"><span className="text-slate-400">Client</span><strong className="font-semibold text-slate-700">{profile?.clientName || '-'}</strong></div>
-            <div className="flex items-start justify-between gap-6 px-5 py-3 text-xs">
+            <div className="flex items-center justify-between gap-4 overflow-hidden px-5 py-3 text-xs">
+              <span className="shrink-0 text-slate-400">Name</span>
+              <strong className="min-w-0 flex-1 truncate text-right font-semibold text-slate-700">
+                {profile?.name || '-'}
+              </strong>
+            </div>
+
+            <div className="flex items-center justify-between gap-4 overflow-hidden px-5 py-3 text-xs">
+              <span className="shrink-0 text-slate-400">Role</span>
+              <strong className="min-w-0 flex-1 truncate text-right font-semibold text-slate-700">
+                {profile?.role || '-'}
+              </strong>
+            </div>
+
+            <div className="flex items-center justify-between gap-4 overflow-hidden px-5 py-3 text-xs">
+              <span className="shrink-0 text-slate-400">Client</span>
+              <strong className="min-w-0 flex-1 truncate text-right font-semibold text-slate-700">
+                {profile?.clientName || '-'}
+              </strong>
+            </div>
+
+            <div className="flex items-center justify-between gap-4 overflow-hidden px-5 py-3 text-xs">
               <span className="shrink-0 text-slate-400">Associated Users</span>
-              <strong
-                className="min-w-0 max-w-[70%] text-right font-semibold text-slate-700 break-words"
-                title={associatedUserNames || undefined}
-              >
+              <strong className="min-w-0 flex-1 truncate text-right font-semibold text-slate-700">
                 {associatedUserNames || '---'}
               </strong>
             </div>
@@ -1028,31 +1080,25 @@ export function UserDetailPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <CardSection title="User Info" flush>
           <div className="divide-y divide-slate-100">
-            <div className="flex items-center justify-between gap-4 px-5 py-3 text-xs">
+            <div className="flex items-center justify-between gap-4 overflow-hidden px-5 py-3 text-xs">
               <span className="shrink-0 text-slate-400">Email</span>
-              <div className="flex min-w-0 flex-1 justify-end">
-                <strong className="min-w-0 max-w-full truncate font-semibold text-slate-700" title={profile?.email || '-'}>
-                  {profile?.email || "-"}
-                </strong>
-              </div>
+              <strong className="min-w-0 flex-1 truncate text-right font-semibold text-slate-700">
+                {profile?.email || '-'}
+              </strong>
             </div>
 
-            <div className="flex items-center justify-between gap-4 px-5 py-3 text-xs">
+            <div className="flex items-center justify-between gap-4 overflow-hidden px-5 py-3 text-xs">
               <span className="shrink-0 text-slate-400">Client</span>
-              <div className="flex min-w-0 flex-1 justify-end">
-                <strong className="min-w-0 max-w-full truncate font-semibold text-slate-700" title={clientName || '-'}>
-                  {clientName || "-"}
-                </strong>
-              </div>
+              <strong className="min-w-0 flex-1 truncate text-right font-semibold text-slate-700">
+                {clientName || '-'}
+              </strong>
             </div>
 
-            <div className="flex items-center justify-between gap-4 px-5 py-3 text-xs">
+            <div className="flex items-center justify-between gap-4 overflow-hidden px-5 py-3 text-xs">
               <span className="shrink-0 text-slate-400">Environment</span>
-              <div className="flex min-w-0 flex-1 justify-end">
-                <strong className="min-w-0 max-w-full truncate font-semibold text-slate-700" title={profile?.env || '-'}>
-                  {profile?.env || "-"}
-                </strong>
-              </div>
+              <strong className="min-w-0 flex-1 truncate text-right font-semibold text-slate-700">
+                {profile?.env || '-'}
+              </strong>
             </div>
           </div>
         </CardSection>
@@ -1070,7 +1116,7 @@ export function UserDetailPage() {
                 </span>
                 <div className="min-w-0">
                   <p className="text-xs font-medium text-slate-500">Total bots used</p>
-                  <strong className="mt-0.5 block min-w-0 truncate text-2xl font-bold tracking-tight text-slate-900">
+                  <strong className="mt-0.5 block min-w-0 break-all text-2xl font-bold tracking-tight text-slate-900">
                     {formatOptionalNumber(displayedBotsCount)}
                   </strong>
                 </div>
@@ -1170,8 +1216,14 @@ export function UserDetailPage() {
                     <Bot size={16} />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <strong className="block truncate text-sm font-semibold text-slate-800">{getBotName(bot) || 'Unnamed bot'}</strong>
-                    {getBotDetail(bot) ? <span className="mt-0.5 block truncate text-xs text-slate-500">{getBotDetail(bot)}</span> : null}
+                    <strong className="block break-words text-sm font-semibold text-slate-800">
+                      {getBotName(bot) || 'Unnamed bot'}
+                    </strong>
+                    {getBotDetail(bot) ? (
+                      <span className="mt-0.5 block break-words text-xs text-slate-500">
+                        {getBotDetail(bot)}
+                      </span>
+                    ) : null}
                   </div>
                   {formatBotCreatedAt(bot) ? <span className="shrink-0 text-xs text-slate-400">Created {formatBotCreatedAt(bot)}</span> : null}
                 </div>
@@ -1189,29 +1241,54 @@ export function UserDetailPage() {
             {primaryPackage || subscriptionPackages.length ? (
               <div className="divide-y divide-slate-100">
                 {primaryPackage ? (
-                  <div className="flex items-center justify-between gap-4 px-5 py-3">
-                    <div className="min-w-0">
-                      <div className="truncate text-xs font-semibold text-slate-700">{primaryPackage.planName ?? primaryPackage.packagename ?? 'Vault package'}</div>
+                  <div className="flex items-start justify-between gap-4 overflow-hidden px-5 py-3">
+                    <div className="min-w-0 flex-1 overflow-hidden">
+                      <div className="max-w-[220px] min-w-0 overflow-hidden">
+                        <TruncatedText
+                          value={primaryPackage.planName ?? primaryPackage.packagename ?? 'Vault package'}
+                          className="w-full"
+                        />
+                      </div>
                       <div className="mt-0.5 text-[11px] text-slate-400">Vault package</div>
                     </div>
-                    <strong className="shrink-0 text-xs font-semibold tabular-nums text-slate-700">{primaryPackage.price != null ? `$${formatNumber(primaryPackage.price)}` : '---'}</strong>
+                    <strong className="shrink-0 text-xs font-semibold tabular-nums text-slate-700">
+                      {primaryPackage.price != null ? `$${formatNumber(primaryPackage.price)}` : '---'}
+                    </strong>
                   </div>
                 ) : null}
                 {subscriptionPackages.map((pkg, index) => {
                   const status = pkg?.status ?? 'unknown';
                   const isActive = String(status).toLowerCase() === 'active';
                   return (
-                    <div key={pkg?.id ?? `${pkg?.planName ?? pkg?.packagename ?? 'package'}-${index}`} className="flex items-center justify-between gap-4 px-5 py-3">
-                      <div className="min-w-0">
-                        <div className="truncate text-xs font-semibold text-slate-700">{pkg?.planName ?? pkg?.packagename ?? 'Unnamed subscription'}</div>
+                    <div
+                      key={pkg?.id ?? `${pkg?.planName ?? pkg?.packagename ?? 'package'}-${index}`}
+                      className="flex items-start justify-between gap-4 px-5 py-3"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="min-w-0 break-all text-xs font-semibold text-slate-700">
+                          {pkg?.planName ?? pkg?.packagename ?? 'Unnamed subscription'}
+                        </div>
                         <div className="mt-1 flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-600">Storage package</span>
-                          {pkg?.currentPeriodEnd ? <span className="text-[11px] text-slate-400">Ends on {formatPackageDate(pkg.currentPeriodEnd)}</span> : null}
+                          <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-600">
+                            Storage package
+                          </span>
+                          {pkg?.currentPeriodEnd ? (
+                            <span className="text-[11px] text-slate-400">
+                              Ends on {formatPackageDate(pkg.currentPeriodEnd)}
+                            </span>
+                          ) : null}
                         </div>
                       </div>
                       <div className="flex shrink-0 flex-col items-end gap-1">
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{String(status).charAt(0).toUpperCase() + String(status).slice(1)}</span>
-                        <strong className="text-xs font-semibold tabular-nums text-slate-700">{pkg?.price != null ? `$${formatNumber(pkg.price)}` : '---'}</strong>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                            }`}
+                        >
+                          {String(status).charAt(0).toUpperCase() + String(status).slice(1)}
+                        </span>
+                        <strong className="text-xs font-semibold tabular-nums text-slate-700">
+                          {pkg?.price != null ? `$${formatNumber(pkg.price)}` : '---'}
+                        </strong>
                       </div>
                     </div>
                   );
@@ -1237,20 +1314,29 @@ export function UserDetailPage() {
               <div className="divide-y divide-slate-100">
                 {twinPackage ? (
                   <div className="flex items-center justify-between gap-4 px-5 py-3">
-                    <div className="min-w-0">
-                      <div className="text-xs font-semibold text-slate-700">{twinPackage.packagename || '---'}</div>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-xs font-semibold text-slate-700">{twinPackage.packagename || '---'}</div>
                       <div className="mt-0.5 text-[11px] text-slate-400">Twin Package</div>
                     </div>
-                    <strong className="shrink-0 text-xs font-semibold tabular-nums text-slate-700">{twinPackage.price != null ? `$${twinPackage.price}` : '---'}</strong>
+                    <strong className="min-w-0 max-w-[45%] truncate text-right text-xs font-semibold tabular-nums text-slate-700">
+                      {twinPackage.price != null ? `$${twinPackage.price}` : '---'}
+                    </strong>
                   </div>
                 ) : null}
                 {subscriptionPackages.map((pkg, index) => (
-                  <div key={`${pkg?.packagename || 'package'}-${index}`} className="flex items-center justify-between gap-4 px-5 py-3">
-                    <div className="min-w-0">
-                      <div className="truncate text-xs font-semibold text-slate-700">{pkg?.packagename || '---'}</div>
+                  <div
+                    key={`${pkg?.packagename || 'package'}-${index}`}
+                    className="flex items-start justify-between gap-4 overflow-hidden px-5 py-3"
+                  >
+                    <div className="min-w-0 flex-1 overflow-hidden">
+                      <div className="max-w-[220px] min-w-0 overflow-hidden">
+                        <TruncatedText value={pkg?.packagename || '---'} className="w-full" />
+                      </div>
                       <div className="mt-0.5 text-[11px] text-slate-400">{pkg?.validity || 'Subscription'}</div>
                     </div>
-                    <strong className="shrink-0 text-xs font-semibold tabular-nums text-slate-700">{pkg?.price != null ? `$${pkg.price}` : '---'}</strong>
+                    <strong className="shrink-0 text-xs font-semibold tabular-nums text-slate-700">
+                      {pkg?.price != null ? `$${pkg.price}` : '---'}
+                    </strong>
                   </div>
                 ))}
               </div>
@@ -1265,10 +1351,8 @@ export function UserDetailPage() {
           <div className="divide-y divide-slate-100">
             <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-4 bg-slate-50 px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
               <span>Service used</span>
-
               <span className="text-right">Usage</span>
-
-              <span className="w-20 text-right">Cost</span>
+              <span className="text-right">Cost</span>
             </div>
 
             {isVault ? (
@@ -1285,15 +1369,10 @@ export function UserDetailPage() {
               </>
             )}
 
-            <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-4 bg-slate-50/70 px-5 py-3 text-xs whitespace-nowrap">
-              <span className="font-semibold text-slate-500 whitespace-nowrap">
-                Total cost
-              </span>
-
-              <span />
-
-              <strong className="w-24 min-w-0 justify-self-end text-right font-bold tabular-nums text-slate-900 sm:w-28 lg:w-32">
-                <TruncatedValue value={totalServiceCost == null ? '---' : formatCost(totalServiceCost)} className="w-full text-right" />
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 bg-slate-50/70 px-5 py-3 text-xs">
+              <span className="font-semibold text-slate-500">Total cost</span>
+              <strong className="min-w-0 break-all text-right font-bold tabular-nums text-slate-900">
+                {totalServiceCost == null ? '---' : formatCost(totalServiceCost)}
               </strong>
             </div>
           </div>

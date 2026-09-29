@@ -501,9 +501,13 @@ export function ClientsPage() {
                             {getClientInitials(client.name)}
                           </span>
                           <div className="min-w-0 flex-1">
-                            <strong className="block w-full min-w-0 font-semibold text-slate-700"><TruncatedText value={client.name} className="w-full" /></strong>
+                            <strong className="block w-full min-w-0 font-semibold text-slate-700">
+                              <TruncatedText value={client.name} className="w-full" />
+                            </strong>
                             {isVault && client.plan ? (
-                              <span className="mt-0.5 block w-full min-w-0 text-xs text-slate-400"><TruncatedText value={client.plan} className="w-full" /></span>
+                              <span className="mt-0.5 block w-full min-w-0 text-xs text-slate-400">
+                                <TruncatedText value={client.plan} className="w-full" />
+                              </span>
                             ) : null}
                           </div>
                         </div>
@@ -526,10 +530,26 @@ export function ClientsPage() {
                           ) : '---'}
                         </td>
                       ) : null}
-                      {!isVault ? <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(client.twins)}</td> : null}
-                      <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(client.users)}</td>
-                      <td className="px-4 py-3.5 text-right tabular-nums"><TruncatedValue value={formatCost(client.cost)} className="ml-auto max-w-40 text-right" /></td>
-                      <td className="px-4 py-3.5 text-right tabular-nums"><TruncatedValue value={formatRevenue(client.revenue)} className="ml-auto max-w-40 text-right" /></td>                  </tr>
+                      {!isVault ? (
+                        <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">
+                          <div className="ml-auto max-w-[100px] min-w-0 overflow-hidden">
+                            <TruncatedValue value={formatOptionalNumber(client.twins)} className="block w-full text-right" />
+                          </div>
+                        </td>
+                      ) : null}
+
+                      <td className="min-w-0 overflow-hidden px-4 py-3.5 text-right tabular-nums text-slate-500">
+                        <TruncatedValue value={formatOptionalNumber(client.users)} className="ml-auto block w-full text-right" />
+                      </td>
+
+                      <td className="min-w-0 overflow-hidden px-4 py-3.5 text-right tabular-nums text-slate-700">
+                        <TruncatedValue value={formatCost(client.cost)} className="ml-auto block w-full text-right" />
+                      </td>
+
+                      <td className="min-w-0 overflow-hidden px-4 py-3.5 text-right tabular-nums text-slate-700">
+                        <TruncatedValue value={formatRevenue(client.revenue)} className="ml-auto block w-full text-right" />
+                      </td>
+                    </tr>
                   ))
                 )}
               </tbody>
