@@ -1,6 +1,8 @@
 import { superadminDemoData } from '../demo-data/superadminDemoData';
 import { isServiceForProduct } from './productAccess';
 import { selectFacts, sumMetric, RANGE_DAYS } from '../demo-data/superadminSelectors';
+import { useState, useRef, useEffect } from 'react';
+
 const compactFormatter = new Intl.NumberFormat('en-US', {
   notation: 'compact',
   maximumFractionDigits: 1,
@@ -78,6 +80,7 @@ export function formatCost(value) {
   if (abs >= 1e3) return `$${(num / 1e3).toFixed(6)}k`;
   return `$${num.toFixed(6)}`;
 }
+
 export function formatRevenue(value) {
   if (value == null || value === '') return '---';
   const num = Number(
@@ -94,6 +97,7 @@ export function formatRevenue(value) {
   if (abs >= 1e3) return `$${(num / 1e3).toFixed(2)}k`;
   return `$${num.toFixed(2)}`;
 }
+
 export function formatRevenueWhole(value) {
   if (value == null || value === '') return '---';
   const num = Number(
@@ -110,22 +114,62 @@ export function formatRevenueWhole(value) {
   if (abs >= 1e3) return `$${(num / 1e3).toFixed(1)}k`;
   return `$${Math.round(num)}`;
 }
+
 export function TruncatedValue({ value, children, className = '' }) {
   const fullValue = children ?? value ?? '---';
+  const [open, setOpen] = useState(false);
+  const [coords, setCoords] = useState({ top: 0, left: 0 });
+  const ref = useRef(null);
+
+  const show = () => {
+    const el = ref.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    setCoords({
+      top: rect.top,
+      left: rect.left + rect.width / 2,
+    });
+    setOpen(true);
+  };
+
+  const hide = () => setOpen(false);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onScroll = () => hide();
+    window.addEventListener('scroll', onScroll, true);
+    window.addEventListener('resize', onScroll, true);
+    return () => {
+      window.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('resize', onScroll, true);
+    };
+  }, [open]);
+
   return (
-    <span
-      className={`group relative block min-w-0 max-w-full ${className}`}
-      tabIndex={0}
-      aria-label={String(fullValue)}
-    >
-      <span className="block overflow-hidden text-ellipsis whitespace-nowrap">{fullValue}</span>
+    <>
       <span
-        role="tooltip"
-        className="pointer-events-none absolute bottom-full right-0 z-50 mb-2 hidden w-max max-w-[min(24rem,calc(100vw-2rem))] rounded-lg bg-slate-900 px-3 py-2 text-left text-xs font-medium leading-5 whitespace-normal text-white shadow-lg break-all group-hover:block group-focus:block"
+        ref={ref}
+        className={`group relative block min-w-0 max-w-full ${className}`}
+        tabIndex={0}
+        aria-label={String(fullValue)}
+        onMouseEnter={show}
+        onMouseLeave={hide}
+        onFocus={show}
+        onBlur={hide}
       >
-        {fullValue}
+        <span className="block min-w-0 truncate">{fullValue}</span>
       </span>
-    </span>
+
+      {open ? (
+        <span
+          role="tooltip"
+          className="pointer-events-none fixed z-[9999] -translate-x-1/2 -translate-y-full -translate-y-2 rounded-lg bg-slate-900 px-3 py-2 text-center text-xs font-medium leading-5 text-white shadow-lg"
+          style={{ top: coords.top, left: coords.left }}
+        >
+          {fullValue}
+        </span>
+      ) : null}
+    </>
   );
 }
 
@@ -222,7 +266,7 @@ export function normalizeRoleName(role) {
 export function ServiceUsageRow({ label, cost }) {
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-4 px-5 py-3 text-xs">
-      <strong className="truncate font-semibold text-slate-700">{label}</strong>
+      <strong className="min-w-0 truncate font-semibold text-slate-700">{label}</strong>
       <span />
       <strong className="w-24 min-w-0 justify-self-end text-right font-semibold tabular-nums text-slate-800 sm:w-28 lg:w-32">
         <TruncatedValue value={formatCost(cost)} className="w-full text-right" />

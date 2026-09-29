@@ -405,7 +405,12 @@ export function OverviewPage() {
 
   const trendConfig = useMemo(() => {
     if (!vaultSeries?.labels?.length) {
-      return { title: 'Cost vs Revenue over time', labels: [], datasets: [], formatter: formatOverviewCurrency };
+      return {
+        title: 'Cost vs Revenue over time',
+        labels: [],
+        datasets: [],
+        formatter: formatOverviewCurrency,
+      };
     }
 
     return {
@@ -421,20 +426,24 @@ export function OverviewPage() {
       formatter: formatOverviewCurrency,
     };
   }, [vaultSeries]);
-
+  const hasTrendData = useMemo(
+    () =>
+      trendConfig.labels.length > 0 &&
+      trendConfig.datasets.some(
+        (d) => Array.isArray(d.data) && d.data.some((v) => Number(v) > 0),
+      ),
+    [trendConfig],
+  );
   useEffect(() => {
     const charts = [];
 
-    if (trendChartRef.current) {
+    if (trendChartRef.current && hasTrendData) {
       charts.push(
         areaChart(
           trendChartRef.current,
           trendConfig.labels,
           trendConfig.datasets,
-          {
-            fmt: formatTrendTooltip,
-            yfmt: trendConfig.formatter,
-          },
+          { fmt: formatTrendTooltip, yfmt: trendConfig.formatter },
         ),
       );
     }
@@ -450,13 +459,13 @@ export function OverviewPage() {
     }
 
     return () => charts.forEach((chart) => chart.destroy());
-  }, [trendConfig, vendorChartConfig]);
+  }, [trendConfig, vendorChartConfig, hasTrendData]);
 
   return (
     <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       {/* ---- KPI cards ---- */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {vaultSummaryStatus === 'loading' ? (
+        {vaultSummaryStatus !== 'ready' || !overviewMetrics ? (
           [0, 1, 2, 3].map((i) => (
             <article
               key={i}
@@ -470,10 +479,6 @@ export function OverviewPage() {
               <div className="mt-2 h-3 w-20 animate-pulse rounded bg-slate-100" />
             </article>
           ))
-        ) : vaultSummaryStatus === 'unavailable' || !overviewMetrics ? (
-          <div className="col-span-full rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm font-medium text-rose-700">
-            Summary metrics are unavailable right now. Try refreshing.
-          </div>
         ) : (
           overviewMetrics.map((metric) => {
             const config = metricConfig.find((item) => item.key === metric.key);
@@ -530,9 +535,17 @@ export function OverviewPage() {
               ))}
             </div>
           </div>
-          <div className="relative mt-5 h-72">
-            <canvas ref={trendChartRef} />
-          </div>
+          {vaultSeriesStatus === 'loading' ? (
+            <div className="mt-5 h-72 animate-pulse rounded-xl bg-slate-50" />
+          ) : hasTrendData ? (
+            <div className="relative mt-5 h-72">
+              <canvas ref={trendChartRef} />
+            </div>
+          ) : (
+            <div className="flex h-72 items-center justify-center text-sm text-slate-400">
+              No data available for the applied filter.
+            </div>
+          )}
         </section>
       </div>
 
@@ -542,18 +555,38 @@ export function OverviewPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-base font-semibold text-slate-800">Cost by vendor</h2>
           </div>
-          <div className="relative mt-5 h-72">
-            <canvas ref={vendorChartRef} />
-          </div>
+          {vaultVendorSeriesStatus === 'loading' ? (
+            <div className="mt-5 h-72 animate-pulse rounded-xl bg-slate-50" />
+          ) : vendorChartConfig.datasets.length > 0 ? (
+            <div className="relative mt-5 h-72">
+              <canvas ref={vendorChartRef} />
+            </div>
+          ) : (
+            <div className="flex h-72 items-center justify-center text-sm text-slate-400">
+              No data available for the applied filter.
+            </div>
+          )}
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-base font-semibold text-slate-800">Environment comparison</h2>
           </div>
-          {environmentCards.length === 0 ? (
+          {vaultByEnvStatus === 'loading' || vaultByEnvStatus === 'idle' ? (
+            <div className="mt-3 space-y-4">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="py-2">
+                  <div className="h-3 w-24 animate-pulse rounded bg-slate-100" />
+                  <div className="mt-3 grid grid-cols-2 gap-3">
+                    <div className="h-3 w-16 animate-pulse rounded bg-slate-100" />
+                    <div className="h-3 w-16 animate-pulse rounded bg-slate-100" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : environmentCards.length === 0 ? (
             <div className="py-8 text-center text-sm text-slate-400">
-              No environments selected.
+              No data available.
             </div>
           ) : (
             <div className="mt-3 divide-y divide-slate-100">
@@ -623,7 +656,7 @@ export function OverviewPage() {
                     className="group flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-2 text-left transition hover:border-slate-200 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     onClick={() =>
                       client.clientId &&
-                      navigate(`/clients/${client.clientId}`, { state: { from: '/' } })
+                      navigate(`/clients/${client.clientId}?env=${client.env}`, { state: { from: '/' } })
                     }
                     disabled={!client.clientId}
                   >
