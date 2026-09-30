@@ -382,17 +382,17 @@ export function TwinsPage() {
                       state: { from: `${location.pathname}${location.search}` },
                     })}
                   >
-                    <td className="w-56 max-w-56 px-4 py-3.5 lg:w-64 lg:max-w-64">
-                      <div className="flex w-full min-w-0 items-center gap-3">
+                    <td className="px-4 py-3.5">
+                      <div className="flex max-w-[240px] items-center gap-3">
                         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-violet-100 text-xs font-bold text-violet-600">
                           {getTwinInitials(twin.name)}
                         </span>
-                        <div className="min-w-0 flex-1">
-                          <strong className="block w-full font-semibold text-slate-700">
-                            <TruncatedText value={twin.name} className="w-full" />
+                        <div className="min-w-0">
+                          <strong className="block font-semibold text-slate-700">
+                            <TruncatedText value={twin.name} />
                           </strong>
-                          <span className="mt-0.5 block w-full text-xs text-slate-400">
-                            <TruncatedText value={twin.role} className="w-full" />
+                          <span className="mt-0.5 block text-xs text-slate-400">
+                            <TruncatedText value={twin.role} />
                           </span>
                         </div>
                       </div>
@@ -404,13 +404,13 @@ export function TwinsPage() {
 
                     <td className="px-4 py-3.5 text-slate-500">
                       <div className="max-w-[180px] min-w-0 overflow-hidden">
-                        <TruncatedText value={twin.client || '---'} className="w-full" />
+                        <TruncatedText value={twin.client || '---'} />
                       </div>
                     </td>
 
-                    <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">
-                      <div className="ml-auto max-w-[120px] min-w-0 overflow-hidden">
-                        <TruncatedValue value={formatOptionalNumber(twin.usersCount)} className="block w-full text-right" />
+                    <td className="px-4 py-3.5 tabular-nums text-slate-500">
+                      <div className="max-w-[120px] min-w-0 overflow-hidden">
+                        <TruncatedValue value={formatOptionalNumber(twin.usersCount)} className="block" />
                       </div>
                     </td>
 
@@ -421,15 +421,16 @@ export function TwinsPage() {
                         </span>
                       ) : '---'}
                     </td>
-                    <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">
-                      <div className="ml-auto max-w-[120px] min-w-0 overflow-hidden">
-                        <TruncatedValue value={formatRevenue(twin.revenue)} className="block w-full text-right" />
+
+                    <td className="whitespace-nowrap px-4 py-3.5 tabular-nums text-slate-500">
+                      <div className="max-w-[120px] min-w-0 overflow-hidden">
+                        <TruncatedValue value={formatRevenue(twin.revenue)} className="block" />
                       </div>
                     </td>
 
-                    <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">
-                      <div className="ml-auto max-w-[120px] min-w-0 overflow-hidden">
-                        <TruncatedValue value={formatOptionalNumber(twin.pointsSpent)} className="block w-full text-right" />
+                    <td className="whitespace-nowrap px-4 py-3.5 tabular-nums text-slate-500">
+                      <div className="max-w-[120px] min-w-0 overflow-hidden">
+                        <TruncatedValue value={formatOptionalNumber(twin.pointsSpent)} className="block" />
                       </div>
                     </td>
                   </tr>

@@ -509,7 +509,9 @@ export function OverviewPage() {
                     </span>
                   ) : null}
                 </div>
-                <h2 className="mt-5 text-3xl font-bold tracking-tight text-slate-800">{metric.value}</h2>
+                <h2 className="mt-5 truncate text-3xl font-bold tracking-tight text-slate-800">
+                  {metric.value}
+                </h2>
                 <p className="mt-2 text-sm font-medium text-slate-500">
                   {config.label}
                   {metric.meta ? <span className="text-slate-400"> · {metric.meta}</span> : null}
@@ -599,13 +601,13 @@ export function OverviewPage() {
                     </span>
                     {!item.active ? <span className="text-xs font-medium text-slate-400">filtered out</span> : null}
                   </div>
-                  <div className={`mt-3 grid gap-3 ${isVault ? 'grid-cols-2' : 'grid-cols-2'}`}>
-                    <div className="flex flex-col">
-                      <strong>{item.cost}</strong>
+                  <div className={`mt-3 grid gap-x-4 ${isVault ? 'grid-cols-2' : 'grid-cols-2'}`}>
+                    <div className="flex min-w-0 flex-col">
+                      <strong className="truncate">{item.cost}</strong>
                       <span className="mt-1 text-xs text-slate-400">Cost</span>
                     </div>
-                    <div className="flex flex-col">
-                      <strong>{item.revenue}</strong>
+                    <div className="flex min-w-0 flex-col">
+                      <strong className="truncate">{item.revenue}</strong>
                       <span className="mt-1 text-xs text-slate-400">Revenue</span>
                     </div>
                   </div>
