@@ -613,31 +613,30 @@ export function UsersPage() {
 
         <div className="relative">
           <div className="max-h-[65vh] overflow-auto">
-            <table className="min-w-[1380px] w-full border-collapse text-sm [&_td]:!text-left [&_td>div]:justify-start [&_th]:!text-left">
-              <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_0_0_rgba(226,232,240,1)]">
-                <tr>
-                  {[
-                    ['user', 'User'],
-                    ['env', 'Env'],
-                    ['client', 'Client'],
-                    ['cost', 'Cost'],
-                    ['revenue', 'Revenue'],
-                    ['totalPoints', 'Balance Points'],
-                    ['pointsSpent', 'Points spent'],
-                    ['messages', 'Messages'],
-                    ['sessions', 'Sessions'],
-                  ].map(([key, label]) => (
-                    <th key={key} className={`px-4 py-4 text-xs font-bold uppercase tracking-wide text-slate-400 ${key === 'user' || key === 'client' ? 'text-left' : key === 'env' ? 'text-center' : 'text-right'}`}>
-                      <button type="button" className="inline-flex items-center gap-1 transition hover:text-slate-700" onClick={() => toggleSort(key)}>
-                        <span>{label}</span>
-                        <span className={`text-xs text-slate-300 ${sortConfig.key === key ? 'text-indigo-600' : ''}`}>
-                          {sortConfig.key === key ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}
-                        </span>
-                      </button>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
+            <table className="w-full border-collapse text-sm">              <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_0_0_rgba(226,232,240,1)]">
+              <tr>
+                {[
+                  ['user', 'User'],
+                  ['env', 'Env'],
+                  ['client', 'Client'],
+                  ['cost', 'Cost'],
+                  ['revenue', 'Revenue'],
+                  ['totalPoints', 'Balance Points'],
+                  ['pointsSpent', 'Points spent'],
+                  ['messages', 'Messages'],
+                  ['sessions', 'Sessions'],
+                ].map(([key, label]) => (
+                  <th key={key} className={`px-4 py-4 text-xs font-bold uppercase tracking-wide text-slate-400 ${key === 'user' || key === 'client' ? 'text-left' : key === 'env' ? 'text-center' : 'text-right'}`}>
+                    <button type="button" className="inline-flex items-center gap-1 transition hover:text-slate-700" onClick={() => toggleSort(key)}>
+                      <span>{label}</span>
+                      <span className={`text-xs text-slate-300 ${sortConfig.key === key ? 'text-indigo-600' : ''}`}>
+                        {sortConfig.key === key ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}
+                      </span>
+                    </button>
+                  </th>
+                ))}
+              </tr>
+            </thead>
               <tbody>
                 {isTableLoading ? (
                   <tr>
