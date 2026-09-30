@@ -427,35 +427,14 @@ export function ClientsPage() {
 
         <div className="relative">
           <div className="max-h-[65vh] overflow-auto">
-            <table key={isVault ? "clients-vault-layout" : "clients-twin-layout"} className="w-full min-w-[960px] table-fixed border-collapse text-sm">
-              <colgroup>
-                {isVault ? (
-                  <>
-                    <col className="w-[32%]" />
-                    <col className="w-[18%]" />
-                    <col className="w-[14%]" />
-                    <col className="w-[16%]" />
-                    <col className="w-[20%]" />
-                  </>
-                ) : (
-                  <>
-                    <col className="w-[24%]" />
-                    <col className="w-[13%]" />
-                    <col className="w-[12%]" />
-                    <col className="w-[10%]" />
-                    <col className="w-[10%]" />
-                    <col className="w-[15.5%]" />
-                    <col className="w-[15.5%]" />
-                  </>
-                )}
-              </colgroup>
+            <table key={isVault ? "clients-vault-layout" : "clients-twin-layout"} className="w-full min-w-[960px] border-collapse text-sm [&_td]:!text-left [&_td>div]:justify-start [&_th]:!text-left">
               <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_0_0_rgba(226,232,240,1)]">
                 <tr>
                   {clientTableColumns.map(([key, label]) => (
                     <th key={key} className={`px-4 py-4 text-xs font-bold uppercase tracking-wide text-slate-400 ${key === 'client' ? 'text-left' : key === 'env' ? 'text-center' : 'text-right'}`}>
                       <button
                         type="button"
-                        className={`flex w-full items-center gap-1 transition hover:text-slate-700 ${key === 'client' ? 'justify-start' : key === 'env' ? 'justify-center' : 'justify-end'}`}
+                        className="inline-flex items-center gap-1 transition hover:text-slate-700"
                         onClick={() => toggleSort(key)}
                       >
                         <span>{label}</span>
@@ -495,19 +474,15 @@ export function ClientsPage() {
                         state: { from: `${location.pathname}${location.search}` },
                       })}
                     >
-                      <td className="overflow-visible px-4 py-3.5 text-left">
-                        <div className="flex w-full min-w-0 items-center gap-3">
+                      <td className="px-4 py-3.5 text-left">
+                        <div className="flex max-w-[240px] items-center gap-3">
                           <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-bold ${isVault ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-600'}`}>
                             {getClientInitials(client.name)}
                           </span>
-                          <div className="min-w-0 flex-1">
-                            <strong className="block w-full min-w-0 font-semibold text-slate-700">
-                              <TruncatedText value={client.name} className="w-full" />
-                            </strong>
+                          <div className="min-w-0">
+                            <strong className="block font-semibold text-slate-700"><TruncatedText value={client.name} /></strong>
                             {isVault && client.plan ? (
-                              <span className="mt-0.5 block w-full min-w-0 text-xs text-slate-400">
-                                <TruncatedText value={client.plan} className="w-full" />
-                              </span>
+                              <span className="mt-0.5 block text-xs text-slate-400"><TruncatedText value={client.plan} /></span>
                             ) : null}
                           </div>
                         </div>
@@ -531,23 +506,29 @@ export function ClientsPage() {
                         </td>
                       ) : null}
                       {!isVault ? (
-                        <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">
-                          <div className="ml-auto max-w-[100px] min-w-0 overflow-hidden">
-                            <TruncatedValue value={formatOptionalNumber(client.twins)} className="block w-full text-right" />
+                        <td className="px-4 py-3.5 tabular-nums text-slate-500">
+                          <div className="max-w-[100px] min-w-0 overflow-hidden">
+                            <TruncatedValue value={formatOptionalNumber(client.twins)} className="block" />
                           </div>
                         </td>
                       ) : null}
 
-                      <td className="min-w-0 overflow-hidden px-4 py-3.5 text-right tabular-nums text-slate-500">
-                        <TruncatedValue value={formatOptionalNumber(client.users)} className="ml-auto block w-full text-right" />
+                      <td className="px-4 py-3.5 tabular-nums text-slate-500">
+                        <div className="max-w-[120px] min-w-0 overflow-hidden">
+                          <TruncatedValue value={formatOptionalNumber(client.users)} className="block" />
+                        </div>
                       </td>
 
-                      <td className="min-w-0 overflow-hidden px-4 py-3.5 text-right tabular-nums text-slate-700">
-                        <TruncatedValue value={formatCost(client.cost)} className="ml-auto block w-full text-right" />
+                      <td className="whitespace-nowrap px-4 py-3.5 tabular-nums text-slate-700">
+                        <div className="max-w-[140px] min-w-0 overflow-hidden">
+                          <TruncatedValue value={formatCost(client.cost)} className="block" />
+                        </div>
                       </td>
 
-                      <td className="min-w-0 overflow-hidden px-4 py-3.5 text-right tabular-nums text-slate-700">
-                        <TruncatedValue value={formatRevenue(client.revenue)} className="ml-auto block w-full text-right" />
+                      <td className="whitespace-nowrap px-4 py-3.5 tabular-nums text-slate-700">
+                        <div className="max-w-[140px] min-w-0 overflow-hidden">
+                          <TruncatedValue value={formatRevenue(client.revenue)} className="block" />
+                        </div>
                       </td>
                     </tr>
                   ))
