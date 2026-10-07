@@ -17,7 +17,12 @@ const GRANULARITIES = [
   { value: 'week', label: 'By Weeks' },
   { value: 'month', label: 'By Months' },
 ];
-
+const ENTITY_RANGES = [
+  { value: '1month', label: 'Last 1 Month' },
+  { value: '6months', label: 'Last 6 Months' },
+  { value: '1year', label: 'Last 1 Year' },
+  { value: 'morethan1year', label: 'More Than 1 Year' },
+];
 function ScopeDropdown({ filterKey, filters, updateScopeFilter, options, placeholder, searchPlaceholder, tone, ...props }) {
   return (
     <div className="min-w-0">
@@ -46,8 +51,10 @@ export function FilterToolbar({
   adminProduct,
   visibleScopes = ['granularity', 'client', 'twin', 'user', 'service', 'vendor'],
   showEnvironment = true,
+  compact = false,
 }) {
   const isVault = adminProduct === 'vault';
+  const scopeClass = compact ? 'flex-1 min-w-[160px]' : 'min-w-0';
   const isVisible = (scope) => visibleScopes.includes(scope);
   const visibleCount = visibleScopes.filter((scope) => scope !== 'service' && (scope !== 'twin' || !isVault)).length;
   const desktopGridClass = {
@@ -57,47 +64,80 @@ export function FilterToolbar({
   return (
     <>
       <div className="border-b border-slate-200 bg-white px-4 py-3 sm:px-6 lg:px-8">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
-          {showEnvironment ? <div className="flex w-full shrink-0 flex-wrap items-center justify-center gap-2 sm:w-auto sm:flex-nowrap sm:justify-start">
-            <span className="text-center text-xs font-bold uppercase tracking-[0.12em] text-slate-400 sm:mr-1 sm:text-left">Environment</span>
-            <div className="flex max-w-full items-center justify-center gap-1.5 overflow-x-auto px-1 py-0.5 no-scrollbar">
-              {ENVIRONMENTS.map((option) => {
-                const active = filters.envs.includes(option.id);
-                return (
-                  <button
-                    key={option.id}
-                    type="button"
-                    className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-xs font-semibold shadow-2xs transition hover:-translate-y-px ${active ? 'ring-2 ring-offset-1' : 'border border-slate-200 bg-white text-slate-600 hover:border-indigo-200'} ${option.id === 'dev' && active ? 'bg-slate-500 text-white ring-slate-200' : ''} ${option.id === 'staging' && active ? 'bg-sky-500 text-white ring-sky-100' : ''} ${option.id === 'prod' && active ? 'bg-indigo-600 text-white ring-indigo-100' : ''}`}
-                    onClick={() => {
-                      const envs = active ? filters.envs.filter((id) => id !== option.id) : [...filters.envs, option.id];
-                      if (envs.length) updateFilters({ envs });
-                    }}
-                  >
-                    <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
-                    {option.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div> : null}
-
-          <div className={`grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 ${desktopGridClass} ${showEnvironment ? '' : 'lg:ml-auto lg:max-w-xl'}`}>
-            {isVisible('granularity') ? <div className="min-w-0">
+        <div className={compact
+          ? 'flex flex-wrap items-center gap-2'
+          : 'flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4'}>
+          {showEnvironment ? (
+            <div className={compact ? scopeClass : 'w-full shrink-0 sm:w-48'}>
               <FilterDropdown
-                value={filters.gran}
-                onChange={(value) => updateFilters({ gran: value ?? 'day' })}
-                options={GRANULARITIES}
-                placeholder="By Days"
+                value={filters.envs.length === 1 ? filters.envs[0] : null}
+                onChange={(value) => updateFilters({ envs: value ? [value] : ['dev', 'staging', 'prod'] })}
+                options={[
+                  { value: 'dev', label: 'Development' },
+                  { value: 'staging', label: 'Staging' },
+                  { value: 'prod', label: 'Production' },
+                ]}
+                placeholder="All environments"
+                searchPlaceholder="Search environment..."
                 searchable={false}
-                showPlaceholderOption={false}
                 tone={isVault ? 'vault' : 'twin'}
               />
-            </div> : null}
-            {isVisible('client') ? <ScopeDropdown tone={isVault ? 'vault' : 'twin'} filterKey="client" filters={filters} updateScopeFilter={updateScopeFilter} options={clientOptions} placeholder="All clients" searchPlaceholder="Search client..." /> : null}
-            {!isVault && isVisible('twin') ? <ScopeDropdown filterKey="twin" filters={filters} updateScopeFilter={updateScopeFilter} options={twinOptions} placeholder="All twins" searchPlaceholder="Search twin..." align="right" /> : null}
-            {isVisible('user') ? <ScopeDropdown tone={isVault ? 'vault' : 'twin'} filterKey="user" filters={filters} updateScopeFilter={updateScopeFilter} options={userOptions} placeholder="All users" searchPlaceholder="Search user..." /> : null}
-            {isVisible('vendor') ? <ScopeDropdown tone={isVault ? 'vault' : 'twin'} filterKey="vendor" filters={filters} updateScopeFilter={updateScopeFilter} options={vendorOptions} placeholder="All services" searchPlaceholder="Search service..." align="right" /> : null}
-          </div>
+            </div>
+          ) : null}
+
+          {compact ? (
+            <>
+              {isVisible('granularity') ? (
+                <div className={scopeClass}>
+                  <FilterDropdown
+                    value={filters.entityRange === 'all' ? null : filters.entityRange}
+                    onChange={(value) => updateScopeFilter('entityRange', value || 'all')}
+                    options={ENTITY_RANGES}
+                    placeholder="Created: All time"
+                    searchable={false}
+                    tone={isVault ? 'vault' : 'twin'}
+                  />
+                </div>
+              ) : null}
+              {isVisible('client') ? (
+                <div className={scopeClass}>
+                  <ScopeDropdown tone={isVault ? 'vault' : 'twin'} filterKey="client" filters={filters} updateScopeFilter={updateScopeFilter} options={clientOptions} placeholder="All clients" searchPlaceholder="Search client..." />
+                </div>
+              ) : null}
+              {!isVault && isVisible('twin') ? (
+                <div className={scopeClass}>
+                  <ScopeDropdown tone={isVault ? 'vault' : 'twin'} filterKey="twin" filters={filters} updateScopeFilter={updateScopeFilter} options={twinOptions} placeholder="All twins" searchPlaceholder="Search twin..." />
+                </div>
+              ) : null}
+              {isVisible('user') ? (
+                <div className={scopeClass}>
+                  <ScopeDropdown tone={isVault ? 'vault' : 'twin'} filterKey="user" filters={filters} updateScopeFilter={updateScopeFilter} options={userOptions} placeholder="All users" searchPlaceholder="Search user..." />
+                </div>
+              ) : null}
+              {isVisible('vendor') ? (
+                <div className={scopeClass}>
+                  <ScopeDropdown tone={isVault ? 'vault' : 'twin'} filterKey="vendor" filters={filters} updateScopeFilter={updateScopeFilter} options={vendorOptions} placeholder="All services" searchPlaceholder="Search service..." />
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <div className={`grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 ${desktopGridClass} ${showEnvironment ? '' : 'lg:ml-auto lg:max-w-xl'}`}>
+              {isVisible('granularity') ? <div className="min-w-0">
+                <FilterDropdown
+                  value={filters.entityRange === 'all' ? null : filters.entityRange}
+                  onChange={(value) => updateScopeFilter('entityRange', value || 'all')}
+                  options={ENTITY_RANGES}
+                  placeholder="Created: All time"
+                  searchable={false}
+                  tone={isVault ? 'vault' : 'twin'}
+                />
+              </div> : null}
+              {isVisible('client') ? <ScopeDropdown tone={isVault ? 'vault' : 'twin'} filterKey="client" filters={filters} updateScopeFilter={updateScopeFilter} options={clientOptions} placeholder="All clients" searchPlaceholder="Search client..." /> : null}
+              {!isVault && isVisible('twin') ? <ScopeDropdown filterKey="twin" filters={filters} updateScopeFilter={updateScopeFilter} options={twinOptions} placeholder="All twins" searchPlaceholder="Search twin..." align="right" /> : null}
+              {isVisible('user') ? <ScopeDropdown tone={isVault ? 'vault' : 'twin'} filterKey="user" filters={filters} updateScopeFilter={updateScopeFilter} options={userOptions} placeholder="All users" searchPlaceholder="Search user..." /> : null}
+              {isVisible('vendor') ? <ScopeDropdown tone={isVault ? 'vault' : 'twin'} filterKey="vendor" filters={filters} updateScopeFilter={updateScopeFilter} options={vendorOptions} placeholder="All services" searchPlaceholder="Search service..." align="right" /> : null}
+            </div>
+          )}
         </div>
       </div>
 

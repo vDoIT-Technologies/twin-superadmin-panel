@@ -52,7 +52,22 @@ export async function getFilebaseTopUsers(params = {}) {
   const topUsers = extractList(payload, 'topUsers');
   return topUsers.length ? topUsers : extractList(payload, 'users');
 }
-
+export async function getTopClientsByCost(params = {}) {
+  const payload = await apiGet('/api/v1/vault/top-clients-cost', params);
+  return extractList(payload, 'clients');
+}
+export function getCostRevenueSeries(params = {}) {
+  return apiGet('/api/v1/vault/cost-revenue-series', params);
+}
+export function getCostByVendorSeries(params = {}) {
+  return apiGet('/api/v1/vault/cost-by-vendor-series', params);
+}
+export function getVaultSummary(params = {}) {
+  return apiGet('/api/v1/vault/summary', params);
+}
+export function getVaultSummaryByEnv(params = {}) {
+  return apiGet('/api/v1/vault/summary-by-env', params);
+}
 export default {
   dropdownApiAvailable,
   getClientsDropdown,

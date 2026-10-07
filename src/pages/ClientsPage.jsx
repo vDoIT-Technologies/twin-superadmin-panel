@@ -6,7 +6,7 @@ import { useEntityFilters } from "../app/FilterContext";
 import { TruncatedText } from "../components/common/TruncatedText";
 import { FilterDropdown } from "../components/common/FilterDropdown";
 import { dashboardService, exportService } from "../services";
-import { envBadge, formatCost } from "../utils/dashboardUtils";
+import { envBadge, formatCost, formatRevenue, TruncatedValue } from "../utils/dashboardUtils";
 import { normalizeEntityStatus } from "../utils/status";
 import { getEntityFilterParams } from "../utils/entityFilters";
 import { isNumericTableSearch, matchesTableSearch, TABLE_SEARCH_DATASET_LIMIT } from "../utils/tableSearch";
@@ -267,7 +267,7 @@ export function ClientsPage() {
         client.cost,
         formatCost(client.cost),
         client.revenue,
-        formatCost(client.revenue),
+        formatRevenue(client.revenue),
       ]);
       return matchesStatus && matchesQuery;
     });
@@ -332,12 +332,12 @@ export function ClientsPage() {
       prev.key === key
         ? { key, direction: prev.direction === "asc" ? "desc" : "asc" }
         : {
-            key,
-            direction:
-              key === "client" || key === "env"
-                ? "asc"
-                : "desc",
-          },
+          key,
+          direction:
+            key === "client" || key === "env"
+              ? "asc"
+              : "desc",
+        },
     );
   };
 
@@ -368,24 +368,24 @@ export function ClientsPage() {
                 className="min-w-0 flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
                 type="text"
                 value={query}
-              onChange={(event) => {
-                setQuery(event.target.value);
-                setPage(1);
-              }}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  setPage(1);
+                }}
                 placeholder="Search clients..."
               />
             </label>
 
             <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
-            <FilterDropdown
-              value={filters.envs.length === 1 ? filters.envs[0] : null}
-              onChange={(value) => updateTableFilter('envs', value ? [value] : ['dev', 'staging', 'prod'])}
-              options={[{ value: 'dev', label: 'Development' }, { value: 'staging', label: 'Staging' }, { value: 'prod', label: 'Production' }]}
-              placeholder="All environments"
-              searchPlaceholder="Search environment..."
-              searchable={false}
-              tone={isVault ? 'vault' : 'twin'}
-            />
+              <FilterDropdown
+                value={filters.envs.length === 1 ? filters.envs[0] : null}
+                onChange={(value) => updateTableFilter('envs', value ? [value] : ['dev', 'staging', 'prod'])}
+                options={[{ value: 'dev', label: 'Development' }, { value: 'staging', label: 'Staging' }, { value: 'prod', label: 'Production' }]}
+                placeholder="All environments"
+                searchPlaceholder="Search environment..."
+                searchable={false}
+                tone={isVault ? 'vault' : 'twin'}
+              />
               {!isVault ? (
                 <FilterDropdown
                   value={filters.status}
@@ -427,93 +427,114 @@ export function ClientsPage() {
 
         <div className="relative">
           <div className="max-h-[65vh] overflow-auto">
-          <table key={isVault ? "clients-vault-layout" : "clients-twin-layout"} className="w-full min-w-[960px] border-collapse text-sm [&_td]:!text-left [&_td>div]:justify-start [&_th]:!text-left">
-            <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_0_0_rgba(226,232,240,1)]">
-              <tr>
-                {clientTableColumns.map(([key, label]) => (
-                  <th key={key} className={`px-4 py-4 text-xs font-bold uppercase tracking-wide text-slate-400 ${key === 'client' ? 'text-left' : key === 'env' ? 'text-center' : 'text-right'}`}>
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-1 transition hover:text-slate-700"
-                      onClick={() => toggleSort(key)}
-                    >
-                      <span>{label}</span>
-                      <span
-                        className={`text-xs text-slate-300 ${sortConfig.key === key ? "text-indigo-600" : ""}`}
+            <table key={isVault ? "clients-vault-layout" : "clients-twin-layout"} className="w-full min-w-[960px] border-collapse text-sm [&_td]:!text-left [&_td>div]:justify-start [&_th]:!text-left">
+              <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_0_0_rgba(226,232,240,1)]">
+                <tr>
+                  {clientTableColumns.map(([key, label]) => (
+                    <th key={key} className={`px-4 py-4 text-xs font-bold uppercase tracking-wide text-slate-400 ${key === 'client' ? 'text-left' : key === 'env' ? 'text-center' : 'text-right'}`}>
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 transition hover:text-slate-700"
+                        onClick={() => toggleSort(key)}
                       >
-                        {sortConfig.key === key
-                          ? sortConfig.direction === "asc"
-                            ? "↑"
-                            : "↓"
-                          : "↕"}
-                      </span>
-                    </button>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {isTableLoading ? (
-                <tr>
-                  <td colSpan={clientTableColumns.length} className="p-0 text-sm text-slate-400">
-                    <div className="min-h-40" />
-                  </td>
-                </tr>
-              ) : sortedRows.length === 0 ? (
-                <tr>
-                  <td colSpan={clientTableColumns.length} className="px-5 py-12 text-center text-sm text-slate-400">
-                    No clients found
-                  </td>
-                </tr>
-              ) : (
-                sortedRows.map((client) => (
-                  <tr
-                    key={client.rowKey}
-                    className="cursor-pointer border-t border-slate-100 transition hover:bg-slate-50"
-                    onClick={() => navigate(client.detailRoute, {
-                      state: { from: `${location.pathname}${location.search}` },
-                    })}
-                  >
-                    <td className="px-4 py-3.5 text-left">
-                      <div className="flex items-center gap-3">
-                        <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-bold ${isVault ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-600'}`}>
-                          {getClientInitials(client.name)}
+                        <span>{label}</span>
+                        <span
+                          className={`text-xs text-slate-300 ${sortConfig.key === key ? "text-indigo-600" : ""}`}
+                        >
+                          {sortConfig.key === key
+                            ? sortConfig.direction === "asc"
+                              ? "↑"
+                              : "↓"
+                            : "↕"}
                         </span>
-                        <div className="min-w-0">
-                          <strong className="block font-semibold text-slate-700"><TruncatedText value={client.name} /></strong>
-                          {isVault && client.plan ? (
-                            <span className="mt-0.5 block text-xs text-slate-400"><TruncatedText value={client.plan} /></span>
-                          ) : null}
-                        </div>
-                      </div>
+                      </button>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {isTableLoading ? (
+                  <tr>
+                    <td colSpan={clientTableColumns.length} className="p-0 text-sm text-slate-400">
+                      <div className="min-h-40" />
                     </td>
-                    <td className="px-4 py-3.5 text-center">
-                      <div className="flex flex-wrap justify-center gap-1.5">
-                        {client.envs.map((env) => (
-                          <span key={env} className="inline-flex rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-500">
-                            {envBadge(env)}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    {!isVault ? (
-                      <td className="px-4 py-3.5 text-slate-500">
-                        {client.status ? (
-                          <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${client.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                            {client.status === 'active' ? 'Active' : 'Inactive'}
-                          </span>
-                        ) : '---'}
-                      </td>
-                    ) : null}
-                    {!isVault ? <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(client.twins)}</td> : null}
-                    <td className="px-4 py-3.5 text-right tabular-nums text-slate-500">{formatOptionalNumber(client.users)}</td>
-                    <td className="whitespace-nowrap px-4 py-3.5 text-right tabular-nums">{formatCost(client.cost)}</td>
-                    <td className="whitespace-nowrap px-4 py-3.5 text-right tabular-nums">{formatCost(client.revenue)}</td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : sortedRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={clientTableColumns.length} className="px-5 py-12 text-center text-sm text-slate-400">
+                      No clients found
+                    </td>
+                  </tr>
+                ) : (
+                  sortedRows.map((client) => (
+                    <tr
+                      key={client.rowKey}
+                      className="cursor-pointer border-t border-slate-100 transition hover:bg-slate-50"
+                      onClick={() => navigate(client.detailRoute, {
+                        state: { from: `${location.pathname}${location.search}` },
+                      })}
+                    >
+                      <td className="px-4 py-3.5 text-left">
+                        <div className="flex max-w-[240px] items-center gap-3">
+                          <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-bold ${isVault ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-600'}`}>
+                            {getClientInitials(client.name)}
+                          </span>
+                          <div className="min-w-0">
+                            <strong className="block font-semibold text-slate-700"><TruncatedText value={client.name} /></strong>
+                            {isVault && client.plan ? (
+                              <span className="mt-0.5 block text-xs text-slate-400"><TruncatedText value={client.plan} /></span>
+                            ) : null}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3.5 text-center">
+                        <div className="flex flex-wrap justify-center gap-1.5">
+                          {client.envs.map((env) => (
+                            <span key={env} className="inline-flex rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-500">
+                              {envBadge(env)}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      {!isVault ? (
+                        <td className="px-4 py-3.5 text-slate-500">
+                          {client.status ? (
+                            <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${client.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                              {client.status === 'active' ? 'Active' : 'Inactive'}
+                            </span>
+                          ) : '---'}
+                        </td>
+                      ) : null}
+                      {!isVault ? (
+                        <td className="px-4 py-3.5 tabular-nums text-slate-500">
+                          <div className="max-w-[100px] min-w-0 overflow-hidden">
+                            <TruncatedValue value={formatOptionalNumber(client.twins)} className="block" />
+                          </div>
+                        </td>
+                      ) : null}
+
+                      <td className="px-4 py-3.5 tabular-nums text-slate-500">
+                        <div className="max-w-[120px] min-w-0 overflow-hidden">
+                          <TruncatedValue value={formatOptionalNumber(client.users)} className="block" />
+                        </div>
+                      </td>
+
+                      <td className="whitespace-nowrap px-4 py-3.5 tabular-nums text-slate-700">
+                        <div className="max-w-[140px] min-w-0 overflow-hidden">
+                          <TruncatedValue value={formatCost(client.cost)} className="block" />
+                        </div>
+                      </td>
+
+                      <td className="whitespace-nowrap px-4 py-3.5 tabular-nums text-slate-700">
+                        <div className="max-w-[140px] min-w-0 overflow-hidden">
+                          <TruncatedValue value={formatRevenue(client.revenue)} className="block" />
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
           {isTableLoading ? (
             <div className="pointer-events-none absolute inset-x-0 top-14 flex h-40 items-center justify-center gap-2 text-sm text-slate-400">

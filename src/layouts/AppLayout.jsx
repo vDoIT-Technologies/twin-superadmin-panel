@@ -60,6 +60,7 @@ export function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { adminProduct, isAuthenticated, logout, profile, user } = useAuth();
+  const isVault = adminProduct === 'vault';
   const { filters, setFilters } = useContext(FilterContext);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -80,8 +81,10 @@ export function AppLayout() {
     location.pathname === route || location.pathname.startsWith(`${route}/`),
   );
   const showFilterBar = location.pathname !== '/profile' && location.pathname !== '/vault' && !isEntityRoute && !isStandalonePage;
-  const showOverviewControls = location.pathname === '/';
-  const visibleScopes = ['granularity', 'client', 'twin', 'user', 'service', 'vendor'];
+  const showOverviewControls = false;
+  const visibleScopes = location.pathname === '/'
+    ? ['granularity', 'client', 'service']
+    : ['granularity', 'client', 'twin', 'user', 'service', 'vendor'];
   const baseTitle =
     breadcrumbTitles[location.pathname] ??
     (location.pathname.startsWith('/clients/')
@@ -220,8 +223,12 @@ export function AppLayout() {
       filebase: 'Filebase / IPFS',
       stripe: 'Stripe',
     };
-    const excludedServices = new Set(['heygen', 'polygon', 'blockchain', 'apify', 'moonpay', 'moopifay']);
-
+    const baseExcluded = ['heygen', 'polygon', 'blockchain', 'apify', 'moonpay', 'moopifay'];
+    const excludedServices = new Set(
+      isVault
+        ? [...baseExcluded, 'did', 'stripe']
+        : [...baseExcluded, 'filebase', 'stripe'],
+    );
     dashboardService.getServicesStatus()
       .then((response) => {
         if (!active) return;
@@ -584,6 +591,8 @@ export function AppLayout() {
               showOverviewControls={showOverviewControls}
               adminProduct={adminProduct}
               visibleScopes={visibleScopes}
+              compact={location.pathname === '/'}
+
             />
           ) : null}
         </div>

@@ -28,4 +28,9 @@ export {
   getFilebaseTopUsers,
   getTwinsDropdown,
   getUsersDropdown,
+  getTopClientsByCost,
+  getCostRevenueSeries,
+  getVaultSummary,
+  getVaultSummaryByEnv,
+  getCostByVendorSeries,
 } from './dropdownService';
