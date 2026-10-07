@@ -9,6 +9,7 @@ import {
   Coins,
   MessagesSquare,
   Percent,
+  Plus,
   TrendingUp,
   Users,
   Wallet,
@@ -19,6 +20,7 @@ import { useAuth } from '../app/AuthContext';
 import { FilterContext } from '../app/FilterContext';
 import { TruncatedText } from '../components/common/TruncatedText';
 import { envBadge, formatCost, formatNumber, formatRevenueWhole, ServiceUsageRow, TruncatedValue } from '../utils/dashboardUtils';
+import { GrantPackageModal } from '../components/vault/GrantPackageModal';
 const DETAIL_PAGE_SIZE = 10;
 
 function getInitials(name) {
@@ -96,14 +98,15 @@ function DetailHeader({ avatarClassName, initials, title, subtitle, onBack }) {
   );
 }
 
-function CardSection({ title, subtitle, children, flush = false }) {
+function CardSection({ title, subtitle, children, flush = false, action = null }) {
   return (
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-panel">
-      <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-        <div>
+      <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
+        <div className="min-w-0">
           <h2 className="text-base font-semibold text-slate-800">{title}</h2>
           {subtitle ? <span className="mt-0.5 block text-xs text-slate-400">{subtitle}</span> : null}
         </div>
+        {action}
       </div>
       <div className={flush ? '' : 'p-5'}>{children}</div>
     </section>
@@ -796,7 +799,7 @@ export function UserDetailPage() {
   const [userData, setUserData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isBotsModalOpen, setIsBotsModalOpen] = useState(false);
-
+  const [isGrantOpen, setIsGrantOpen] = useState(false);
   useEffect(() => {
     let active = true;
     setIsLoading(true);
@@ -1233,11 +1236,37 @@ export function UserDetailPage() {
         </div>
       ) : null}
 
+      {isVault && isGrantOpen ? (
+        <GrantPackageModal
+          open={isGrantOpen}
+          onClose={() => setIsGrantOpen(false)}
+          user={{
+            _id: profile?._id || userId,
+            name: profile?.name,
+            email: profile?.email,
+          }}
+          onGranted={() => setIsGrantOpen(false)}
+        />
+      ) : null}
+
       {/* Packages + All-service usage */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* Packages */}
         {isVault ? (
-          <CardSection title="Packages" flush>
+          <CardSection
+            title="Packages"
+            flush
+            action={
+              <button
+                type="button"
+                onClick={() => setIsGrantOpen(true)}
+                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700"
+              >
+                <Plus size={14} />
+                Grant Package
+              </button>
+            }
+          >
             {primaryPackage || subscriptionPackages.length ? (
               <div className="divide-y divide-slate-100">
                 {primaryPackage ? (
@@ -1302,7 +1331,9 @@ export function UserDetailPage() {
                   </span>
                   <div>
                     <p className="text-sm font-semibold text-slate-600">No packages assigned</p>
-                    <p className="mt-0.5 text-xs text-slate-400">This user does not have an active Vault package or subscription.</p>
+                    <p className="mt-0.5 text-xs text-slate-400">
+                      This user does not have an active Vault package or subscription.
+                    </p>
                   </div>
                 </div>
               </div>
