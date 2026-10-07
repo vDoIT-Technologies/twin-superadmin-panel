@@ -1,9 +1,11 @@
 import { useContext, useEffect, useState } from 'react';
 import {
   Activity,
+  AlertCircle,
   ArrowLeft,
   BookOpen,
   Bot,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Coins,
@@ -13,6 +15,7 @@ import {
   TrendingUp,
   Users,
   Wallet,
+  X,
 } from 'lucide-react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { dashboardService } from '../services';
@@ -130,6 +133,30 @@ function EntityListRow({ avatarClassName, initials, title, subtitle, meta, onCli
 
 function EmptyDetailState({ message }) {
   return <div className="py-12 text-center text-sm text-slate-400">{message}</div>;
+}
+
+function Toast({ type, message, onClose }) {
+  const isSuccess = type === 'success';
+  return (
+    <div
+      className={`fixed bottom-4 right-4 z-[60] flex w-[min(24rem,calc(100vw-2rem))] items-start gap-3 rounded-2xl border bg-white p-4 shadow-2xl ${isSuccess ? 'border-emerald-200' : 'border-rose-200'
+        }`}
+      role={isSuccess ? 'status' : 'alert'}
+    >
+      <span className={`mt-0.5 shrink-0 ${isSuccess ? 'text-emerald-600' : 'text-rose-600'}`}>
+        {isSuccess ? <CheckCircle2 size={19} /> : <AlertCircle size={19} />}
+      </span>
+      <p className="flex-1 text-sm font-medium leading-5 text-slate-700">{message}</p>
+      <button
+        type="button"
+        onClick={onClose}
+        className="shrink-0 text-slate-400 transition hover:text-slate-700"
+        aria-label="Dismiss notification"
+      >
+        <X size={17} />
+      </button>
+    </div>
+  );
 }
 
 function DetailPagination({ currentPage, itemCount, onPageChange }) {
@@ -800,6 +827,12 @@ export function UserDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isBotsModalOpen, setIsBotsModalOpen] = useState(false);
   const [isGrantOpen, setIsGrantOpen] = useState(false);
+  const [grantToast, setGrantToast] = useState(null);
+  useEffect(() => {
+    if (!grantToast) return undefined;
+    const timeoutId = window.setTimeout(() => setGrantToast(null), 4000);
+    return () => window.clearTimeout(timeoutId);
+  }, [grantToast]);
   useEffect(() => {
     let active = true;
     setIsLoading(true);
@@ -1245,7 +1278,10 @@ export function UserDetailPage() {
             name: profile?.name,
             email: profile?.email,
           }}
-          onGranted={() => setIsGrantOpen(false)}
+          onGranted={({ message }) => {
+            setIsGrantOpen(false);
+            setGrantToast({ type: 'success', message });
+          }}
         />
       ) : null}
 
@@ -1409,6 +1445,13 @@ export function UserDetailPage() {
           </div>
         </CardSection>
       </div>
+      {grantToast ? (
+        <Toast
+          type={grantToast.type}
+          message={grantToast.message}
+          onClose={() => setGrantToast(null)}
+        />
+      ) : null}
     </section>
   );
 }
