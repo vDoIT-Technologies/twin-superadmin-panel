@@ -5,6 +5,7 @@ import { AppLayout } from '../layouts/AppLayout';
 import { HomeAuthPage } from '../pages/HomeAuthPage';
 import { LoginOtpPage } from '../pages/LoginOtpPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
+import { RouteErrorPage } from '../pages/RouteErrorPage';
 import { canAccessPath } from '../utils/productAccess';
 
 const OverviewPage = lazy(() => import('../pages/OverviewPage').then((module) => ({ default: module.OverviewPage })));
@@ -96,26 +97,31 @@ function RedirectIfAuthenticated() {
 export const router = createBrowserRouter([
   {
     element: <RequireAuth />,
+    errorElement: <RouteErrorPage />,
     children: [
       {
         path: '/',
         element: <AppLayout />,
-        errorElement: <NotFoundPage />,
         children: [
-          { index: true, element: <ProductOverview /> },
-          { path: 'profile', element: renderLazyPage(<ProfilePage />) },
-          { path: 'clients', element: renderLazyPage(<ClientsPage />) },
-          { path: 'clients/:clientId', element: renderLazyPage(<ClientDetailPage />) },
-          { path: 'twins', element: <ProductRoute>{renderLazyPage(<TwinsPage />)}</ProductRoute> },
-          { path: 'twins/:twinId', element: <ProductRoute>{renderLazyPage(<TwinDetailPage />)}</ProductRoute> },
-          { path: 'users', element: renderLazyPage(<UsersPage />) },
-          { path: 'users/:userId', element: renderLazyPage(<UserDetailPage />) },
-          { path: 'services', element: renderLazyPage(<ServicesPage />) },
-          { path: 'vault', element: <ProductRoute>{renderLazyPage(<VaultPage />)}</ProductRoute> },
-          { path: 'plans', element: <ProductRoute>{renderLazyPage(<PlansPage />)}</ProductRoute> },
-          { path: 'financial', element: <ProductRoute>{renderLazyPage(<FinancialPage />)}</ProductRoute> },
-          { path: 'usage', element: <ProductRoute>{renderLazyPage(<UsagePage />)}</ProductRoute> },
-          { path: 'telemetry', element: renderLazyPage(<TelemetryPage />) },
+          {
+            errorElement: <RouteErrorPage />,
+            children: [
+              { index: true, element: <ProductOverview /> },
+              { path: 'profile', element: renderLazyPage(<ProfilePage />) },
+              { path: 'clients', element: renderLazyPage(<ClientsPage />) },
+              { path: 'clients/:clientId', element: renderLazyPage(<ClientDetailPage />) },
+              { path: 'twins', element: <ProductRoute>{renderLazyPage(<TwinsPage />)}</ProductRoute> },
+              { path: 'twins/:twinId', element: <ProductRoute>{renderLazyPage(<TwinDetailPage />)}</ProductRoute> },
+              { path: 'users', element: renderLazyPage(<UsersPage />) },
+              { path: 'users/:userId', element: renderLazyPage(<UserDetailPage />) },
+              { path: 'services', element: renderLazyPage(<ServicesPage />) },
+              { path: 'vault', element: <ProductRoute>{renderLazyPage(<VaultPage />)}</ProductRoute> },
+              { path: 'plans', element: <ProductRoute>{renderLazyPage(<PlansPage />)}</ProductRoute> },
+              { path: 'financial', element: <ProductRoute>{renderLazyPage(<FinancialPage />)}</ProductRoute> },
+              { path: 'usage', element: <ProductRoute>{renderLazyPage(<UsagePage />)}</ProductRoute> },
+              { path: 'telemetry', element: renderLazyPage(<TelemetryPage />) },
+            ],
+          },
         ],
       },
     ],
