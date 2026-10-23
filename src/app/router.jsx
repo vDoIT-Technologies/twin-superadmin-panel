@@ -5,6 +5,7 @@ import { AppLayout } from '../layouts/AppLayout';
 import { HomeAuthPage } from '../pages/HomeAuthPage';
 import { LoginOtpPage } from '../pages/LoginOtpPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
+import { RouteErrorPage } from '../pages/RouteErrorPage';
 import { canAccessPath } from '../utils/productAccess';
 
 const OverviewPage = lazy(() => import('../pages/OverviewPage').then((module) => ({ default: module.OverviewPage })));
@@ -15,14 +16,9 @@ const UsersPage = lazy(() => import('../pages/UsersPage').then((module) => ({ de
 const ServicesPage = lazy(() => import('../pages/ServicesPage').then((module) => ({ default: module.ServicesPage })));
 const VaultPage = lazy(() => import('../pages/VaultPage').then((module) => ({ default: module.VaultPage })));
 const PlansPage = lazy(() => import('../pages/PlansPage').then((module) => ({ default: module.PlansPage })));
-
-// Commented out Billing
-// const FinancialPage = lazy(() => import('../pages/FinancialPage').then((module) => ({ default: module.FinancialPage })));
-
+const FinancialPage = lazy(() => import('../pages/FinancialPage').then((module) => ({ default: module.FinancialPage })));
 const UsagePage = lazy(() => import('../pages/UsagePage').then((module) => ({ default: module.UsagePage })));
-
-// Commented out Telemetry
-// const TelemetryPage = lazy(() => import('../pages/TelemetryPage').then((module) => ({ default: module.TelemetryPage })));
+const TelemetryPage = lazy(() => import('../pages/TelemetryPage').then((module) => ({ default: module.TelemetryPage })));
 
 const ClientDetailPage = lazy(() => import('../pages/EntityDetailPages').then((module) => ({ default: module.ClientDetailPage })));
 const TwinDetailPage = lazy(() => import('../pages/EntityDetailPages').then((module) => ({ default: module.TwinDetailPage })));
@@ -102,30 +98,35 @@ function RedirectIfAuthenticated() {
 export const router = createBrowserRouter([
   {
     element: <RequireAuth />,
+    errorElement: <RouteErrorPage />,
     children: [
       {
         path: '/',
         element: <AppLayout />,
-        errorElement: <NotFoundPage />,
         children: [
-          { index: true, element: <ProductOverview /> },
-          { path: 'profile', element: renderLazyPage(<ProfilePage />) },
-          { path: 'clients', element: renderLazyPage(<ClientsPage />) },
-          { path: 'clients/:clientId', element: renderLazyPage(<ClientDetailPage />) },
-          { path: 'twins', element: <ProductRoute>{renderLazyPage(<TwinsPage />)}</ProductRoute> },
-          { path: 'twins/:twinId', element: <ProductRoute>{renderLazyPage(<TwinDetailPage />)}</ProductRoute> },
-          { path: 'users', element: renderLazyPage(<UsersPage />) },
-          { path: 'users/:userId', element: renderLazyPage(<UserDetailPage />) },
-          { path: 'services', element: renderLazyPage(<ServicesPage />) },
-          { path: 'vault', element: <ProductRoute>{renderLazyPage(<VaultPage />)}</ProductRoute> },
-          { path: 'plans', element: <ProductRoute>{renderLazyPage(<PlansPage />)}</ProductRoute> },
-          
-          // Commented out Billing & Telemetry
-          // { path: 'financial', element: <ProductRoute>{renderLazyPage(<FinancialPage />)}</ProductRoute> },
-          
-          { path: 'usage', element: <ProductRoute>{renderLazyPage(<UsagePage />)}</ProductRoute> },
-          
-          // { path: 'telemetry', element: renderLazyPage(<TelemetryPage />) },
+          {
+            errorElement: <RouteErrorPage />,
+            children: [
+              { index: true, element: <ProductOverview /> },
+              { path: 'profile', element: renderLazyPage(<ProfilePage />) },
+              { path: 'clients', element: renderLazyPage(<ClientsPage />) },
+              { path: 'clients/:clientId', element: renderLazyPage(<ClientDetailPage />) },
+              { path: 'twins', element: <ProductRoute>{renderLazyPage(<TwinsPage />)}</ProductRoute> },
+              { path: 'twins/:twinId', element: <ProductRoute>{renderLazyPage(<TwinDetailPage />)}</ProductRoute> },
+              { path: 'users', element: renderLazyPage(<UsersPage />) },
+              { path: 'users/:userId', element: renderLazyPage(<UserDetailPage />) },
+              { path: 'services', element: renderLazyPage(<ServicesPage />) },
+              { path: 'vault', element: <ProductRoute>{renderLazyPage(<VaultPage />)}</ProductRoute> },
+              { path: 'plans', element: <ProductRoute>{renderLazyPage(<PlansPage />)}</ProductRoute> },
+              
+              // Commented out Billing & Telemetry
+              // { path: 'financial', element: <ProductRoute>{renderLazyPage(<FinancialPage />)}</ProductRoute> },
+              
+              { path: 'usage', element: <ProductRoute>{renderLazyPage(<UsagePage />)}</ProductRoute> },
+              
+              // { path: 'telemetry', element: renderLazyPage(<TelemetryPage />) },
+            ],
+          },
         ],
       },
     ],
