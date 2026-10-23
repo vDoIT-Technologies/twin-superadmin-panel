@@ -211,7 +211,6 @@ export function UsagePage() {
 
   return (
     <section className="px-4 py-6 sm:px-6 lg:px-8">
-      {/* Filter Row - reduced bottom margin to fix gap */}
       <div className="mb-4 flex justify-end">
         <div className="w-64">
           <FilterDropdown
@@ -230,7 +229,6 @@ export function UsagePage() {
         </div>
       </div>
 
-      {/* Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {metricCards.map((card) => {
           const Icon = card.icon;
