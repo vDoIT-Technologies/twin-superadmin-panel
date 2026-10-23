@@ -1,15 +1,7 @@
-// Live OpenAI token-usage service (SuperAdmin backend).
-//
-// Maps the panel's FilterContext into backend query params, fetches real usage,
-// and shapes it for the UsagePage charts/tables. All calls degrade gracefully:
-// callers should treat a thrown error / unconfigured API as "fall back to demo".
 import { apiGet, isApiConfigured } from './apiClient';
 
 export const usageApiAvailable = () => isApiConfigured();
 
-// FilterContext -> backend query params.
-// env: backend takes a single env; only send it when exactly one is selected.
-// range: '7d' | '30d' | '90d' | '24h' — backend parses this directly.
 const mapServerFilters = (filters = {}) => {
   const params = {};
   if (Array.isArray(filters.envs) && filters.envs.length === 1) params.env = filters.envs[0];
@@ -20,12 +12,11 @@ const mapServerFilters = (filters = {}) => {
   return params;
 };
 
-export const getTokenFacts = (filters) => apiGet('api/v1/usage/tokens', mapServerFilters(filters));
-export const getUsageByUser = (filters) => apiGet('api/v1/usage/by-user', mapServerFilters(filters));
-export const getUsageByClient = (filters) => apiGet('api/v1/usage/by-client', mapServerFilters(filters));
-export const getUsageSummary = (filters) => apiGet('api/v1/usage/summary', mapServerFilters(filters));
+export const getTokenFacts = (filters) => apiGet('/api/v1/usage/tokens', mapServerFilters(filters));
+export const getUsageByUser = (filters) => apiGet('/api/v1/usage/by-user', mapServerFilters(filters));
+export const getUsageByClient = (filters) => apiGet('/api/v1/usage/by-client', mapServerFilters(filters));
+export const getUsageSummary = (filters) => apiGet('/api/v1/usage/summary', mapServerFilters(filters));
 
-// Aggregate fact rows into a per-day token time series.
 export const buildTokenTimeSeries = (facts = []) => {
   const byDay = new Map();
   let totalTokens = 0;
@@ -37,17 +28,13 @@ export const buildTokenTimeSeries = (facts = []) => {
   }
   const days = [...byDay.keys()].sort();
   return {
-    labels: days.map((d) => d.slice(5)), // MM-DD
+    labels: days.map((d) => d.slice(5)),
     values: days.map((d) => byDay.get(d)),
     totalTokens,
     totalCost,
   };
 };
 
-/**
- * One-shot loader for the UsagePage. Returns { live:false } if the API is
- * unconfigured or any request fails, so the page can fall back to demo data.
- */
 export const loadTokenUsage = async (filters) => {
   if (!usageApiAvailable()) return { live: false };
   try {
@@ -69,6 +56,76 @@ export const loadTokenUsage = async (filters) => {
   }
 };
 
+export const getUsageSummaryByRole = () =>
+  apiGet('/api/v1/usage/summary-by-role');
+
+export const loadUsageSummaryByRole = async () => {
+  if (!usageApiAvailable()) return { live: false };
+  try {
+    const data = await getUsageSummaryByRole();
+    return { live: true, ...data };
+  } catch (error) {
+    console.error('[usageService] summary-by-role load failed:', error.message);
+    return { live: false, error: error.message };
+  }
+};
+
+export const getVideoMinutesSeries = () =>
+  apiGet('/api/v1/usage/video-minutes-series');
+
+export const loadVideoMinutesSeries = async () => {
+  if (!usageApiAvailable()) return { live: false, series: [] };
+  try {
+    const data = await getVideoMinutesSeries();
+    return { live: true, series: data?.series || [] };
+  } catch (error) {
+    console.error('[usageService] video-minutes-series load failed:', error.message);
+    return { live: false, series: [], error: error.message };
+  }
+};
+
+export const getVoiceCharsSeries = () =>
+  apiGet('/api/v1/usage/voice-chars-series');
+
+export const loadVoiceCharsSeries = async () => {
+  if (!usageApiAvailable()) return { live: false, series: [] };
+  try {
+    const data = await getVoiceCharsSeries();
+    return { live: true, series: data?.series || [] };
+  } catch (error) {
+    console.error('[usageService] voice-chars-series load failed:', error.message);
+    return { live: false, series: [], error: error.message };
+  }
+};
+
+export const getOpenAiTokensSeries = () =>
+  apiGet('/api/v1/usage/openai-tokens-series');
+
+export const loadOpenAiTokensSeries = async () => {
+  if (!usageApiAvailable()) return { live: false, series: [] };
+  try {
+    const data = await getOpenAiTokensSeries();
+    return { live: true, series: data?.series || [] };
+  } catch (error) {
+    console.error('[usageService] openai-tokens-series load failed:', error.message);
+    return { live: false, series: [], error: error.message };
+  }
+};
+
+export const getMessagesModalitySeries = () =>
+  apiGet('/api/v1/usage/messages-modality-series');
+
+export const loadMessagesModalitySeries = async () => {
+  if (!usageApiAvailable()) return { live: false, series: [] };
+  try {
+    const data = await getMessagesModalitySeries();
+    return { live: true, series: data?.series || [] };
+  } catch (error) {
+    console.error('[usageService] messages-modality-series load failed:', error.message);
+    return { live: false, series: [], error: error.message };
+  }
+};
+
 export default {
   usageApiAvailable,
   getTokenFacts,
@@ -77,4 +134,14 @@ export default {
   getUsageSummary,
   buildTokenTimeSeries,
   loadTokenUsage,
+  getUsageSummaryByRole,
+  loadUsageSummaryByRole,
+  getVideoMinutesSeries,
+  loadVideoMinutesSeries,
+  getVoiceCharsSeries,
+  loadVoiceCharsSeries,
+  getOpenAiTokensSeries,
+  loadOpenAiTokensSeries,
+  getMessagesModalitySeries,
+  loadMessagesModalitySeries,
 };

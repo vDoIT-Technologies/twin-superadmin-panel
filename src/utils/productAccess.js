@@ -1,11 +1,11 @@
 const PRODUCT_ACCESS = {
   twin: {
     label: 'Twin Protocol',
-    paths: ['/', '/profile', '/clients', '/twins', '/users', '/services', '/financial', '/usage', '/telemetry'],
+    paths: ['/', '/profile', '/clients', '/twins', '/users', '/services', '/usage'],
   },
   vault: {
     label: 'Vault',
-    paths: ['/', '/profile', '/clients', '/users', '/services', '/vault', '/plans', '/financial', '/usage', '/telemetry'],
+    paths: ['/', '/profile', '/clients', '/users', '/services', '/vault', '/plans', '/usage'],
   },
 };
 
@@ -16,7 +16,6 @@ export function getAdminProduct(role) {
   if (normalized.includes('vault')) return 'vault';
   if (normalized.includes('twin') || normalized.includes('platform')) return 'twin';
 
-  // Preserve the existing platform experience for older sessions that only say "SuperAdmin".
   return 'twin';
 }
 
