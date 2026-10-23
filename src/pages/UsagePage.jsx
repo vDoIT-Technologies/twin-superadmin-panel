@@ -4,23 +4,19 @@ import { FilterContext } from '../app/FilterContext';
 import { areaChart, stackedBar } from '../utils/chartHelpers';
 import { formatNumber } from '../utils/dashboardUtils.jsx';
 import { useAuth } from '../app/AuthContext';
+import { FilterDropdown } from '../components/common/FilterDropdown';
 import {
   loadUsageSummaryByRole,
   loadVideoMinutesSeries,
   loadVoiceCharsSeries,
   loadOpenAiTokensSeries,
-  loadMessagesModalitySeries, 
+  loadMessagesModalitySeries,
 } from '../services/usageService';
-
-const metricCards = [
-  { key: 'messages', label: 'Messages', icon: MessageSquareMore, tone: 'indigo' },
-  { key: 'tokens', label: 'OpenAI tokens', icon: Cpu, tone: 'emerald' },
-  { key: 'videoMins', label: 'Video minutes', icon: Video, tone: 'violet' },
-  { key: 'voiceChars', label: 'Voice chars', icon: Mic, tone: 'sky' },
-];
 
 function formatAxisMillions(value) {
   if (value === 0) return '0';
+  if (value < 1000) return value.toString(); 
+  if (value < 1000000) return `${(value / 1e3).toFixed(1)}k`; 
   return `${(value / 1e6).toFixed(2)}M`;
 }
 
@@ -29,10 +25,35 @@ function formatAxisBillions(value) {
   return `${(value / 1e9).toFixed(2)}B`;
 }
 
+const formatCompact = (num) => {
+  if (num == null) return '0';
+  if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
+  if (num >= 1000) return `${(num / 1000).toFixed(1)}k`; // Show 'k' for thousands
+  return new Intl.NumberFormat('en-US').format(num);
+};
+
 export function UsagePage() {
   const { adminProduct } = useAuth();
-  const { filters } = useContext(FilterContext);
-  
+  const { filters, setFilters } = useContext(FilterContext);
+
+  const isVault = adminProduct === 'vault';
+  const metricCards = [
+    { key: 'messages', label: 'Messages', icon: MessageSquareMore, tone: 'indigo' },
+    { key: 'tokens', label: 'OpenAI tokens', icon: Cpu, tone: 'emerald' },
+    {
+      key: 'videoMins',
+      label: isVault ? 'Transcribed Minutes' : 'Video minutes',
+      icon: Video,
+      tone: 'violet'
+    },
+    {
+      key: 'voiceChars',
+      label: isVault ? 'Transcription Credits' : 'Voice chars',
+      icon: Mic,
+      tone: 'sky'
+    },
+  ];
+
   const modalityRef = useRef(null);
   const tokensRef = useRef(null);
   const videoRef = useRef(null);
@@ -47,14 +68,14 @@ export function UsagePage() {
   useEffect(() => {
     let cancelled = false;
 
-    loadUsageSummaryByRole().then((r) => { if (!cancelled) setRoleSummary(r); });
-    loadVideoMinutesSeries().then((r) => { if (!cancelled) setVideoSeries(r); });
-    loadVoiceCharsSeries().then((r) => { if (!cancelled) setVoiceSeries(r); });
-    loadOpenAiTokensSeries().then((r) => { if (!cancelled) setOpenAiSeries(r); });
-    loadMessagesModalitySeries().then((r) => { if (!cancelled) setModalitySeries(r); });
+    loadUsageSummaryByRole(filters).then((r) => { if (!cancelled) setRoleSummary(r); });
+    loadVideoMinutesSeries(filters).then((r) => { if (!cancelled) setVideoSeries(r); });
+    loadVoiceCharsSeries(filters).then((r) => { if (!cancelled) setVoiceSeries(r); });
+    loadOpenAiTokensSeries(filters).then((r) => { if (!cancelled) setOpenAiSeries(r); });
+    loadMessagesModalitySeries(filters).then((r) => { if (!cancelled) setModalitySeries(r); });
 
     return () => { cancelled = true; };
-  }, []);
+  }, [filters]);
 
   const liveCards = roleSummary?.live ? roleSummary.cards : null;
 
@@ -99,25 +120,51 @@ export function UsagePage() {
 
   const videoChartData = useMemo(() => {
     const points = videoSeries?.series || [];
+    
+    const labels = points.map((p) => {
+      const [y, m] = p.month.split('-');
+      return `${m}/${y.slice(2)}`;
+    });
+
+    if (isVault) {
+      return {
+        labels,
+        datasets: [
+          { label: 'Audio Transcribed (mins)', color: '#0ea5e9', data: points.map((p) => p.audio) },
+          { label: 'Video Transcribed (mins)', color: '#a855f7', data: points.map((p) => p.video) },
+        ],
+      };
+    }
+
     return {
-      labels: points.map((p) => {
-        const [y, m] = p.month.split('-');
-        return `${m}/${y.slice(2)}`;
-      }),
+      labels,
       datasets: [{ label: 'Video minutes', color: '#a855f7', data: points.map((p) => p.value) }],
     };
-  }, [videoSeries]);
+  }, [videoSeries, isVault]);
 
   const voiceChartData = useMemo(() => {
     const points = voiceSeries?.series || [];
+    
+    const labels = points.map((p) => {
+      const [y, m] = p.month.split('-');
+      return `${m}/${y.slice(2)}`;
+    });
+
+    if (isVault) {
+      return {
+        labels,
+        datasets: [
+          { label: 'Audio Credits', color: '#0ea5e9', data: points.map((p) => p.audio) },
+          { label: 'Video Credits', color: '#a855f7', data: points.map((p) => p.video) },
+        ],
+      };
+    }
+
     return {
-      labels: points.map((p) => {
-        const [y, m] = p.month.split('-');
-        return `${m}/${y.slice(2)}`;
-      }),
+      labels,
       datasets: [{ label: 'Voice chars', color: '#0ea5e9', data: points.map((p) => p.value) }],
     };
-  }, [voiceSeries]);
+  }, [voiceSeries, isVault]);
 
   useEffect(() => {
     const charts = [];
@@ -163,12 +210,33 @@ export function UsagePage() {
   }, [modalityChartData, openAiChartData, videoChartData, voiceChartData]);
 
   return (
-    <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+    <section className="px-4 py-6 sm:px-6 lg:px-8">
+      {/* Filter Row - reduced bottom margin to fix gap */}
+      <div className="mb-4 flex justify-end">
+        <div className="w-64">
+          <FilterDropdown
+            value={filters.envs.length === 1 ? filters.envs[0] : null}
+            onChange={(value) => setFilters((current) => ({ ...current, envs: value ? [value] : ['dev', 'staging', 'prod'] }))}
+            options={[
+              { value: 'dev', label: 'Development' },
+              { value: 'staging', label: 'Staging' },
+              { value: 'prod', label: 'Production' },
+            ]}
+            placeholder="All environments"
+            searchPlaceholder="Search environment..."
+            searchable={false}
+            tone={isVault ? 'vault' : 'twin'}
+          />
+        </div>
+      </div>
+
+      {/* Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {metricCards.map((card) => {
           const Icon = card.icon;
           const cardValue = cardValueFor(card.key);
           const hasValue = cardValue != null;
+          const displayValue = hasValue ? formatCompact(cardValue) : '—';
 
           return (
             <article key={card.key} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
@@ -182,8 +250,11 @@ export function UsagePage() {
                   </span>
                 ) : null}
               </div>
-              <h2 className="mt-4 text-2xl font-bold tracking-tight text-slate-800">
-                {hasValue ? formatNumber(cardValue) : '—'}
+              <h2 
+                className="mt-4 max-w-full truncate text-2xl font-bold tracking-tight text-slate-800" 
+                title={displayValue}
+              >
+                {displayValue}
               </h2>
               <p className="mt-1 text-sm text-slate-400">{card.label}</p>
             </article>
@@ -191,7 +262,8 @@ export function UsagePage() {
         })}
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
+      {/* Charts Row 1 */}
+      <div className="mt-6 grid gap-4 xl:grid-cols-2">
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-base font-semibold text-slate-800">Messages by modality</h2>
@@ -225,10 +297,13 @@ export function UsagePage() {
         </section>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      {/* Charts Row 2 */}
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-base font-semibold text-slate-800">Video minutes</h2>
+            <h2 className="text-base font-semibold text-slate-800">
+              {isVault ? 'Transcribed Minutes (Video + Audio)' : 'Video minutes'}
+            </h2>
             {videoSeries?.live ? (
               <span className="text-xs font-semibold text-emerald-600">live · monthly</span>
             ) : null}
@@ -244,7 +319,9 @@ export function UsagePage() {
 
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-base font-semibold text-slate-800">Voice characters</h2>
+            <h2 className="text-base font-semibold text-slate-800">
+              {isVault ? 'Transcription Credits' : 'Voice characters'}
+            </h2>
             {voiceSeries?.live ? (
               <span className="text-xs font-semibold text-emerald-600">live · monthly</span>
             ) : null}

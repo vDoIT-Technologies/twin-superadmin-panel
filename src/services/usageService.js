@@ -56,13 +56,13 @@ export const loadTokenUsage = async (filters) => {
   }
 };
 
-export const getUsageSummaryByRole = () =>
-  apiGet('/api/v1/usage/summary-by-role');
+export const getUsageSummaryByRole = (filters) =>
+  apiGet('/api/v1/usage/summary-by-role', mapServerFilters(filters));
 
-export const loadUsageSummaryByRole = async () => {
+export const loadUsageSummaryByRole = async (filters) => {
   if (!usageApiAvailable()) return { live: false };
   try {
-    const data = await getUsageSummaryByRole();
+    const data = await getUsageSummaryByRole(filters);
     return { live: true, ...data };
   } catch (error) {
     console.error('[usageService] summary-by-role load failed:', error.message);
@@ -70,13 +70,13 @@ export const loadUsageSummaryByRole = async () => {
   }
 };
 
-export const getVideoMinutesSeries = () =>
-  apiGet('/api/v1/usage/video-minutes-series');
+export const getVideoMinutesSeries = (filters) =>
+  apiGet('/api/v1/usage/video-minutes-series', mapServerFilters(filters));
 
-export const loadVideoMinutesSeries = async () => {
+export const loadVideoMinutesSeries = async (filters) => {
   if (!usageApiAvailable()) return { live: false, series: [] };
   try {
-    const data = await getVideoMinutesSeries();
+    const data = await getVideoMinutesSeries(filters);
     return { live: true, series: data?.series || [] };
   } catch (error) {
     console.error('[usageService] video-minutes-series load failed:', error.message);
@@ -84,13 +84,13 @@ export const loadVideoMinutesSeries = async () => {
   }
 };
 
-export const getVoiceCharsSeries = () =>
-  apiGet('/api/v1/usage/voice-chars-series');
+export const getVoiceCharsSeries = (filters) =>
+  apiGet('/api/v1/usage/voice-chars-series', mapServerFilters(filters));
 
-export const loadVoiceCharsSeries = async () => {
+export const loadVoiceCharsSeries = async (filters) => {
   if (!usageApiAvailable()) return { live: false, series: [] };
   try {
-    const data = await getVoiceCharsSeries();
+    const data = await getVoiceCharsSeries(filters);
     return { live: true, series: data?.series || [] };
   } catch (error) {
     console.error('[usageService] voice-chars-series load failed:', error.message);
@@ -98,13 +98,13 @@ export const loadVoiceCharsSeries = async () => {
   }
 };
 
-export const getOpenAiTokensSeries = () =>
-  apiGet('/api/v1/usage/openai-tokens-series');
+export const getOpenAiTokensSeries = (filters) =>
+  apiGet('/api/v1/usage/openai-tokens-series', mapServerFilters(filters));
 
-export const loadOpenAiTokensSeries = async () => {
+export const loadOpenAiTokensSeries = async (filters) => {
   if (!usageApiAvailable()) return { live: false, series: [] };
   try {
-    const data = await getOpenAiTokensSeries();
+    const data = await getOpenAiTokensSeries(filters);
     return { live: true, series: data?.series || [] };
   } catch (error) {
     console.error('[usageService] openai-tokens-series load failed:', error.message);
@@ -112,13 +112,13 @@ export const loadOpenAiTokensSeries = async () => {
   }
 };
 
-export const getMessagesModalitySeries = () =>
-  apiGet('/api/v1/usage/messages-modality-series');
+export const getMessagesModalitySeries = (filters) =>
+  apiGet('/api/v1/usage/messages-modality-series', mapServerFilters(filters));
 
-export const loadMessagesModalitySeries = async () => {
+export const loadMessagesModalitySeries = async (filters) => {
   if (!usageApiAvailable()) return { live: false, series: [] };
   try {
-    const data = await getMessagesModalitySeries();
+    const data = await getMessagesModalitySeries(filters);
     return { live: true, series: data?.series || [] };
   } catch (error) {
     console.error('[usageService] messages-modality-series load failed:', error.message);
