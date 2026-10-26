@@ -267,7 +267,7 @@ export function UsagePage() {
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-base font-semibold text-slate-800">Messages by modality</h2>
             {modalitySeries?.live ? (
-              <span className="text-xs font-semibold text-slate-400">monthly</span>
+              <span className="text-xs font-semibold text-slate-400">Monthly</span>
             ) : null}
           </div>
           <div className="relative mt-4 h-72">
@@ -283,7 +283,7 @@ export function UsagePage() {
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-base font-semibold text-slate-800">OpenAI tokens</h2>
             {openAiSeries?.live ? (
-              <span className="text-xs font-semibold text-slate-400">monthly</span>
+              <span className="text-xs font-semibold text-slate-400">Monthly</span>
             ) : null}
           </div>
           <div className="relative mt-4 h-72">
@@ -304,7 +304,7 @@ export function UsagePage() {
               {isVault ? 'Transcribed Minutes (Video + Audio)' : 'Video minutes'}
             </h2>
             {videoSeries?.live ? (
-              <span className="text-xs font-semibold text-slate-400">monthly</span>
+              <span className="text-xs font-semibold text-slate-400">Monthly</span>
             ) : null}
           </div>
           <div className="relative mt-4 h-60">
@@ -322,7 +322,7 @@ export function UsagePage() {
               {isVault ? 'Transcription Credits' : 'Voice characters'}
             </h2>
             {voiceSeries?.live ? (
-              <span className="text-xs font-semibold text-slate-400">monthly</span>
+              <span className="text-xs font-semibold text-slate-400">Monthly</span>
             ) : null}
           </div>
           <div className="relative mt-4 h-60">
