@@ -80,7 +80,7 @@ export function AppLayout() {
   const isStandalonePage = ['/plans', '/financial', '/usage', '/telemetry'].some((route) =>
     location.pathname === route || location.pathname.startsWith(`${route}/`),
   );
-  const showFilterBar = location.pathname !== '/profile' && location.pathname !== '/vault' && !isEntityRoute && !isStandalonePage;
+  const showFilterBar = location.pathname !== '/profile' && location.pathname !== '/vault' && location.pathname !== '/services' && !isEntityRoute && !isStandalonePage;
   const showOverviewControls = false;
   const visibleScopes = location.pathname === '/'
     ? ['granularity', 'client', 'service']

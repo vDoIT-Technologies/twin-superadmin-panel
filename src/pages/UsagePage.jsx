@@ -15,8 +15,8 @@ import {
 
 function formatAxisMillions(value) {
   if (value === 0) return '0';
-  if (value < 1000) return value.toString(); 
-  if (value < 1000000) return `${(value / 1e3).toFixed(1)}k`; 
+  if (value < 1000) return value.toString();
+  if (value < 1000000) return `${(value / 1e3).toFixed(1)}k`;
   return `${(value / 1e6).toFixed(2)}M`;
 }
 
@@ -67,15 +67,16 @@ export function UsagePage() {
 
   useEffect(() => {
     let cancelled = false;
+    const activeFilters = { envs: filters.envs };
 
-    loadUsageSummaryByRole(filters).then((r) => { if (!cancelled) setRoleSummary(r); });
-    loadVideoMinutesSeries(filters).then((r) => { if (!cancelled) setVideoSeries(r); });
-    loadVoiceCharsSeries(filters).then((r) => { if (!cancelled) setVoiceSeries(r); });
-    loadOpenAiTokensSeries(filters).then((r) => { if (!cancelled) setOpenAiSeries(r); });
-    loadMessagesModalitySeries(filters).then((r) => { if (!cancelled) setModalitySeries(r); });
+    loadUsageSummaryByRole(activeFilters).then((r) => { if (!cancelled) setRoleSummary(r); });
+    loadVideoMinutesSeries(activeFilters).then((r) => { if (!cancelled) setVideoSeries(r); });
+    loadVoiceCharsSeries(activeFilters).then((r) => { if (!cancelled) setVoiceSeries(r); });
+    loadOpenAiTokensSeries(activeFilters).then((r) => { if (!cancelled) setOpenAiSeries(r); });
+    loadMessagesModalitySeries(activeFilters).then((r) => { if (!cancelled) setModalitySeries(r); });
 
     return () => { cancelled = true; };
-  }, [filters]);
+  }, [filters.envs]);
 
   const liveCards = roleSummary?.live ? roleSummary.cards : null;
 
@@ -120,7 +121,7 @@ export function UsagePage() {
 
   const videoChartData = useMemo(() => {
     const points = videoSeries?.series || [];
-    
+
     const labels = points.map((p) => {
       const [y, m] = p.month.split('-');
       return `${m}/${y.slice(2)}`;
@@ -144,7 +145,7 @@ export function UsagePage() {
 
   const voiceChartData = useMemo(() => {
     const points = voiceSeries?.series || [];
-    
+
     const labels = points.map((p) => {
       const [y, m] = p.month.split('-');
       return `${m}/${y.slice(2)}`;
@@ -248,9 +249,9 @@ export function UsagePage() {
                   </span>
                 ) : null}
               </div>
-              <h2 
-                className="mt-4 max-w-full truncate text-2xl font-bold tracking-tight text-slate-800" 
-                title={displayValue}
+              <h2
+                className="mt-4 max-w-full truncate text-2xl font-bold tracking-tight text-slate-800"
+                title={hasValue ? formatNumber(cardValue) : '—'}
               >
                 {displayValue}
               </h2>

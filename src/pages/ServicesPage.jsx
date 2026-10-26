@@ -4,7 +4,7 @@ import { dashboardService } from '../services';
 import { useAuth } from '../app/AuthContext';
 
 const VAULT_ONLY_SERVICE_PATTERN = /vault|filebase|ipfs|storage|object.?store/i;
-const HIDDEN_SERVICE_PATTERN = /^(apify|d-?id)$/i;
+const HIDDEN_SERVICE_PATTERN = /^(apify|d-?id|aws|openai|open_ai)$/i; 
 
 const statusTone = {
   'Not Configured': 'border-amber-200 bg-amber-50 text-amber-700',
