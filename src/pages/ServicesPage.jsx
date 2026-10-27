@@ -3,8 +3,7 @@ import { AlertCircle, Clock3, RefreshCw } from 'lucide-react';
 import { dashboardService } from '../services';
 import { useAuth } from '../app/AuthContext';
 
-const VAULT_ONLY_SERVICE_PATTERN = /vault|filebase|ipfs|storage|object.?store/i;
-const HIDDEN_SERVICE_PATTERN = /^(apify|d-?id|aws|openai|open_ai)$/i; 
+const HIDDEN_SERVICE_PATTERN = /^(apify|d-?id|aws|openai|open_ai)$/i;
 
 const statusTone = {
   'Not Configured': 'border-amber-200 bg-amber-50 text-amber-700',
@@ -144,7 +143,9 @@ export function ServicesPage() {
   }, [reloadKey]);
 
   const serviceList = services ? Object.entries(services)
-    .filter(([name]) => !VAULT_ONLY_SERVICE_PATTERN.test(name) && !HIDDEN_SERVICE_PATTERN.test(name))
+    .filter(([name]) => {
+      return !HIDDEN_SERVICE_PATTERN.test(name);
+    })
     .map(([name, info]) => {
       const key = name.toLowerCase();
       const reportedStatus = info?.status || 'Unknown';
