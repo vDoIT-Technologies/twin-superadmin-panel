@@ -152,12 +152,20 @@ export function normalizeStorageClient(client, index) {
     : firstNumber(rawStorage);
   const envValue = String(client.env ?? client.environment ?? client.__env ?? 'dev').toLowerCase();
 
+  const storageGbResolved =
+    storageGb ??
+    (storageTb != null ? storageTb * 1024 : storageBytes != null ? storageBytes / BYTES_PER_GB : parsedStorageGb ?? 0);
+  const storageBytesResolved =
+    storageBytes ??
+    (storageGbResolved != null ? storageGbResolved * BYTES_PER_GB : 0);
+
   return {
     id: clientId == null ? null : String(clientId),
     rank: firstNumber(client.rank) ?? index + 1,
     name: client.clientName ?? client.name ?? client.companyName ?? details.name ?? details.companyName ?? 'Unknown client',
     env: envValue === 'development' ? 'dev' : envValue === 'production' ? 'prod' : envValue,
-    storageGb: storageGb ?? (storageTb != null ? storageTb * 1024 : storageBytes != null ? storageBytes / BYTES_PER_GB : parsedStorageGb ?? 0),
+    storageGb: storageGbResolved,
+    storageBytes: storageBytesResolved,  
     files: firstNumber(client.files, client.fileCount, client.filesCount, client.totalFiles) ?? 0,
   };
 }
