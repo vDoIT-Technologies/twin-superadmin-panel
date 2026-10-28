@@ -106,7 +106,6 @@ export function VaultPage() {
     { label: 'Total files', value: formatNumber(totalFiles), icon: Package, tone: 'violet' },
     { label: 'Active drives · users', value: String(activeDrives), icon: Users, tone: 'rose' },
     { label: 'Quota utilization', value: `${Number(quotaPercent || 0).toFixed(1)}%`, icon: Gauge, tone: 'indigo' },
-    { label: 'Available capacity', value: `${formatNumber(Math.max(0, storageLimit - storageUsed))} GB`, icon: Database, tone: 'sky' },
   ];
 
   if (isLoading) {

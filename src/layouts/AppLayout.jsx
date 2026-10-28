@@ -80,7 +80,7 @@ export function AppLayout() {
   const isStandalonePage = ['/plans', '/financial', '/usage', '/telemetry'].some((route) =>
     location.pathname === route || location.pathname.startsWith(`${route}/`),
   );
-  const showFilterBar = location.pathname !== '/profile' && location.pathname !== '/vault' && !isEntityRoute && !isStandalonePage;
+  const showFilterBar = location.pathname !== '/profile' && location.pathname !== '/vault' && location.pathname !== '/services' && !isEntityRoute && !isStandalonePage;
   const showOverviewControls = false;
   const visibleScopes = location.pathname === '/'
     ? ['granularity', 'client', 'service']
@@ -465,7 +465,7 @@ export function AppLayout() {
             </div>
 
             <div className={`flex min-w-0 items-center justify-end gap-2 ${isMobileSearchOpen ? 'w-full flex-1' : ''}`}>
-              <div className={`relative min-w-0 ${isMobileSearchOpen ? 'flex-1' : 'w-9 sm:w-64'}`} ref={searchRef}>
+              {/* <div className={`relative min-w-0 ${isMobileSearchOpen ? 'flex-1' : 'w-9 sm:w-64'}`} ref={searchRef}>
                 {!isMobileSearchOpen ? (
                   <button
                     type="button"
@@ -546,7 +546,7 @@ export function AppLayout() {
                     )}
                   </div>
                 ) : null}
-              </div>
+              </div> */}
 
               <button className="inline-grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-transparent text-slate-600 transition hover:bg-slate-100" type="button" aria-label="Notifications">
                 <Bell size={16} />

@@ -116,7 +116,7 @@ export function TopUsersTable({ users, sortConfig, onSort, onExport }) {
                     {envBadge(user.env)}
                   </td>
                   <td className="px-5 py-4 text-right font-semibold tabular-nums text-slate-700">
-                    {user.storageMB} MB
+                    {user.storageGB} GB
                   </td>
                   <td className="px-5 py-4 text-right tabular-nums text-slate-500">
                     {formatNumber(user.files)}
