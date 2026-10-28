@@ -1,12 +1,22 @@
 import { ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { envBadge } from '../../utils/dashboardUtils';
-import { formatStorageGb, getUserInitials } from '../../utils/vaultFormatters';
+import { formatBytes, getUserInitials } from '../../utils/vaultFormatters';
+
+function getClientStorageBytes(client) {
+  const bytes = Number(client?.storageBytes);
+  if (Number.isFinite(bytes) && bytes >= 0) return bytes;
+
+  const gb = Number(client?.storageGb);
+  if (Number.isFinite(gb) && gb >= 0) return gb * 1024 ** 3;
+
+  return 0;
+}
 
 export function StorageByClientCard({ clients }) {
   const navigate = useNavigate();
   const totalStorage = Math.max(
-    clients.reduce((acc, client) => acc + (Number(client.storageGb) || 0), 0),
+    clients.reduce((acc, client) => acc + getClientStorageBytes(client), 0),
     0.001,
   );
 
@@ -25,7 +35,8 @@ export function StorageByClientCard({ clients }) {
           <div className="py-8 text-center text-sm text-slate-400">No client storage data found</div>
         ) : (
           clients.map((client) => {
-            const sharePercent = ((client.storageGb / totalStorage) * 100).toFixed(1);
+            const storageBytes = getClientStorageBytes(client);
+            const sharePercent = ((storageBytes / totalStorage) * 100).toFixed(1);
             return (
               <button
                 key={client.id ? `${client.id}-${client.env}` : `${client.rank}-${client.name}-${client.env}`}
@@ -55,12 +66,16 @@ export function StorageByClientCard({ clients }) {
                   <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-slate-100">
                     <span
                       className="block h-full rounded-full bg-sky-400"
-                      style={{ width: `${Math.max(0, Math.min(100, (client.storageGb / totalStorage) * 100))}%` }}
+                      style={{
+                        width: `${Math.max(0, Math.min(100, (storageBytes / totalStorage) * 100))}%`,
+                      }}
                     />
                   </span>
                 </span>
                 <span className="flex w-24 shrink-0 flex-col text-right">
-                  <strong className="text-sm text-slate-700">{formatStorageGb(client.storageGb)}</strong>
+                  <strong className="text-sm text-slate-700">
+                    {formatBytes(storageBytes)}
+                  </strong>
                   <span className="text-xs text-slate-400">{sharePercent}% of total</span>
                 </span>
                 <ChevronRight
