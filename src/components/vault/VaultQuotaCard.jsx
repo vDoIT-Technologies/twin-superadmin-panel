@@ -1,15 +1,25 @@
 import { AlertTriangle, Database } from 'lucide-react';
-import { formatQuotaPercent } from '../../utils/vaultFormatters';
+import { formatBytes, formatQuotaPercent } from '../../utils/vaultFormatters';
 
-function formatStorageGb(value) {
-  const amount = Number(value) || 0;
-  if (amount >= 1024) {
-    return `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(amount / 1024)} TB`;
-  }
-  return `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(amount)} GB`;
+function resolveStorageBytes(storageUsedBytes, storageUsed) {
+  const bytes = Number(storageUsedBytes);
+  if (Number.isFinite(bytes) && bytes >= 0) return bytes;
+
+  const gb = Number(storageUsed);
+  if (Number.isFinite(gb) && gb >= 0) return gb * 1024 ** 3;
+
+  return 0;
 }
 
-export function VaultQuotaCard({ percentage, storageUsed, storageLimit, product = 'vault', variant = 'card' }) {
+export function VaultQuotaCard({
+  percentage,
+  storageUsed,
+  storageUsedBytes,
+  storageLimit,
+  product = 'vault',
+  variant = 'card',
+}) {
+  const usedBytes = resolveStorageBytes(storageUsedBytes, storageUsed);
   const hasLimit = storageLimit != null && Number(storageLimit) > 0 && String(storageLimit) !== 'unlimited';
   const boundedPercentage = hasLimit ? Math.min(100, Math.max(0, Number(percentage) || 0)) : null;
   const isTwin = product === 'twin';
@@ -33,7 +43,7 @@ export function VaultQuotaCard({ percentage, storageUsed, storageLimit, product 
         </div>
 
         <div className="mt-10">
-          <strong className="text-5xl font-bold tracking-tight text-slate-800 sm:text-6xl">{formatStorageGb(storageUsed)}</strong>
+          <strong className="text-5xl font-bold tracking-tight text-slate-800 sm:text-6xl">{formatBytes(usedBytes)}</strong>
           <p className="mt-3 text-xl text-slate-400 sm:text-2xl">
             {hasLimit ? `of ${(storageLimit)} TB provisioned limit` : 'Total pinned storage'}
           </p>
@@ -76,7 +86,7 @@ export function VaultQuotaCard({ percentage, storageUsed, storageLimit, product 
           </div>
 
           <div>
-            <strong className="text-2xl font-bold tracking-tight text-slate-800">{formatStorageGb(storageUsed)}</strong>
+            <strong className="text-2xl font-bold tracking-tight text-slate-800">{formatBytes(usedBytes)}</strong>
             <span className="ml-2 text-sm text-slate-400">used</span>
             <p className="mt-0.5 text-xs text-slate-400">{hasLimit ? `${(storageLimit)} TB provisioned` : 'Pay-as-you-go storage'}</p>
           </div>
@@ -114,7 +124,7 @@ export function VaultQuotaCard({ percentage, storageUsed, storageLimit, product 
       <div className="mt-5">
         <div className="flex items-end justify-between gap-4">
           <div className="flex flex-col">
-            <strong className="text-3xl font-bold tracking-tight text-slate-800">{formatStorageGb(storageUsed)}</strong>
+            <strong className="text-3xl font-bold tracking-tight text-slate-800">{formatBytes(usedBytes)}</strong>
             <span className="mt-1 text-sm text-slate-400">
               {hasLimit ? `of ${(storageLimit)} TB provisioned limit` : 'Total pinned storage'}
             </span>

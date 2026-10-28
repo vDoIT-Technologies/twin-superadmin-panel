@@ -152,54 +152,78 @@ export function LoginOtpPage() {
     }
   };
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
+const handleSubmit = async (event) => {
+  event.preventDefault();
 
-    if (!pendingChallenge || otp.length !== OTP_LENGTH) {
-      return;
+  if (!pendingChallenge || otp.length !== OTP_LENGTH) {
+    return;
+  }
+
+  try {
+    await verifyLoginOtp({
+      email: pendingChallenge.email,
+      otp,
+      challengeId: pendingChallenge.challengeId,
+      verificationToken: pendingChallenge.verificationToken,
+    });
+    clearPendingLoginOtpChallenge();
+    navigate(pendingChallenge.nextPath ?? '/', { replace: true });
+  } catch (error) {
+    const message = error?.message || 'Unable to verify the login code.';
+    setErrorMessage(message);
+    const mustRestartLogin =
+      /no login otp was issued|not issued for login|has expired/i.test(message);
+
+    if (mustRestartLogin) {
+      window.setTimeout(() => {
+        clearPendingLoginOtpChallenge();
+        navigate('/login', {
+          replace: true,
+          state: { authError: message },
+        });
+      }, 1500);
     }
+  }
+};
 
-    try {
-      await verifyLoginOtp({
-        email: pendingChallenge.email,
-        otp,
-        challengeId: pendingChallenge.challengeId,
-        verificationToken: pendingChallenge.verificationToken,
-      });
+const handleResendOtp = async () => {
+  if (!pendingChallenge || resendCooldown > 0) {
+    return;
+  }
+
+  setErrorMessage('');
+
+  try {
+    const challenge = await resendLoginOtp({
+      email: pendingChallenge.email,
+      challengeId: pendingChallenge.challengeId,
+      verificationToken: pendingChallenge.verificationToken,
+    });
+
+    const nextChallenge = {
+      ...pendingChallenge,
+      ...challenge,
+    };
+
+    setPendingChallenge(nextChallenge);
+    persistPendingLoginOtpChallenge(nextChallenge);
+    setResendCooldown(RESEND_TIMEOUT_SECONDS);
+    setInfoMessage(challenge.message ?? 'A fresh verification code has been sent to your email.');
+  } catch (error) {
+    const message = error?.message || 'Unable to resend the login code right now.';
+
+    if (/login otp has expired|sign in with your password/i.test(message)) {
       clearPendingLoginOtpChallenge();
-      navigate(pendingChallenge.nextPath ?? '/', { replace: true });
-    } catch (error) {
-      setErrorMessage(error.message);
-    }
-  };
-
-  const handleResendOtp = async () => {
-    if (!pendingChallenge || resendCooldown > 0) {
+      navigate('/login', {
+        replace: true,
+        state: { authError: message },
+      });
       return;
     }
 
-    setErrorMessage('');
-
-    try {
-      const challenge = await resendLoginOtp({
-        email: pendingChallenge.email,
-        challengeId: pendingChallenge.challengeId,
-        verificationToken: pendingChallenge.verificationToken,
-      });
-
-      const nextChallenge = {
-        ...pendingChallenge,
-        ...challenge,
-      };
-
-      setPendingChallenge(nextChallenge);
-      persistPendingLoginOtpChallenge(nextChallenge);
-      setResendCooldown(RESEND_TIMEOUT_SECONDS);
-      setInfoMessage(challenge.message ?? 'A fresh verification code has been sent to your email.');
-    } catch (error) {
-      setErrorMessage(error.message);
-    }
-  };
+    setErrorMessage(message);
+  }
+};
 
   const handleBackToLogin = () => {
     clearPendingLoginOtpChallenge();
