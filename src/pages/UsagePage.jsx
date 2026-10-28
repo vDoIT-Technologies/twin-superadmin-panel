@@ -1,37 +1,22 @@
 import { useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { Cpu, HardDrive, MessageSquareMore, Mic, Video } from 'lucide-react';
+import { Cpu, MessageSquareMore, Mic, Video } from 'lucide-react';
 import { FilterContext } from '../app/FilterContext';
-import { superadminDemoData } from '../demo-data/superadminDemoData';
-import { selectFacts, sumMetric, timeSeries } from '../demo-data/superadminSelectors';
 import { areaChart, stackedBar } from '../utils/chartHelpers';
-import { deltaPercent, formatNumber } from '../utils/dashboardUtils.jsx';
-import { DataTable } from '../components/common/DataTable.jsx';
-import { loadTokenUsage } from '../services/usageService';
+import { formatNumber } from '../utils/dashboardUtils.jsx';
 import { useAuth } from '../app/AuthContext';
-import { isServiceForProduct } from '../utils/productAccess';
-
-const formatUSD = (value) =>
-  `$${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-const metricCards = [
-  { key: 'messages', label: 'Messages', icon: MessageSquareMore, tone: 'indigo' },
-  { key: 'tokens', label: 'OpenAI tokens', icon: Cpu, tone: 'emerald' },
-  { key: 'videoMins', label: 'Video minutes', icon: Video, tone: 'violet' },
-  { key: 'voiceChars', label: 'Voice chars', icon: Mic, tone: 'sky' },
-  { key: 'storageGB', label: 'Storage (GB)', icon: HardDrive, tone: 'amber' },
-];
-
-function formatScopeLabel(filters) {
-  if (filters.envs.length === superadminDemoData.ENVS.length) {
-    return `All envs · last ${filters.range}`;
-  }
-  const separator = filters.envs.length > 1 ? ' + ' : ', ';
-  const envLabel = filters.envs.map((env) => superadminDemoData.ENV_META[env]?.label ?? env).join(separator);
-  return `${envLabel} · last ${filters.range}`;
-}
+import { FilterDropdown } from '../components/common/FilterDropdown';
+import {
+  loadUsageSummaryByRole,
+  loadVideoMinutesSeries,
+  loadVoiceCharsSeries,
+  loadOpenAiTokensSeries,
+  loadMessagesModalitySeries,
+} from '../services/usageService';
 
 function formatAxisMillions(value) {
   if (value === 0) return '0';
+  if (value < 1000) return value.toString();
+  if (value < 1000000) return `${(value / 1e3).toFixed(1)}k`;
   return `${(value / 1e6).toFixed(2)}M`;
 }
 
@@ -40,171 +25,154 @@ function formatAxisBillions(value) {
   return `${(value / 1e9).toFixed(2)}B`;
 }
 
+const formatCompact = (num) => {
+  if (num == null) return '0';
+  if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
+  if (num >= 1000) return `${(num / 1000).toFixed(1)}k`; // Show 'k' for thousands
+  return new Intl.NumberFormat('en-US').format(num);
+};
+
 export function UsagePage() {
   const { adminProduct } = useAuth();
-  const { filters } = useContext(FilterContext);
+  const { filters, setFilters } = useContext(FilterContext);
+
+  const isVault = adminProduct === 'vault';
+  const metricCards = [
+    { key: 'messages', label: 'Messages', icon: MessageSquareMore, tone: 'indigo' },
+    { key: 'tokens', label: 'OpenAI tokens', icon: Cpu, tone: 'emerald' },
+    {
+      key: 'videoMins',
+      label: isVault ? 'Transcribed Minutes' : 'Video minutes',
+      icon: Video,
+      tone: 'violet'
+    },
+    {
+      key: 'voiceChars',
+      label: isVault ? 'Transcription Credits' : 'Voice chars',
+      icon: Mic,
+      tone: 'sky'
+    },
+  ];
+
   const modalityRef = useRef(null);
   const tokensRef = useRef(null);
   const videoRef = useRef(null);
   const voiceRef = useRef(null);
-  const storageRef = useRef(null);
-  const apiRef = useRef(null);
 
-  const scopedFilters = useMemo(
-    () => ({
-      ...filters,
-      service: adminProduct === 'vault' ? 'vault' : null,
-      vendor: null,
-    }),
-    [adminProduct, filters],
-  );
+  const [roleSummary, setRoleSummary] = useState(null);
+  const [videoSeries, setVideoSeries] = useState(null);
+  const [voiceSeries, setVoiceSeries] = useState(null);
+  const [openAiSeries, setOpenAiSeries] = useState(null);
+  const [modalitySeries, setModalitySeries] = useState(null);
 
-  const rows = useMemo(
-    () => selectFacts(scopedFilters).filter((row) => isServiceForProduct(adminProduct, row.service)),
-    [adminProduct, scopedFilters],
-  );
-  const scopeLabel = useMemo(() => formatScopeLabel(filters), [filters]);
-  const labels = useMemo(() => timeSeries(rows, 'messages', scopedFilters).labels, [rows, scopedFilters]);
-
-  const summary = useMemo(
-    () => ({
-      messages: sumMetric(rows, 'messages', scopedFilters),
-      tokens: sumMetric(rows, 'tokens', scopedFilters),
-      videoMins: sumMetric(rows, 'videoMins', scopedFilters),
-      voiceChars: sumMetric(rows, 'voiceChars', scopedFilters),
-      storageGB: sumMetric(rows, 'storageGB', scopedFilters),
-    }),
-    [rows, scopedFilters],
-  );
-
-  const modalityData = useMemo(
-    () => [
-      { label: 'Text', color: '#4f46e5', data: timeSeries(rows, 'mText', scopedFilters).values },
-      { label: 'Audio', color: '#1d9bf0', data: timeSeries(rows, 'mAudio', scopedFilters).values },
-      { label: 'Video', color: '#a855f7', data: timeSeries(rows, 'mVideo', scopedFilters).values },
-    ],
-    [rows, scopedFilters],
-  );
-
-  const tokenSeries = useMemo(
-    () => [{ label: 'Tokens', color: '#10b981', data: timeSeries(rows, 'tokens', scopedFilters).values }],
-    [rows, scopedFilters],
-  );
-
-  // Live OpenAI token usage from the SuperAdmin backend (falls back to demo).
-  const [liveUsage, setLiveUsage] = useState(null);
   useEffect(() => {
     let cancelled = false;
-    loadTokenUsage(scopedFilters).then((result) => {
-      if (!cancelled) setLiveUsage(result);
-    });
-    return () => {
-      cancelled = true;
+    const activeFilters = { envs: filters.envs };
+
+    loadUsageSummaryByRole(activeFilters).then((r) => { if (!cancelled) setRoleSummary(r); });
+    loadVideoMinutesSeries(activeFilters).then((r) => { if (!cancelled) setVideoSeries(r); });
+    loadVoiceCharsSeries(activeFilters).then((r) => { if (!cancelled) setVoiceSeries(r); });
+    loadOpenAiTokensSeries(activeFilters).then((r) => { if (!cancelled) setOpenAiSeries(r); });
+    loadMessagesModalitySeries(activeFilters).then((r) => { if (!cancelled) setModalitySeries(r); });
+
+    return () => { cancelled = true; };
+  }, [filters.envs]);
+
+  const liveCards = roleSummary?.live ? roleSummary.cards : null;
+
+  const cardValueFor = (key) => {
+    if (!liveCards) return null;
+    if (key === 'messages') return liveCards.messages;
+    if (key === 'tokens') return liveCards.openAiTokens;
+    if (key === 'videoMins') return liveCards.videoMinutes;
+    if (key === 'voiceChars') return liveCards.voiceChars;
+    return null;
+  };
+
+  const modalityChartData = useMemo(() => {
+    const points = modalitySeries?.series || [];
+    return {
+      labels: points.map((p) => {
+        const [y, m] = p.month.split('-');
+        return `${m}/${y.slice(2)}`;
+      }),
+      datasets: [
+        { label: 'Text', color: '#4f46e5', data: points.map((p) => p.text) },
+        ...(points.some((p) => p.audio > 0)
+          ? [{ label: 'Audio', color: '#1d9bf0', data: points.map((p) => p.audio) }]
+          : []),
+        ...(points.some((p) => p.video > 0)
+          ? [{ label: 'Video', color: '#a855f7', data: points.map((p) => p.video) }]
+          : []),
+      ],
     };
-  }, [scopedFilters]);
+  }, [modalitySeries]);
 
-  const isLive = Boolean(liveUsage?.live);
-  // When live, the OpenAI-tokens card, chart and breakdown tables use real data.
-  const tokensValue = isLive ? liveUsage.totalTokens : summary.tokens;
-  const tokenLabels = isLive && liveUsage.labels?.length ? liveUsage.labels : labels;
-  const tokenChartSeries = useMemo(
-    () =>
-      isLive
-        ? [{ label: 'Tokens', color: '#10b981', data: liveUsage.values || [] }]
-        : tokenSeries,
-    [isLive, liveUsage, tokenSeries],
-  );
+  const openAiChartData = useMemo(() => {
+    const points = openAiSeries?.series || [];
+    return {
+      labels: points.map((p) => {
+        const [y, m] = p.month.split('-');
+        return `${m}/${y.slice(2)}`;
+      }),
+      datasets: [{ label: 'OpenAI tokens', color: '#10b981', data: points.map((p) => p.value) }],
+    };
+  }, [openAiSeries]);
 
-  // Per-user / per-client OpenAI token usage tables (live only).
-  const userUsageColumns = useMemo(
-    () => [
-      {
-        key: 'userId',
-        label: 'User (personaUserId)',
-        render: (r) => (r.userId && r.userId !== 'anonymous' ? `${String(r.userId).slice(0, 14)}…` : 'anonymous'),
-      },
-      { key: 'clientName', label: 'Client' },
-      { key: 'tokens', label: 'Tokens', align: 'right', render: (r) => formatNumber(r.tokens) },
-      { key: 'promptTokens', label: 'Prompt', align: 'right', render: (r) => formatNumber(r.promptTokens) },
-      { key: 'completionTokens', label: 'Completion', align: 'right', render: (r) => formatNumber(r.completionTokens) },
-      { key: 'apiCalls', label: 'Calls', align: 'right', render: (r) => formatNumber(r.apiCalls) },
-      { key: 'cost', label: 'Cost', align: 'right', render: (r) => formatUSD(r.cost) },
-    ],
-    [],
-  );
-  const userUsageRows = useMemo(
-    () => (liveUsage?.byUser || []).map((u) => ({ ...u, userId: u.userId || 'anonymous' })),
-    [liveUsage],
-  );
+  const videoChartData = useMemo(() => {
+    const points = videoSeries?.series || [];
 
-  const clientUsageColumns = useMemo(
-    () => [
-      { key: 'clientName', label: 'Client' },
-      { key: 'tokens', label: 'Tokens', align: 'right', render: (r) => formatNumber(r.tokens) },
-      { key: 'promptTokens', label: 'Prompt', align: 'right', render: (r) => formatNumber(r.promptTokens) },
-      { key: 'completionTokens', label: 'Completion', align: 'right', render: (r) => formatNumber(r.completionTokens) },
-      { key: 'apiCalls', label: 'Calls', align: 'right', render: (r) => formatNumber(r.apiCalls) },
-      { key: 'cost', label: 'Cost', align: 'right', render: (r) => formatUSD(r.cost) },
-    ],
-    [],
-  );
-  const clientUsageRows = useMemo(
-    () =>
-      (liveUsage?.byClient || []).map((c, i) => ({
-        ...c,
-        clientKey: c.clientId || c.clientName || `row-${i}`,
-      })),
-    [liveUsage],
-  );
+    const labels = points.map((p) => {
+      const [y, m] = p.month.split('-');
+      return `${m}/${y.slice(2)}`;
+    });
 
-  const videoSeries = useMemo(
-    () => [{ label: 'Video minutes', color: '#a855f7', data: timeSeries(rows, 'videoMins', scopedFilters).values }],
-    [rows, scopedFilters],
-  );
-
-  const voiceSeries = useMemo(
-    () => [{ label: 'Voice chars', color: '#0ea5e9', data: timeSeries(rows, 'voiceChars', scopedFilters).values }],
-    [rows, scopedFilters],
-  );
-
-  const storageSeries = useMemo(() => {
-    const base = timeSeries(rows, 'storageGB', scopedFilters).values;
-    let acc = 0;
-    return [{ label: 'Storage', color: '#f59e0b', data: base.map((value) => (acc += value)) }];
-  }, [rows, scopedFilters]);
-
-  const apiSeries = useMemo(
-    () => [{ label: 'API calls', color: '#4f46e5', data: timeSeries(rows, 'apiCalls', scopedFilters).values }],
-    [rows, scopedFilters],
-  );
-
-  const heatmap = useMemo(() => {
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    const grid = [];
-    let max = 0;
-
-    for (let day = 0; day < 7; day += 1) {
-      const row = [];
-      for (let hour = 0; hour < 24; hour += 1) {
-        const weekend = day >= 5 ? 0.55 : 1;
-        const value =
-          weekend *
-          (Math.exp(-Math.pow(hour - 10, 2) / 14) + 0.85 * Math.exp(-Math.pow(hour - 20, 2) / 10) + 0.06);
-        row.push(value);
-        max = Math.max(max, value);
-      }
-      grid.push({ day: days[day], row });
+    if (isVault) {
+      return {
+        labels,
+        datasets: [
+          { label: 'Audio Transcribed (mins)', color: '#0ea5e9', data: points.map((p) => p.audio) },
+          { label: 'Video Transcribed (mins)', color: '#a855f7', data: points.map((p) => p.video) },
+        ],
+      };
     }
 
-    return { grid, max };
-  }, []);
+    return {
+      labels,
+      datasets: [{ label: 'Video minutes', color: '#a855f7', data: points.map((p) => p.value) }],
+    };
+  }, [videoSeries, isVault]);
+
+  const voiceChartData = useMemo(() => {
+    const points = voiceSeries?.series || [];
+
+    const labels = points.map((p) => {
+      const [y, m] = p.month.split('-');
+      return `${m}/${y.slice(2)}`;
+    });
+
+    if (isVault) {
+      return {
+        labels,
+        datasets: [
+          { label: 'Audio Credits', color: '#0ea5e9', data: points.map((p) => p.audio) },
+          { label: 'Video Credits', color: '#a855f7', data: points.map((p) => p.video) },
+        ],
+      };
+    }
+
+    return {
+      labels,
+      datasets: [{ label: 'Voice chars', color: '#0ea5e9', data: points.map((p) => p.value) }],
+    };
+  }, [voiceSeries, isVault]);
 
   useEffect(() => {
     const charts = [];
 
-    if (modalityRef.current) {
+    if (modalityRef.current && modalityChartData.labels.length > 0) {
       charts.push(
-        stackedBar(modalityRef.current, labels, modalityData, {
+        stackedBar(modalityRef.current, modalityChartData.labels, modalityChartData.datasets, {
           legend: true,
           fmt: formatNumber,
           yfmt: formatAxisMillions,
@@ -212,45 +180,27 @@ export function UsagePage() {
       );
     }
 
-    if (tokensRef.current) {
+    if (tokensRef.current && openAiChartData.labels.length > 0) {
       charts.push(
-        areaChart(tokensRef.current, tokenLabels, tokenChartSeries, {
+        areaChart(tokensRef.current, openAiChartData.labels, openAiChartData.datasets, {
           fmt: formatNumber,
           yfmt: formatAxisBillions,
         }),
       );
     }
 
-    if (videoRef.current) {
+    if (videoRef.current && videoChartData.labels.length > 0) {
       charts.push(
-        areaChart(videoRef.current, labels, videoSeries, {
+        areaChart(videoRef.current, videoChartData.labels, videoChartData.datasets, {
           fmt: formatNumber,
           yfmt: (value) => (value === 0 ? '0' : `${(value / 1e3).toFixed(1)}k`),
         }),
       );
     }
 
-    if (voiceRef.current) {
+    if (voiceRef.current && voiceChartData.labels.length > 0) {
       charts.push(
-        areaChart(voiceRef.current, labels, voiceSeries, {
-          fmt: formatNumber,
-          yfmt: formatAxisMillions,
-        }),
-      );
-    }
-
-    if (storageRef.current) {
-      charts.push(
-        areaChart(storageRef.current, labels, storageSeries, {
-          fmt: formatNumber,
-          yfmt: formatAxisMillions,
-        }),
-      );
-    }
-
-    if (apiRef.current) {
-      charts.push(
-        areaChart(apiRef.current, labels, apiSeries, {
+        areaChart(voiceRef.current, voiceChartData.labels, voiceChartData.datasets, {
           fmt: formatNumber,
           yfmt: formatAxisMillions,
         }),
@@ -258,26 +208,34 @@ export function UsagePage() {
     }
 
     return () => charts.forEach((chart) => chart.destroy());
-  }, [apiSeries, labels, modalityData, storageSeries, tokenChartSeries, tokenLabels, videoSeries, voiceSeries]);
+  }, [modalityChartData, openAiChartData, videoChartData, voiceChartData]);
 
   return (
-    <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">{adminProduct === 'vault' ? 'Vault Usage Analytics' : 'Usage Analytics'}</h1>
-          <p className="mt-1 text-sm text-slate-400 sm:text-base">{adminProduct === 'vault' ? 'Vault-only storage, API traffic, user activity, and service consumption' : 'Deep time-series across modalities, tokens, media, storage and traffic'}</p>
+    <section className="px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mb-4 flex justify-end">
+        <div className="w-64">
+          <FilterDropdown
+            value={filters.envs.length === 1 ? filters.envs[0] : null}
+            onChange={(value) => setFilters((current) => ({ ...current, envs: value ? [value] : ['dev', 'staging', 'prod'] }))}
+            options={[
+              { value: 'dev', label: 'Development' },
+              { value: 'staging', label: 'Staging' },
+              { value: 'prod', label: 'Production' },
+            ]}
+            placeholder="All environments"
+            searchPlaceholder="Search environment..."
+            searchable={false}
+            tone={isVault ? 'vault' : 'twin'}
+          />
         </div>
-        <div className="text-left sm:text-right">
-          <span className="block text-xs font-bold uppercase tracking-widest text-slate-400">Scope</span>
-          <span className="mt-1 block text-sm font-semibold text-slate-500">{scopeLabel}</span>
-        </div>
-      </header>
+      </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {metricCards.map((card) => {
           const Icon = card.icon;
-          const delta = card.key === 'storageGB' ? null : deltaPercent(scopedFilters, card.key, null, adminProduct);
-          const cardValue = card.key === 'tokens' ? tokensValue : summary[card.key];
+          const cardValue = cardValueFor(card.key);
+          const hasValue = cardValue != null;
+          const displayValue = hasValue ? formatCompact(cardValue) : '—';
 
           return (
             <article key={card.key} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
@@ -285,165 +243,95 @@ export function UsagePage() {
                 <span className="grid h-9 w-9 place-items-center rounded-xl bg-indigo-50 text-indigo-600">
                   <Icon size={17} />
                 </span>
-                {card.key === 'tokens' && isLive ? (
-                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-600">live</span>
-                ) : delta != null ? (
-                  <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-600">↑ {Math.abs(delta).toFixed(1)}%</span>
+                {hasValue ? (
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-500">
+                    All time
+                  </span>
                 ) : null}
               </div>
-              <h2 className="mt-4 text-2xl font-bold tracking-tight text-slate-800">{formatNumber(cardValue)}</h2>
+              <h2
+                className="mt-4 max-w-full truncate text-2xl font-bold tracking-tight text-slate-800"
+                title={hasValue ? formatNumber(cardValue) : '—'}
+              >
+                {displayValue}
+              </h2>
               <p className="mt-1 text-sm text-slate-400">{card.label}</p>
             </article>
           );
         })}
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
+      {/* Charts Row 1 */}
+      <div className="mt-6 grid gap-4 xl:grid-cols-2">
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-base font-semibold text-slate-800">Messages by modality</h2>
-            <span className="text-xs text-slate-400">stacked, per day</span>
+            {modalitySeries?.live ? (
+              <span className="text-xs font-semibold text-slate-400">Monthly</span>
+            ) : null}
           </div>
           <div className="relative mt-4 h-72">
-            <canvas ref={modalityRef} />
+            {modalityChartData.labels.length > 0 ? (
+              <canvas ref={modalityRef} />
+            ) : (
+              <div className="flex h-full items-center justify-center text-sm text-slate-400">No data yet</div>
+            )}
           </div>
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-base font-semibold text-slate-800">OpenAI tokens</h2>
-            <span className="text-xs text-slate-400">{isLive ? 'live · PERSONA usage' : 'demo data'}</span>
+            {openAiSeries?.live ? (
+              <span className="text-xs font-semibold text-slate-400">Monthly</span>
+            ) : null}
           </div>
           <div className="relative mt-4 h-72">
-            <canvas ref={tokensRef} />
+            {openAiChartData.labels.length > 0 ? (
+              <canvas ref={tokensRef} />
+            ) : (
+              <div className="flex h-full items-center justify-center text-sm text-slate-400">No data yet</div>
+            )}
           </div>
         </section>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      {/* Charts Row 2 */}
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-base font-semibold text-slate-800">Video minutes</h2>
+            <h2 className="text-base font-semibold text-slate-800">
+              {isVault ? 'Transcribed Minutes (Video + Audio)' : 'Video minutes'}
+            </h2>
+            {videoSeries?.live ? (
+              <span className="text-xs font-semibold text-slate-400">Monthly</span>
+            ) : null}
           </div>
           <div className="relative mt-4 h-60">
-            <canvas ref={videoRef} />
+            {videoChartData.labels.length > 0 ? (
+              <canvas ref={videoRef} />
+            ) : (
+              <div className="flex h-full items-center justify-center text-sm text-slate-400">No data yet</div>
+            )}
           </div>
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-base font-semibold text-slate-800">Voice characters</h2>
+            <h2 className="text-base font-semibold text-slate-800">
+              {isVault ? 'Transcription Credits' : 'Voice characters'}
+            </h2>
+            {voiceSeries?.live ? (
+              <span className="text-xs font-semibold text-slate-400">Monthly</span>
+            ) : null}
           </div>
           <div className="relative mt-4 h-60">
-            <canvas ref={voiceRef} />
+            {voiceChartData.labels.length > 0 ? (
+              <canvas ref={voiceRef} />
+            ) : (
+              <div className="flex h-full items-center justify-center text-sm text-slate-400">No data yet</div>
+            )}
           </div>
-        </section>
-
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-base font-semibold text-slate-800">Storage growth (GB)</h2>
-          </div>
-          <div className="relative mt-4 h-60">
-            <canvas ref={storageRef} />
-          </div>
-        </section>
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-2">
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-base font-semibold text-slate-800">API call volume</h2>
-            <span className="text-xs text-slate-400">SDK gateway telemetry</span>
-          </div>
-          <div className="relative mt-4 h-72">
-            <canvas ref={apiRef} />
-          </div>
-        </section>
-
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-base font-semibold text-slate-800">Peak-hour heatmap</h2>
-            <span className="text-xs text-slate-400">UTC</span>
-          </div>
-          <div className="mt-4 space-y-2">
-            <div className="space-y-1.5">
-              {heatmap.grid.map((row) => (
-                <div key={row.day} className="flex items-center gap-2">
-                  <span className="w-8 text-xs font-semibold text-slate-400">{row.day}</span>
-                  <div className="flex flex-1 gap-1">
-                    {row.row.map((value, index) => {
-                      const ratio = value / heatmap.max;
-                      return (
-                        <span
-                          key={index}
-                          className="h-5 min-w-0 flex-1 rounded-xs transition hover:scale-110"
-                          style={{ backgroundColor: `rgba(79, 70, 229, ${0.10 + ratio * 0.90})` }}
-                        />
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
-              <div className="flex justify-between gap-6 pl-10 pr-2 font-mono">
-                <span>00</span>
-                <span>06</span>
-                <span>12</span>
-                <span>18</span>
-                <span>23</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span>low</span>
-                <div className="flex gap-0.5">
-                  {[0.12, 0.28, 0.44, 0.6, 0.76, 0.92].map((alpha) => (
-                    <span key={alpha} className="h-3 w-3 rounded-xs" style={{ backgroundColor: `rgba(79, 70, 229, ${alpha})` }} />
-                  ))}
-                </div>
-                <span>high</span>
-              </div>
-            </div>
-          </div>
-        </section>
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-2">
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
-          <div className="flex items-center justify-between gap-3 pb-3">
-            <h2 className="text-base font-semibold text-slate-800">OpenAI tokens by user</h2>
-            <span className="text-xs text-slate-400">{isLive ? 'live · per personaUserId' : 'connect backend for live data'}</span>
-          </div>
-          {isLive ? (
-            <DataTable
-              columns={userUsageColumns}
-              rows={userUsageRows}
-              rowKey="userId"
-              emptyMessage="No token usage in range"
-            />
-          ) : (
-            <p className="py-6 text-center text-xs text-slate-400">
-              Set <code className="rounded bg-slate-100 px-1 py-0.5">VITE_API_BASE_URL</code> (and a SuperAdmin token) to load real per-user OpenAI token usage.
-            </p>
-          )}
-        </section>
-
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
-          <div className="flex items-center justify-between gap-3 pb-3">
-            <h2 className="text-base font-semibold text-slate-800">OpenAI tokens by client</h2>
-            <span className="text-xs text-slate-400">{isLive ? 'live · reconciled to TWIN client' : 'connect backend for live data'}</span>
-          </div>
-          {isLive ? (
-            <DataTable
-              columns={clientUsageColumns}
-              rows={clientUsageRows}
-              rowKey="clientKey"
-              emptyMessage="No token usage in range"
-            />
-          ) : (
-            <p className="py-6 text-center text-xs text-slate-400">
-              Set <code className="rounded bg-slate-100 px-1 py-0.5">VITE_API_BASE_URL</code> (and a SuperAdmin token) to load real per-client OpenAI token usage.
-            </p>
-          )}
         </section>
       </div>
     </section>
