@@ -22,13 +22,13 @@ export const NAV_GROUPS_BY_ROLE = {
       { to: '/twins', label: 'Twins', icon: Bot },
       { to: '/users', label: 'Users', icon: Users },
     ] },
-    { label: 'Financials', items: [
-      { to: '/financial', label: 'Cost & Billing', icon: Wallet },
+    { label: 'Analytics', items: [
+      // { to: '/financial', label: 'Cost & Billing', icon: Wallet },
       { to: '/usage', label: 'Usage Analytics', icon: Activity },
     ] },
-    { label: 'System', items: [
-      { to: '/telemetry', label: 'Telemetry / Logs', icon: ScrollText },
-    ] },
+    // { label: 'System', items: [
+    //   { to: '/telemetry', label: 'Telemetry / Logs', icon: ScrollText },
+    // ] },
   ],
   vault: [
     { label: 'Monitor', items: [
@@ -43,13 +43,13 @@ export const NAV_GROUPS_BY_ROLE = {
     { label: 'Plans', items: [
       { to: '/plans', label: 'Plans', icon: Package },
     ] },
-    { label: 'Financials', items: [
-      { to: '/financial', label: 'Vault Billing', icon: Wallet },
+    { label: 'Analytics', items: [
+      // { to: '/financial', label: 'Vault Billing', icon: Wallet },
       { to: '/usage', label: 'Vault Usage Analytics', icon: Activity },
     ] },
-    { label: 'System', items: [
-      { to: '/telemetry', label: 'Health & Logs', icon: ScrollText },
-    ] },
+    // { label: 'System', items: [
+    //   { to: '/telemetry', label: 'Health & Logs', icon: ScrollText },
+    // ] },
   ],
   default: [
     { label: 'Monitor', items: [
