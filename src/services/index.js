@@ -34,3 +34,4 @@ export {
   getVaultSummaryByEnv,
   getCostByVendorSeries,
 } from './dropdownService';
+export { loadAppEnvironment } from './apiClient';

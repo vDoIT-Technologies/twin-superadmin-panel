@@ -83,19 +83,26 @@ export function normalizeStorageUsage(payload) {
 export function getTopUserStorageBytes(user) {
   const storageTb = firstNumber(user.storageTB, user.storageTb);
   if (storageTb != null && storageTb > 0) return storageTb * BYTES_PER_TB;
+
+  const rawStorage =
+    user.storageBytes ?? user.storageUsedBytes ?? user.storageUsed ?? user.storage;
+
+  if (rawStorage != null) {
+    if (typeof rawStorage === 'string') {
+      const match = rawStorage.trim().match(/^([\d.]+)\s*(TB|GB|MB|KB|B)?$/i);
+      if (match) {
+        const multipliers = { TB: BYTES_PER_TB, GB: BYTES_PER_GB, MB: 1024 ** 2, KB: 1024, B: 1 };
+        return Number(match[1]) * multipliers[match[2]?.toUpperCase() ?? 'B'];
+      }
+    }
+    const parsed = firstNumber(rawStorage);
+    if (parsed != null) return parsed;
+  }
+
   const storageGb = firstNumber(user.storageGB, user.storageGb);
   if (storageGb != null) return storageGb * BYTES_PER_GB;
-  if (storageTb === 0) return 0;
 
-  const rawStorage = user.storageBytes ?? user.storageUsedBytes ?? user.storageUsed ?? user.storage ?? 0;
-  if (typeof rawStorage === 'string') {
-    const match = rawStorage.trim().match(/^([\d.]+)\s*(TB|GB|MB|KB|B)?$/i);
-    if (match) {
-      const multipliers = { TB: BYTES_PER_TB, GB: BYTES_PER_GB, MB: 1024 ** 2, KB: 1024, B: 1 };
-      return Number(match[1]) * multipliers[match[2]?.toUpperCase() ?? 'B'];
-    }
-  }
-  return firstNumber(rawStorage) ?? 0;
+  return 0;
 }
 
 export function normalizeTopUser(user) {
@@ -188,4 +195,15 @@ export function exportTopUsersCsv(users) {
   link.download = 'top-users-by-storage.csv';
   link.click();
   URL.revokeObjectURL(url);
+}
+export function formatStorageUsage(usedBytes, limitBytes) {
+  const used = Number(usedBytes) || 0;
+  const limit = Number(limitBytes) || 0;
+
+  if (limit <= 0) {
+    return formatBytes(used);
+  }
+
+  const pct = Math.min(100, Math.round((used / limit) * 1000) / 10);
+  return `${formatBytes(used)} of ${formatBytes(limit)} (${pct}%)`;
 }

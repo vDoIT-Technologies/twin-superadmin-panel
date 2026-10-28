@@ -1,7 +1,7 @@
 import { ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { envBadge } from '../../utils/dashboardUtils';
-import { formatStorageGb, getUserInitials } from '../../utils/vaultFormatters';
+import { formatBytes, getUserInitials } from '../../utils/vaultFormatters';
 
 export function StorageByClientCard({ clients }) {
   const navigate = useNavigate();
@@ -60,7 +60,9 @@ export function StorageByClientCard({ clients }) {
                   </span>
                 </span>
                 <span className="flex w-24 shrink-0 flex-col text-right">
-                  <strong className="text-sm text-slate-700">{formatStorageGb(client.storageGb)}</strong>
+                  <strong className="text-sm text-slate-700">
+                    {formatBytes((client.storageGb || 0) * 1024 ** 3)}
+                  </strong>
                   <span className="text-xs text-slate-400">{sharePercent}% of total</span>
                 </span>
                 <ChevronRight
