@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Coins,
+  Database,
   MessagesSquare,
   Percent,
   Plus,
@@ -24,6 +25,8 @@ import { FilterContext } from '../app/FilterContext';
 import { TruncatedText } from '../components/common/TruncatedText';
 import { envBadge, formatCost, formatNumber, formatRevenueWhole, ServiceUsageRow, TruncatedValue } from '../utils/dashboardUtils';
 import { GrantPackageModal } from '../components/vault/GrantPackageModal';
+import { formatBytes } from '../utils/vaultFormatters';
+
 const DETAIL_PAGE_SIZE = 10;
 
 function getInitials(name) {
@@ -401,15 +404,6 @@ export function ClientDetailPage() {
   const clientRevenue = kpis?.revenue;
   const clientCost = firstDecimal(kpis?.cost, displayedTotalCost);
   const clientUsersCount = kpis?.vaultUsers;
-  const formatBytes = (bytes) => {
-    if (!bytes) return '0 B';
-    const num = Number(bytes);
-    if (num >= 1099511627776) return `${(num / 1099511627776).toFixed(2)} TB`;
-    if (num >= 1073741824) return `${(num / 1073741824).toFixed(2)} GB`;
-    if (num >= 1048576) return `${(num / 1048576).toFixed(1)} MB`;
-    if (num >= 1024) return `${(num / 1024).toFixed(0)} KB`;
-    return `${num} B`;
-  };
 
   const formatDateShort = (val) => {
     if (!val) return '-';
@@ -1054,13 +1048,6 @@ export function UserDetailPage() {
       ? 'Not provided'
       : date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
   };
-
-  const formatStorageAllowance = (storageGB) => {
-    const value = Number(storageGB);
-    if (!Number.isFinite(value)) return 'Not provided';
-    return value >= 1024 && value % 1024 === 0 ? `${value / 1024} TB` : `${formatNumber(value)} GB`;
-  };
-
   return (
     <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       <DetailHeader
@@ -1110,6 +1097,15 @@ export function UserDetailPage() {
           value={formatOptionalNumber(firstDecimal(kpis?.pointsSpent ?? 0))}
           tone="indigo"
         />
+        {isVault ? (
+          <MetricCard
+            icon={Database}
+            label="Storage used"
+            value={formatBytes(profile?.storageUsedBytes ?? 0)}
+            meta={profile?.storageLimitBytes > 0 ? `of ${formatBytes(profile.storageLimitBytes)}` : undefined}
+            tone="sky"
+          />
+        ) : null}
       </div>
 
       {/* User Info + linked product usage */}
@@ -1136,6 +1132,46 @@ export function UserDetailPage() {
                 {profile?.env || '-'}
               </strong>
             </div>
+
+            {isVault ? (
+              <>
+                <div className="flex items-center justify-between gap-4 overflow-hidden px-5 py-3 text-xs">
+                  <span className="shrink-0 text-slate-400">Storage used</span>
+                  <strong className="min-w-0 flex-1 truncate text-right font-semibold text-slate-700">
+                    {formatBytes(profile?.storageUsedBytes ?? 0)}
+                  </strong>
+                </div>
+
+                <div className="flex items-center justify-between gap-4 overflow-hidden px-5 py-3 text-xs">
+                  <span className="shrink-0 text-slate-400">Storage limit</span>
+                  <strong className="min-w-0 flex-1 truncate text-right font-semibold text-slate-700">
+                    {profile?.storageLimitBytes > 0 ? formatBytes(profile.storageLimitBytes) : 'No limit'}
+                  </strong>
+                </div>
+
+                {profile?.storageLimitBytes > 0 ? (
+                  <div className="px-5 py-3">
+                    <div className="mb-1.5 flex items-center justify-between text-[11px] font-medium text-slate-500">
+                      <span>Storage utilization</span>
+                      <strong className="text-slate-700">
+                        {Math.min(100, Math.round((profile.storageUsedBytes / profile.storageLimitBytes) * 1000) / 10)}%
+                      </strong>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                      <span
+                        className={`block h-full rounded-full ${profile.storageUsedBytes / profile.storageLimitBytes > 0.9
+                          ? 'bg-rose-500'
+                          : profile.storageUsedBytes / profile.storageLimitBytes > 0.75
+                            ? 'bg-amber-500'
+                            : 'bg-emerald-500'
+                          }`}
+                        style={{ width: `${Math.min(100, (profile.storageUsedBytes / profile.storageLimitBytes) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                ) : null}
+              </>
+            ) : null}
           </div>
         </CardSection>
 

@@ -3,6 +3,7 @@ import {
   AUTH_SESSION_CHANGED_EVENT,
   authService,
   clearAuthToken,
+  loadAppEnvironment,
   persistStoredSession,
   readStoredSession,
   refreshAccessToken,
@@ -49,6 +50,7 @@ export function AuthProvider({ children }) {
       isLoggingOut: false,
       session: initialSession,
       profile: defaultProfileFromSession(initialSession),
+      appEnvironment: null,
     };
   });
 
@@ -83,7 +85,15 @@ export function AuthProvider({ children }) {
 
     return () => { active = false; };
   }, [authState.isBootstrapping]);
-
+  useEffect(() => {
+    let active = true;
+    loadAppEnvironment().then((env) => {
+      if (active) {
+        setAuthState((prev) => ({ ...prev, appEnvironment: env }));
+      }
+    });
+    return () => { active = false; };
+  }, []);
   useEffect(() => {
     persistStoredSession(authState.session);
   }, [authState.session]);
@@ -148,6 +158,8 @@ export function AuthProvider({ children }) {
       user: authState.session?.user ?? null,
       profile: authState.profile,
       adminProduct: getAdminProduct(authState.profile?.role ?? authState.session?.user?.role),
+      appEnvironment: authState.appEnvironment,
+
       async login(credentials) {
         setAuthState((prev) => ({ ...prev, isLoading: true }));
 

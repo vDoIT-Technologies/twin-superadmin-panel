@@ -35,3 +35,18 @@ export async function apiGet(path, params = {}) {
   // SuccessResponse wraps payloads as { success, message, data }.
   return json && Object.prototype.hasOwnProperty.call(json, 'data') ? json.data : json;
 }
+let cachedAppEnvironment = null;
+
+export async function loadAppEnvironment() {
+  if (cachedAppEnvironment) return cachedAppEnvironment;
+
+  try {
+    const response = await api.get('/health');
+    const env = response?.data?.data?.environment ?? null;
+    cachedAppEnvironment = ['dev', 'staging', 'prod'].includes(env) ? env : null;
+  } catch {
+    cachedAppEnvironment = null;
+  }
+
+  return cachedAppEnvironment;
+}
