@@ -58,6 +58,7 @@ export function LoginOtpPage() {
     initialChallenge?.message ?? 'Enter the 6-digit code sent to your email to continue.',
   );
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [isLockedOut, setIsLockedOut] = useState(false);
   const inputRefs = useRef([]);
 
   useEffect(() => {
@@ -152,78 +153,102 @@ export function LoginOtpPage() {
     }
   };
 
-const handleSubmit = async (event) => {
-  event.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
 
-  if (!pendingChallenge || otp.length !== OTP_LENGTH) {
-    return;
-  }
+    if (!pendingChallenge || otp.length !== OTP_LENGTH) {
+      return;
+    }
 
-  try {
-    await verifyLoginOtp({
-      email: pendingChallenge.email,
-      otp,
-      challengeId: pendingChallenge.challengeId,
-      verificationToken: pendingChallenge.verificationToken,
-    });
-    clearPendingLoginOtpChallenge();
-    navigate(pendingChallenge.nextPath ?? '/', { replace: true });
-  } catch (error) {
-    const message = error?.message || 'Unable to verify the login code.';
-    setErrorMessage(message);
-    const mustRestartLogin =
-      /no login otp was issued|not issued for login|has expired/i.test(message);
+    setErrorMessage('');
+    setInfoMessage('');
 
-    if (mustRestartLogin) {
-      window.setTimeout(() => {
+    try {
+      await verifyLoginOtp({
+        email: pendingChallenge.email,
+        otp,
+        challengeId: pendingChallenge.challengeId,
+        verificationToken: pendingChallenge.verificationToken,
+      });
+      clearPendingLoginOtpChallenge();
+      navigate(pendingChallenge.nextPath ?? '/', { replace: true });
+    } catch (error) {
+      const status = error?.response?.status || error?.statusCode || error?.status;
+      const backendMessage = error?.response?.data?.message || error?.message;
+
+      const message = backendMessage && backendMessage !== 'Request failed with status code 429'
+        ? backendMessage
+        : 'Too many incorrect attempts. Please request a new code.';
+
+      setErrorMessage(message);
+
+      setOtp('');
+      if (inputRefs.current[0]) {
+        inputRefs.current[0].focus();
+      }
+
+      const isTooManyAttempts = status === 429 || /too many incorrect attempts/i.test(message);
+      const mustRestartLogin = /no login otp was issued|not issued for login|has expired/i.test(message);
+
+      if (isTooManyAttempts) {
+        setIsLockedOut(true);
+        setResendCooldown(0);
+        setInfoMessage('Request a new code to continue.');
+        return;
+      }
+
+      if (mustRestartLogin) {
+        window.setTimeout(() => {
+          clearPendingLoginOtpChallenge();
+          navigate('/login', {
+            replace: true,
+            state: { authError: message },
+          });
+        }, 1500);
+      }
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (!pendingChallenge || resendCooldown > 0) {
+      return;
+    }
+
+    setErrorMessage('');
+    setIsLockedOut(false);
+
+    try {
+      const challenge = await resendLoginOtp({
+        email: pendingChallenge.email,
+        challengeId: pendingChallenge.challengeId,
+        verificationToken: pendingChallenge.verificationToken,
+      });
+
+      const nextChallenge = {
+        ...pendingChallenge,
+        ...challenge,
+      };
+
+      setPendingChallenge(nextChallenge);
+      persistPendingLoginOtpChallenge(nextChallenge);
+      setResendCooldown(RESEND_TIMEOUT_SECONDS);
+      setInfoMessage(challenge.message ?? 'A fresh verification code has been sent to your email.');
+    } catch (error) {
+      const backendMessage = error?.response?.data?.message || error?.message;
+      const message = backendMessage || 'Unable to resend the login code right now.';
+
+      if (/login otp has expired|sign in with your password/i.test(message)) {
         clearPendingLoginOtpChallenge();
         navigate('/login', {
           replace: true,
           state: { authError: message },
         });
-      }, 1500);
+        return;
+      }
+
+      setErrorMessage(message);
     }
-  }
-};
-
-const handleResendOtp = async () => {
-  if (!pendingChallenge || resendCooldown > 0) {
-    return;
-  }
-
-  setErrorMessage('');
-
-  try {
-    const challenge = await resendLoginOtp({
-      email: pendingChallenge.email,
-      challengeId: pendingChallenge.challengeId,
-      verificationToken: pendingChallenge.verificationToken,
-    });
-
-    const nextChallenge = {
-      ...pendingChallenge,
-      ...challenge,
-    };
-
-    setPendingChallenge(nextChallenge);
-    persistPendingLoginOtpChallenge(nextChallenge);
-    setResendCooldown(RESEND_TIMEOUT_SECONDS);
-    setInfoMessage(challenge.message ?? 'A fresh verification code has been sent to your email.');
-  } catch (error) {
-    const message = error?.message || 'Unable to resend the login code right now.';
-
-    if (/login otp has expired|sign in with your password/i.test(message)) {
-      clearPendingLoginOtpChallenge();
-      navigate('/login', {
-        replace: true,
-        state: { authError: message },
-      });
-      return;
-    }
-
-    setErrorMessage(message);
-  }
-};
+  };
 
   const handleBackToLogin = () => {
     clearPendingLoginOtpChallenge();
@@ -291,13 +316,12 @@ const handleResendOtp = async () => {
                     ref={(element) => {
                       inputRefs.current[index] = element;
                     }}
-                    className={`h-14 w-11 rounded-2xl border text-center text-xl font-bold transition-all duration-150 outline-none sm:h-16 sm:w-14 ${
-                      isFilled
-                        ? 'border-blue-500 bg-white text-blue-700 shadow-sm ring-2 ring-blue-500/10'
-                        : isCurrentActive
+                    className={`h-14 w-11 rounded-2xl border text-center text-xl font-bold transition-all duration-150 outline-none sm:h-16 sm:w-14 ${isFilled
+                      ? 'border-blue-500 bg-white text-blue-700 shadow-sm ring-2 ring-blue-500/10'
+                      : isCurrentActive
                         ? 'border-blue-500 bg-white text-slate-900 ring-4 ring-blue-500/20 shadow-md'
                         : 'border-slate-200/90 bg-slate-100/80 text-slate-800 hover:border-slate-300 hover:bg-slate-100'
-                    }`}
+                      }`}
                     type="text"
                     inputMode="numeric"
                     autoComplete={index === 0 ? 'one-time-code' : 'off'}
@@ -327,8 +351,12 @@ const handleResendOtp = async () => {
               )}
             </div>
 
-            <button type="submit" className="mt-2 inline-flex h-11 items-center justify-center gap-2 rounded-xl border-0 bg-gradient-to-r from-indigo-600 to-blue-600 px-4.5 text-xs font-bold text-white shadow-lg shadow-indigo-500/25 transition hover:brightness-105 disabled:cursor-wait disabled:opacity-75" disabled={isLoading || otp.length !== OTP_LENGTH}>
-              <span>{isLoading ? 'Verifying OTP...' : 'Verify OTP'}</span>
+            <button
+              type="submit"
+              className="mt-2 inline-flex h-11 items-center justify-center gap-2 rounded-xl border-0 bg-gradient-to-r from-indigo-600 to-blue-600 px-4.5 text-xs font-bold text-white shadow-lg shadow-indigo-500/25 transition hover:brightness-105 disabled:cursor-wait disabled:opacity-75"
+              disabled={isLoading || otp.length !== OTP_LENGTH || isLockedOut}
+            >
+              <span>{isLockedOut ? 'Too many attempts' : (isLoading ? 'Verifying OTP...' : 'Verify OTP')}</span>
               <Lock size={16} />
             </button>
           </form>

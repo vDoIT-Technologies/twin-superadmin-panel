@@ -1075,7 +1075,7 @@ export function UserDetailPage() {
 
         <MetricCard
           icon={TrendingUp}
-          label="Revenue"
+          label="Usage Value"
           value={isVault
             ? (revenueValue == null ? '---' : formatRevenueWhole(revenueValue))
             : formatRevenueWhole(revenue?.totalAmount)}
