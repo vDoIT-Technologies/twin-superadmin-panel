@@ -400,7 +400,6 @@ export function ClientDetailPage() {
   const setTabPage = (tab, page) => setTabPages((current) => ({ ...current, [tab]: page }));
   const clientName = profile?.name || profile?.organizationName || '';
   const plan = profile?.plan || '';
-  // Vault client API values have a fixed contract, so use its KPI fields directly.
   const clientRevenue = kpis?.revenue;
   const clientCost = firstDecimal(kpis?.cost, displayedTotalCost);
   const clientUsersCount = kpis?.vaultUsers;
@@ -514,20 +513,6 @@ export function ClientDetailPage() {
                   <div className="flex items-center justify-between gap-4 bg-slate-50/70 px-5 py-3 text-xs"><span className="font-semibold text-slate-500">Total cost</span><strong className="w-24 min-w-0 text-right font-bold text-slate-900 sm:w-28 lg:w-32"><TruncatedValue value={formatOptionalCost(displayedTotalCost)} className="w-full text-right" /></strong></div>
                 </>
               ) : (
-                // <>
-                //   <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-4 bg-slate-50 px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                //     <span>Service used</span><span className="text-right">Usage</span><span className="w-20 text-right">Cost</span>
-                //   </div>
-                //   {serviceUsageRows.map((service) => (
-                //     <div key={service.key} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-4 px-5 py-3 text-xs">
-                //       <strong className="truncate font-semibold text-slate-700">{service.label}</strong>
-                //       <span className="text-right tabular-nums text-slate-500">{service.units == null ? '---' : `${formatNumber(service.units)}${service.unitLabel ? ` ${service.unitLabel}` : ''}`}</span>
-                //       <strong className="w-20 text-right font-semibold tabular-nums text-slate-800">{formatOptionalCurrency(service.cost)}</strong>
-                //     </div>
-                //   ))}
-                //   {serviceUsageRows.length === 0 ? <EmptyDetailState message="Service usage and cost data was not returned by the API." /> : null}
-                //   <div className="flex items-center justify-between bg-slate-50/70 px-5 py-3 text-xs"><span className="font-semibold text-slate-500">Total cost</span><strong className="font-bold text-slate-900">{formatOptionalCurrency(displayedTotalCost)}</strong></div>
-                // </>
                 <>
                   <div className="divide-y divide-slate-100">
                     <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-4 bg-slate-50 px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
@@ -768,7 +753,7 @@ export function TwinDetailPage() {
       />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <MetricCard icon={TrendingUp} label="Revenue" value={formatRevenueWhole(kpis?.revenue || 0)} tone="emerald" />{/* <MetricCard icon={Wallet} label="Cost" value={formatCurrency(kpis?.cost || 0)} tone="rose" /> */}
+        <MetricCard icon={TrendingUp} label="Usage Value" value={formatRevenueWhole(kpis?.revenue || 0)} tone="emerald" />
         <MetricCard icon={MessagesSquare} label="Messages" value={formatNumber(kpis?.messages || kpis?.messagesCount || 0)} tone="indigo" />
         <MetricCard icon={BookOpen} label="Knowledge Files" value={formatNumber(kpis?.knowledgeFiles || kpis?.knowledgeSources || kpis?.sourcesCount || 0)} tone="amber" />
       </div>
