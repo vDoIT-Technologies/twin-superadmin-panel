@@ -15,7 +15,6 @@ import {
 } from '../services';
 import {
   Search,
-  Bell,
   Building2,
   Bot,
   Columns2,
@@ -548,9 +547,9 @@ export function AppLayout() {
                 ) : null}
               </div> */}
 
-              <button className="inline-grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-transparent text-slate-600 transition hover:bg-slate-100" type="button" aria-label="Notifications">
+              {/* <button className="inline-grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-transparent text-slate-600 transition hover:bg-slate-100" type="button" aria-label="Notifications">
                 <Bell size={16} />
-              </button>
+              </button> */}
 
               <div className="relative" ref={profileMenuRef}>
                 <button
