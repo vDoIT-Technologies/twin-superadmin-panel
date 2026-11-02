@@ -438,7 +438,7 @@ export function ClientDetailPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <MetricCard icon={TrendingUp} label="Revenue" value={formatRevenueWhole(kpis?.revenue || 0)} tone="emerald" />
+          <MetricCard icon={TrendingUp} label="Usage Value" value={formatRevenueWhole(kpis?.revenue || 0)} tone="emerald" />
           <MetricCard icon={Wallet} label="Cost" value={formatOptionalCost(displayedTotalCost)} tone="rose" />
           <MetricCard icon={Bot} label="Twins" value={String(kpis?.twinsCount || 0)} tone="indigo" />
           <MetricCard icon={Users} label="Users" value={String(kpis?.usersCount || 0)} tone="amber" />
@@ -1075,7 +1075,7 @@ export function UserDetailPage() {
 
         <MetricCard
           icon={TrendingUp}
-          label="Usage Value"
+          label="Revenue"
           value={isVault
             ? (revenueValue == null ? '---' : formatRevenueWhole(revenueValue))
             : formatRevenueWhole(revenue?.totalAmount)}
