@@ -176,6 +176,11 @@ export function TwinsPage() {
     const env = typeof environment === 'string' ? environment.toLowerCase() : environment?.id ?? environment?.name ?? '';
     const detailRoute = env ? `/twins/${id}?env=${encodeURIComponent(env)}` : `/twins/${id}`;
 
+    const revenue = parseOptionalNumber(
+      t.totalRevenue ?? t.revenueAmount ?? t.revenue ??
+      t.usage?.totalRevenue ?? t.usage?.revenue ??
+      t.kpis?.totalRevenue ?? t.kpis?.revenue,
+    );
 
     return {
       id,
@@ -189,13 +194,13 @@ export function TwinsPage() {
       clientName,
       usersCount,
       cost: parseOptionalNumber(t.cost ?? t.totalCost ?? t.usageCost ?? t.cogs ?? t.usage?.totalCost ?? t.usage?.cost ?? t.kpis?.totalCost ?? t.kpis?.cost),
-      revenue: parseOptionalNumber(t.totalRevenue ?? t.revenueAmount ?? t.revenue ?? t.usage?.totalRevenue ?? t.usage?.revenue ?? t.kpis?.totalRevenue ?? t.kpis?.revenue),
+      revenue,
+      usageValue: revenue,
       totalPoints: parseOptionalNumber(t.totalPoints ?? t.points ?? t.pointsBalance ?? t.pointBalance ?? t.balance ?? t.kpis?.totalPoints ?? t.kpis?.pointsBalance),
       pointsSpent: parseOptionalNumber(t.pointsSpent ?? t.spentPoints ?? t.totalPointsSpent ?? t.pointsUsed ?? t.points_spent ?? t.kpis?.pointsSpent ?? t.kpis?.totalPointsSpent),
       status,
     };
   }), [apiTwins, clientNamesById]);
-
 
   const filteredRows = useMemo(() => {
     const selectedClientId = getId(filters.client);
@@ -219,6 +224,8 @@ export function TwinsPage() {
         formatCost(twin.cost),
         twin.revenue,
         formatRevenue(twin.revenue),
+        twin.usageValue,
+        formatRevenue(twin.usageValue),
         twin.totalPoints,
         formatOptionalNumber(twin.totalPoints),
         twin.pointsSpent,
@@ -236,7 +243,7 @@ export function TwinsPage() {
         case 'client': return t.client;
         case 'users': return t.usersCount;
         case 'cost': return t.cost;
-        case 'revenue': return t.revenue;
+        case 'usageValue': return t.usageValue;
         case 'totalPoints': return t.totalPoints;
         case 'pointsSpent': return t.pointsSpent;
         case 'status': return t.status;
@@ -353,7 +360,15 @@ export function TwinsPage() {
             <table key="twins-nine-column-layout" className="w-full min-w-[1120px] border-collapse text-sm [&_td]:!text-left [&_td>div]:justify-start [&_th]:!text-left">
               <thead className="sticky top-0 z-10 bg-slate-50 shadow-[0_1px_0_0_rgba(226,232,240,1)]">
                 <tr>
-                  {[['twin', 'Twin'], ['env', 'Env'], ['client', 'Client'], ['users', 'Users'], ['status', 'Status'], ['revenue', 'Revenue'], ['pointsSpent', 'Points Spent']].map(([key, label]) => (
+                  {[
+                    ['twin', 'Twin'],
+                    ['env', 'Env'],
+                    ['client', 'Client'],
+                    ['users', 'Users'],
+                    ['status', 'Status'],
+                    ['usageValue', 'Usage Value'],
+                    ['pointsSpent', 'Points Spent']
+                  ].map(([key, label]) => (
                     <th key={key} className={`px-4 py-4 text-xs font-bold uppercase tracking-wide text-slate-400 ${key === 'twin' || key === 'client' || key === 'status' ? 'text-left' : key === 'env' ? 'text-center' : 'text-right'}`}>
                       <button type="button" className="inline-flex items-center gap-1 transition hover:text-slate-700" onClick={() => toggleSort(key)}>
                         <span>{label}</span>
@@ -424,7 +439,7 @@ export function TwinsPage() {
 
                     <td className="whitespace-nowrap px-4 py-3.5 tabular-nums text-slate-500">
                       <div className="max-w-[120px] min-w-0 overflow-hidden">
-                        <TruncatedValue value={formatRevenue(twin.revenue)} className="block" />
+                        <TruncatedValue value={formatRevenue(twin.usageValue)} className="block" />
                       </div>
                     </td>
 
