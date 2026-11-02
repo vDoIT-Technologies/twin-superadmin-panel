@@ -31,14 +31,26 @@ import {
 } from '../services';
 import { firstNumber, normalizeStorageUsage } from '../utils/vaultFormatters';
 import { formatCost } from '../utils/dashboardUtils';
+
 function formatOverviewCurrency(value) {
   const n = Number(value) || 0;
+
+  const numeric = Math.abs(n).toFixed(2);
+
+  if (numeric.length <= 7) {
+    return `$${n.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+  }
+
   const absolute = Math.abs(n);
   if (absolute >= 1e9) return `$${(n / 1e9).toFixed(2)}B`;
   if (absolute >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
   if (absolute >= 1e3) return `$${(n / 1e3).toFixed(2)}k`;
   return `$${n.toFixed(2)}`;
 }
+
 function formatTrendTooltip(value) {
   const n = Number(value) || 0;
   if (n === 0) return '$0.00';
@@ -48,6 +60,7 @@ function formatTrendTooltip(value) {
   if (abs >= 1e3) return `$${(n / 1e3).toFixed(2)}k`;
   return `$${n.toFixed(6)}`;
 }
+
 function formatOverviewMetric(value) {
   const absolute = Math.abs(value);
   if (absolute >= 1e9) return `${(value / 1e9).toFixed(2)}B`;
@@ -62,6 +75,7 @@ function formatDeltaMetric(key, value) {
   }
   return formatOverviewMetric(value);
 }
+
 const VENDOR_COLORS = {
   filebase: '#0ea5e9',
   openai: '#10a37f',
@@ -109,7 +123,6 @@ export function OverviewPage() {
 
   // ----Top 5 clients by cost ----
   useEffect(() => {
-    // Fire for both admins — the backend branches by role.
     let active = true;
     setTopClientsStatus('loading');
 
@@ -137,8 +150,8 @@ export function OverviewPage() {
 
     return () => { active = false; };
   }, [filters.envs, filters.client, filters.user, filters.range]);
-  // ---- Cost vs Revenue series ----
 
+  // ---- Cost vs Revenue series ----
   useEffect(() => {
     let active = true;
     setVaultSeriesStatus('loading');
@@ -225,7 +238,7 @@ export function OverviewPage() {
     return () => { active = false; };
   }, [filters.envs, filters.client]);
 
-  // ---- Summary by env (Environment comparison card, Twin + Vault) ----
+  // ---- Summary by env ----
   useEffect(() => {
     let active = true;
     setVaultByEnvStatus('loading');
@@ -248,6 +261,7 @@ export function OverviewPage() {
 
     return () => { active = false; };
   }, [filters.client]);
+
   const summary = useMemo(() => {
     const totalCost = sumMetric(rows, 'cost', filters);
     const totalRevenue = sumMetric(rows, 'revenue', filters);
@@ -427,6 +441,7 @@ export function OverviewPage() {
       formatter: formatOverviewCurrency,
     };
   }, [vaultSeries]);
+
   const hasTrendData = useMemo(
     () =>
       trendConfig.labels.length > 0 &&
@@ -435,6 +450,7 @@ export function OverviewPage() {
       ),
     [trendConfig],
   );
+
   useEffect(() => {
     const charts = [];
 
@@ -523,7 +539,6 @@ export function OverviewPage() {
         )}
       </div>
 
-      {/* ---- Trend chart ---- */}
       {/* ---- Trend chart ---- */}
       <div className="grid gap-4 xl:grid-cols-3">
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-panel xl:col-span-2">
