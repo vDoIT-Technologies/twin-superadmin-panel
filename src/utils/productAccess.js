@@ -1,7 +1,7 @@
 const PRODUCT_ACCESS = {
   twin: {
     label: 'Twin Protocol',
-    paths: ['/', '/profile', '/clients', '/twins', '/users', '/services', '/usage'],
+    paths: ['/', '/profile', '/clients', '/twins', '/users', '/services', '/usage','/voices',],
   },
   vault: {
     label: 'Vault',

@@ -1,5 +1,6 @@
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { Toaster } from 'sonner';
 import { useAuth } from '../app/AuthContext';
 import { FilterContext } from '../app/FilterContext';
 import { FilterToolbar } from '../components/layout/FilterToolbar';
@@ -31,6 +32,7 @@ const breadcrumbTitles = {
   '/twins': 'Twins',
   '/users': 'Users',
   '/services': 'Services',
+  '/voices': 'ElevenLabs Manager',
   '/vault': 'Vault',
   '/plans': 'Plans',
   '/financial': 'Cost & Billing',
@@ -73,17 +75,31 @@ export function AppLayout() {
   const [serviceStatusOptions, setServiceStatusOptions] = useState([]);
   const searchRef = useRef(null);
   const profileMenuRef = useRef(null);
-  const isEntityRoute = ['/clients', '/twins', '/users'].some((route) =>
-    location.pathname === route || location.pathname.startsWith(`${route}/`),
+  const isEntityRoute = ['/clients', '/twins', '/users'].some(
+    (route) =>
+      location.pathname === route || location.pathname.startsWith(`${route}/`),
   );
-  const isStandalonePage = ['/plans', '/financial', '/usage', '/telemetry'].some((route) =>
-    location.pathname === route || location.pathname.startsWith(`${route}/`),
+  const isStandalonePage = [
+    '/plans',
+    '/financial',
+    '/usage',
+    '/telemetry',
+  ].some(
+    (route) =>
+      location.pathname === route || location.pathname.startsWith(`${route}/`),
   );
-  const showFilterBar = location.pathname !== '/profile' && location.pathname !== '/vault' && location.pathname !== '/services' && !isEntityRoute && !isStandalonePage;
+  const showFilterBar =
+    location.pathname !== '/profile' &&
+    location.pathname !== '/vault' &&
+    location.pathname !== '/services' &&
+    location.pathname !== '/voices' &&
+    !isEntityRoute &&
+    !isStandalonePage;
   const showOverviewControls = false;
-  const visibleScopes = location.pathname === '/'
-    ? ['granularity', 'client', 'service']
-    : ['granularity', 'client', 'twin', 'user', 'service', 'vendor'];
+  const visibleScopes =
+    location.pathname === '/'
+      ? ['granularity', 'client', 'service']
+      : ['granularity', 'client', 'twin', 'user', 'service', 'vendor'];
   const baseTitle =
     breadcrumbTitles[location.pathname] ??
     (location.pathname.startsWith('/clients/')
@@ -93,11 +109,12 @@ export function AppLayout() {
         : location.pathname.startsWith('/users/')
           ? 'Users'
           : 'Overview');
-  const currentTitle = adminProduct === 'vault' && location.pathname === '/financial'
-    ? 'Vault Billing'
-    : adminProduct === 'vault' && location.pathname === '/usage'
-      ? 'Vault Usage Analytics'
-      : baseTitle;
+  const currentTitle =
+    adminProduct === 'vault' && location.pathname === '/financial'
+      ? 'Vault Billing'
+      : adminProduct === 'vault' && location.pathname === '/usage'
+        ? 'Vault Usage Analytics'
+        : baseTitle;
   const browserPageTitle = location.pathname.startsWith('/clients/')
     ? 'Client Details'
     : location.pathname.startsWith('/twins/')
@@ -122,14 +139,16 @@ export function AppLayout() {
   const selectedEnv = filters.envs.length === 1 ? filters.envs[0] : undefined;
 
   useEffect(() => {
-    const productTitle = adminProduct === 'vault'
-      ? 'Vault Superadmin Panel'
-      : 'Twin Superadmin Panel';
+    const productTitle =
+      adminProduct === 'vault'
+        ? 'Vault Superadmin Panel'
+        : 'Twin Superadmin Panel';
     document.title = `${browserPageTitle} | ${productTitle}`;
   }, [adminProduct, browserPageTitle]);
 
   useEffect(() => {
-    const invalidService = filters.service && !isServiceForProduct(adminProduct, filters.service);
+    const invalidService =
+      filters.service && !isServiceForProduct(adminProduct, filters.service);
     const invalidTwin = adminProduct === 'vault' && filters.twin;
 
     if (invalidService || invalidTwin) {
@@ -222,22 +241,43 @@ export function AppLayout() {
       filebase: 'Filebase / IPFS',
       stripe: 'Stripe',
     };
-    const baseExcluded = ['heygen', 'polygon', 'blockchain', 'apify', 'moonpay', 'moopifay'];
+    const baseExcluded = [
+      'heygen',
+      'polygon',
+      'blockchain',
+      'apify',
+      'moonpay',
+      'moopifay',
+    ];
     const excludedServices = new Set(
       isVault
         ? [...baseExcluded, 'did', 'stripe']
         : [...baseExcluded, 'filebase', 'stripe'],
     );
-    dashboardService.getServicesStatus()
+    dashboardService
+      .getServicesStatus()
       .then((response) => {
         if (!active) return;
         const services = response?.data ?? response;
-        const options = Object.entries(services && typeof services === 'object' ? services : {})
+        const options = Object.entries(
+          services && typeof services === 'object' ? services : {},
+        )
           .map(([serviceKey, info]) => {
-            const normalizedKey = serviceKey.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const normalizedKey = serviceKey
+              .toLowerCase()
+              .replace(/[^a-z0-9]/g, '');
             if (excludedServices.has(normalizedKey)) return null;
-            const serviceId = info?.data?.id ?? info?.data?._id ?? info?.id ?? info?._id ?? serviceKey;
-            const apiName = info?.data?.serviceName ?? info?.data?.name ?? info?.serviceName ?? info?.name;
+            const serviceId =
+              info?.data?.id ??
+              info?.data?._id ??
+              info?.id ??
+              info?._id ??
+              serviceKey;
+            const apiName =
+              info?.data?.serviceName ??
+              info?.data?.name ??
+              info?.serviceName ??
+              info?.name;
             const fallbackName = serviceKey
               .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
               .replace(/[_-]+/g, ' ')
@@ -251,12 +291,18 @@ export function AppLayout() {
         setServiceStatusOptions(options);
       })
       .catch((error) => {
-        console.error('[AppLayout] Failed to load service-status dropdown:', error);
+        console.error(
+          '[AppLayout] Failed to load service-status dropdown:',
+          error,
+        );
         if (active) setServiceStatusOptions([]);
       });
 
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [isAuthenticated, showFilterBar]);
+
   const clientDropdownOptions = useMemo(
     () =>
       clients.map((client) => ({
@@ -266,6 +312,7 @@ export function AppLayout() {
       })),
     [clients],
   );
+
   const twinDropdownOptions = useMemo(
     () =>
       twins.map((twin) => ({
@@ -275,11 +322,11 @@ export function AppLayout() {
       })),
     [twins],
   );
+
   const userDropdownOptions = useMemo(
     () =>
       users.map((user) => {
         const name = getUserName(user);
-
         return {
           value: user.id ?? user._id ?? user.value,
           label: name || user.email || user.label || 'Unknown user',
@@ -287,19 +334,21 @@ export function AppLayout() {
       }),
     [users],
   );
+
   const vendorDropdownOptions = serviceStatusOptions;
+
   const updateScopeFilter = (key, value) => {
     if (key === 'client') {
       updateFilters({ client: value, twin: null, user: null });
       return;
     }
 
-    if (key === "twin") {
+    if (key === 'twin') {
       updateFilters({ twin: value, user: null });
       return;
     }
 
-    if (key === "service") {
+    if (key === 'service') {
       updateFilters({ service: value, vendor: null });
       return;
     }
@@ -325,19 +374,22 @@ export function AppLayout() {
         path: `/clients/${client.id}`,
       }));
 
-    const twins = adminProduct === 'twin' ? superadminDemoData.TWINS.filter((twin) =>
-      twin.name.toLowerCase().includes(q),
-    )
-      .slice(0, 4)
-      .map((twin) => ({
-        key: `twin-${twin.id}`,
-        type: 'twin',
-        id: twin.id,
-        name: twin.name,
-        sub: superadminDemoData.byId.client(twin.clientId)?.name ?? '',
-        icon: <Bot size={14} />,
-        path: `/twins/${twin.id}`,
-      })) : [];
+    const twins =
+      adminProduct === 'twin'
+        ? superadminDemoData.TWINS.filter((twin) =>
+            twin.name.toLowerCase().includes(q),
+          )
+            .slice(0, 4)
+            .map((twin) => ({
+              key: `twin-${twin.id}`,
+              type: 'twin',
+              id: twin.id,
+              name: twin.name,
+              sub: superadminDemoData.byId.client(twin.clientId)?.name ?? '',
+              icon: <Bot size={14} />,
+              path: `/twins/${twin.id}`,
+            }))
+        : [];
 
     const users = superadminDemoData.USERS.filter((user) =>
       user.name.toLowerCase().includes(q),
@@ -414,7 +466,13 @@ export function AppLayout() {
   };
 
   return (
-    <div className={`app-shell flex min-h-screen bg-slate-50 text-slate-800 ${adminProduct === 'vault' ? 'product-vault' : 'product-twin'}`} data-product={adminProduct}>
+    <div
+      className={`app-shell flex min-h-screen bg-slate-50 text-slate-800 ${
+        adminProduct === 'vault' ? 'product-vault' : 'product-twin'
+      }`}
+      data-product={adminProduct}
+    >
+      <Toaster position="top-right" richColors />
       <Sidebar
         collapsed={isSidebarCollapsed}
         mobileOpen={isMobileSidebarOpen}
@@ -425,7 +483,11 @@ export function AppLayout() {
       />
       <button
         type="button"
-        className={`fixed inset-0 z-30 bg-slate-900/40 backdrop-blur-sm transition-opacity duration-200 lg:hidden ${isMobileSidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        className={`fixed inset-0 z-30 bg-slate-900/40 backdrop-blur-sm transition-opacity duration-200 lg:hidden ${
+          isMobileSidebarOpen
+            ? 'pointer-events-auto opacity-100'
+            : 'pointer-events-none opacity-0'
+        }`}
         aria-label="Close navigation"
         aria-hidden={!isMobileSidebarOpen}
         tabIndex={isMobileSidebarOpen ? 0 : -1}
@@ -435,7 +497,11 @@ export function AppLayout() {
       <div className="min-w-0 flex-1">
         <div className="sticky top-0 z-30 bg-white/95 backdrop-blur">
           <header className="flex h-16 items-center justify-between gap-3 border-b border-slate-200 px-4 sm:px-6 lg:px-8">
-            <div className={`flex min-w-0 items-center gap-3 ${isMobileSearchOpen ? 'hidden sm:flex' : ''}`}>
+            <div
+              className={`flex min-w-0 items-center gap-3 ${
+                isMobileSearchOpen ? 'hidden sm:flex' : ''
+              }`}
+            >
               <button
                 className="inline-grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-indigo-200 hover:text-indigo-600"
                 type="button"
@@ -459,98 +525,17 @@ export function AppLayout() {
                 <Columns2 size={16} />
               </button>
               <div className="min-w-0">
-                <span className="block truncate text-base font-semibold text-slate-800 sm:text-lg">{currentTitle}</span>
+                <span className="block truncate text-base font-semibold text-slate-800 sm:text-lg">
+                  {currentTitle}
+                </span>
               </div>
             </div>
 
-            <div className={`flex min-w-0 items-center justify-end gap-2 ${isMobileSearchOpen ? 'w-full flex-1' : ''}`}>
-              {/* <div className={`relative min-w-0 ${isMobileSearchOpen ? 'flex-1' : 'w-9 sm:w-64'}`} ref={searchRef}>
-                {!isMobileSearchOpen ? (
-                  <button
-                    type="button"
-                    className="inline-grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-indigo-200 hover:text-indigo-600 sm:hidden"
-                    aria-label="Open search"
-                    aria-expanded={isMobileSearchOpen}
-                    onClick={() => {
-                      setIsMobileSearchOpen(true);
-                      window.requestAnimationFrame(() => {
-                        searchRef.current?.querySelector('input')?.focus();
-                      });
-                    }}
-                  >
-                    <Search size={16} />
-                  </button>
-                ) : null}
-
-                <Search className={`absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 ${!isMobileSearchOpen ? 'hidden sm:block' : ''}`} size={16} />
-
-                <input
-                  type="text"
-                  className={`h-9 w-full rounded-xl border border-slate-200 bg-slate-50/80 pl-9 pr-8 text-xs font-medium text-slate-700 outline-none transition focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100 ${!isMobileSearchOpen ? 'hidden sm:block' : 'block'}`}
-                  value={searchQuery}
-                  placeholder={adminProduct === 'vault' ? 'Search Vault clients and users...' : 'Search clients, twins, users...'}
-                  onChange={(event) => {
-                    const nextQuery = event.target.value;
-                    setSearchQuery(nextQuery);
-                    setSearchOpen(Boolean(nextQuery.trim()));
-                  }}
-                  onFocus={openSearch}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Escape') {
-                      setSearchQuery('');
-                      setSearchOpen(false);
-                      setIsMobileSearchOpen(false);
-                      event.currentTarget.blur();
-                    }
-                  }}
-                />
-
-                {isMobileSearchOpen ? (
-                  <button
-                    type="button"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-lg text-slate-400 hover:text-slate-600 sm:hidden"
-                    aria-label="Close search"
-                    onClick={() => {
-                      setSearchQuery('');
-                      setSearchOpen(false);
-                      setIsMobileSearchOpen(false);
-                    }}
-                  >
-                    ×
-                  </button>
-                ) : null}
-
-                {searchOpen ? (
-                  <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 max-h-80 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-floating" role="listbox" aria-label="Global search results">
-                    {searchHits.length ? (
-                      searchHits.map((hit) => (
-                        <button
-                          key={hit.key}
-                          type="button"
-                          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition hover:bg-indigo-50 hover:text-indigo-700"
-                          onClick={() => selectSearchHit(hit)}
-                        >
-                          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500">{hit.icon}</span>
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate text-xs font-semibold text-slate-800">{hit.name}</span>
-                            <span className="block truncate text-[11px] text-slate-400">{hit.type} · {hit.sub}</span>
-                          </span>
-                          <CornerDownLeft size={14} className="shrink-0 text-slate-400" />
-                        </button>
-                      ))
-                    ) : (
-                      <div className="px-3 py-4 text-center text-xs text-slate-400">
-                        No matches for "{searchQuery.trim()}"
-                      </div>
-                    )}
-                  </div>
-                ) : null}
-              </div> */}
-
-              {/* <button className="inline-grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-transparent text-slate-600 transition hover:bg-slate-100" type="button" aria-label="Notifications">
-                <Bell size={16} />
-              </button> */}
-
+            <div
+              className={`flex min-w-0 items-center justify-end gap-2 ${
+                isMobileSearchOpen ? 'w-full flex-1' : ''
+              }`}
+            >
               <div className="relative" ref={profileMenuRef}>
                 <button
                   className="inline-flex h-9 items-center gap-1 rounded-xl px-1 text-slate-600 transition hover:bg-slate-100"
@@ -559,16 +544,32 @@ export function AppLayout() {
                   aria-expanded={profileMenuOpen}
                   onClick={() => setProfileMenuOpen((value) => !value)}
                 >
-                  <div className={`grid h-8 w-8 place-items-center rounded-xl bg-gradient-to-br text-xs font-bold text-white shadow-xs ${adminProduct === 'vault' ? 'from-emerald-600 to-teal-500' : 'from-indigo-600 to-indigo-500'}`}>{initials}</div>
+                  <div
+                    className={`grid h-8 w-8 place-items-center rounded-xl bg-gradient-to-br text-xs font-bold text-white shadow-xs ${
+                      adminProduct === 'vault'
+                        ? 'from-emerald-600 to-teal-500'
+                        : 'from-indigo-600 to-indigo-500'
+                    }`}
+                  >
+                    {initials}
+                  </div>
                   <ChevronDown size={14} className="text-slate-400" />
                 </button>
                 {profileMenuOpen ? (
                   <div className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-44 rounded-xl border border-slate-200 bg-white p-1.5 shadow-floating">
-                    <button type="button" className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-900" onClick={() => handleProfileAction('/profile')}>
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
+                      onClick={() => handleProfileAction('/profile')}
+                    >
                       <UserCircle2 size={15} />
                       <span>Profile</span>
                     </button>
-                    <button type="button" className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-semibold text-rose-600 transition hover:bg-rose-50 hover:text-rose-700" onClick={handleLogout}>
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-semibold text-rose-600 transition hover:bg-rose-50 hover:text-rose-700"
+                      onClick={handleLogout}
+                    >
                       <LogOut size={15} />
                       <span>Logout</span>
                     </button>
@@ -591,7 +592,6 @@ export function AppLayout() {
               adminProduct={adminProduct}
               visibleScopes={visibleScopes}
               compact={location.pathname === '/'}
-
             />
           ) : null}
         </div>

@@ -1,4 +1,4 @@
-import { Activity, Bot, Boxes, Building2, Database, LayoutDashboard, Package, ScrollText, Users, Wallet } from "lucide-react";
+import { Activity, Bot, Boxes, Building2, Database, LayoutDashboard, Mic, Package, ScrollText, Users, Wallet } from "lucide-react";
 
 export function BrandMark() {
   return (
@@ -13,47 +13,64 @@ export function BrandMark() {
 
 export const NAV_GROUPS_BY_ROLE = {
   twin: [
-    { label: 'Monitor', items: [
-      { to: '/', label: 'Overview', end: true, icon: LayoutDashboard },
-      { to: '/services', label: 'Services', icon: Boxes },
-    ] },
-    { label: 'Entities', items: [
-      { to: '/clients', label: 'Clients', icon: Building2 },
-      { to: '/twins', label: 'Twins', icon: Bot },
-      { to: '/users', label: 'Users', icon: Users },
-    ] },
-    { label: 'Analytics', items: [
-      // { to: '/financial', label: 'Cost & Billing', icon: Wallet },
-      { to: '/usage', label: 'Usage Analytics', icon: Activity },
-    ] },
+    {
+      label: 'Monitor', items: [
+        { to: '/', label: 'Overview', end: true, icon: LayoutDashboard },
+        { to: '/services', label: 'Services', icon: Boxes },
+        { to: '/voices', label: 'ElevenLabs Manager', icon: Mic },
+      ]
+    },
+    {
+      label: 'Entities', items: [
+        { to: '/clients', label: 'Clients', icon: Building2 },
+        { to: '/twins', label: 'Twins', icon: Bot },
+        { to: '/users', label: 'Users', icon: Users },
+      ]
+    },
+    {
+      label: 'Analytics', items: [
+        // { to: '/financial', label: 'Cost & Billing', icon: Wallet },
+        { to: '/usage', label: 'Usage Analytics', icon: Activity },
+      ]
+    },
     // { label: 'System', items: [
     //   { to: '/telemetry', label: 'Telemetry / Logs', icon: ScrollText },
     // ] },
   ],
   vault: [
-    { label: 'Monitor', items: [
-      { to: '/', label: 'Overview', end: true, icon: LayoutDashboard },
-      { to: '/services', label: 'Services', icon: Boxes },
-      { to: '/vault', label: 'Vault', icon: Database },
-    ] },
-    { label: 'Entities', items: [
-      { to: '/clients', label: 'Clients', icon: Building2 },
-      { to: '/users', label: 'Users', icon: Users },
-    ] },
-    { label: 'Plans', items: [
-      { to: '/plans', label: 'Plans', icon: Package },
-    ] },
-    { label: 'Analytics', items: [
-      // { to: '/financial', label: 'Vault Billing', icon: Wallet },
-      { to: '/usage', label: 'Vault Usage Analytics', icon: Activity },
-    ] },
+    {
+      label: 'Monitor', items: [
+        { to: '/', label: 'Overview', end: true, icon: LayoutDashboard },
+        { to: '/services', label: 'Services', icon: Boxes },
+        { to: '/vault', label: 'Vault', icon: Database },
+      ]
+    },
+    {
+      label: 'Entities', items: [
+        { to: '/clients', label: 'Clients', icon: Building2 },
+        { to: '/users', label: 'Users', icon: Users },
+      ]
+    },
+    {
+      label: 'Plans', items: [
+        { to: '/plans', label: 'Plans', icon: Package },
+      ]
+    },
+    {
+      label: 'Analytics', items: [
+        // { to: '/financial', label: 'Vault Billing', icon: Wallet },
+        { to: '/usage', label: 'Vault Usage Analytics', icon: Activity },
+      ]
+    },
     // { label: 'System', items: [
     //   { to: '/telemetry', label: 'Health & Logs', icon: ScrollText },
     // ] },
   ],
   default: [
-    { label: 'Monitor', items: [
-      { to: '/', label: 'Overview', end: true, icon: LayoutDashboard },
-    ] },
+    {
+      label: 'Monitor', items: [
+        { to: '/', label: 'Overview', end: true, icon: LayoutDashboard },
+      ]
+    },
   ],
 };
