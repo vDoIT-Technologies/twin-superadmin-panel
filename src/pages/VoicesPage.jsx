@@ -447,7 +447,7 @@ export function VoicesPage() {
       </section>
 
       {selectedVoice ? (
-        <VoiceDetailsDrawer voice={selectedVoice} onClose={() => setSelectedVoice(null)} />
+        <VoiceDetailsModal voice={selectedVoice} onClose={() => setSelectedVoice(null)} />
       ) : null}
 
       {confirmDialog ? (
@@ -470,77 +470,92 @@ export function VoicesPage() {
   );
 }
 
-function VoiceDetailsDrawer({ voice, onClose }) {
+function VoiceDetailsModal({ voice, onClose }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex justify-end bg-slate-950/40 backdrop-blur-sm"
-      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm"
+      role="presentation"
+      onMouseDown={onClose}
     >
-      <aside
-        className="flex h-full w-full max-w-lg flex-col overflow-hidden bg-white shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="voice-modal-title"
+        className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl"
+        onMouseDown={(event) => event.stopPropagation()}
       >
-        <header className="flex items-start justify-between border-b border-slate-100 px-5 py-4">
+        <header className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
           <div>
-            <h2 className="text-base font-semibold text-slate-800">{voice.name}</h2>
-            <p className="mt-0.5 font-mono text-xs text-slate-500">{voice.voice_id}</p>
+            <h2 id="voice-modal-title" className="text-xl font-semibold text-slate-900">
+              {voice.name}
+            </h2>
+            <p className="mt-1 break-all font-mono text-xs text-slate-500">{voice.voice_id}</p>
           </div>
-          <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-2xl border border-slate-200 bg-white p-2.5 text-slate-500 transition hover:border-slate-300 hover:text-slate-900"
+            aria-label="Close details dialog"
+          >
             <X size={18} />
           </button>
         </header>
-        <div className="flex-1 space-y-5 overflow-y-auto p-5">
-          <section className="rounded-xl border border-slate-200 p-4">
+        
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          <section className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Status</h3>
             <div className="mt-2 flex flex-wrap gap-2">
               <span
-                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${voice.is_used ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}
+                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${voice.is_used ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'}`}
               >
                 {voice.is_used ? 'In Use' : 'Unused'}
               </span>
               {voice.protected ? (
-                <span className="rounded-full bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700">
+                <span className="rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-800">
                   Protected (Prod)
                 </span>
               ) : null}
             </div>
-            <div className="mt-3 space-y-1 text-xs text-slate-500">
-              <p>
-                Created: <strong className="text-slate-700">{formatUnix(voice.created_at_unix)}</strong>
-              </p>
-              <p>
-                Last used: <strong className="text-slate-700">{formatUnix(voice.last_used_unix)}</strong>
-              </p>
+            <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="block text-xs font-medium text-slate-400">Created</span>
+                <strong className="mt-0.5 block text-slate-700">{formatUnix(voice.created_at_unix)}</strong>
+              </div>
+              <div>
+                <span className="block text-xs font-medium text-slate-400">Last used</span>
+                <strong className="mt-0.5 block text-slate-700">{formatUnix(voice.last_used_unix)}</strong>
+              </div>
             </div>
           </section>
+
           <section>
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-              Usage ({voice.usage_count})
+              Usage Details ({voice.usage_count})
             </h3>
             {voice.usage_details?.length ? (
-              <ul className="mt-2 space-y-2">
+              <ul className="mt-3 space-y-2">
                 {voice.usage_details.map((d, i) => (
-                  <li key={i} className="rounded-xl border border-slate-200 p-3 text-xs">
+                  <li key={i} className="rounded-xl border border-slate-200 p-3.5 text-sm shadow-sm">
                     <div className="flex items-center justify-between">
                       <span className="font-semibold text-slate-800">{d.name}</span>
                       {envBadge(d.env)}
                     </div>
-                    <div className="mt-1 grid grid-cols-2 gap-1 text-slate-500">
-                      <span>Type: {d.type}</span>
-                      <span>Usage: {d.usageType}</span>
-                      {d.clientName ? <span className="col-span-2">Client: {d.clientName}</span> : null}
+                    <div className="mt-1.5 grid grid-cols-2 gap-2 text-xs text-slate-500">
+                      <span>Type: <span className="font-medium text-slate-700">{d.type}</span></span>
+                      <span>Usage: <span className="font-medium text-slate-700">{d.usageType}</span></span>
+                      {d.clientName ? <span className="col-span-2">Client: <span className="font-medium text-slate-700">{d.clientName}</span></span> : null}
                     </div>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="mt-2 rounded-xl border border-dashed border-slate-200 p-4 text-center text-xs text-slate-400">
-                No usage detected.
-              </p>
+              <div className="mt-3 rounded-2xl border border-dashed border-slate-200 p-8 text-center text-sm text-slate-400">
+                No usage detected for this voice.
+              </div>
             )}
           </section>
         </div>
-      </aside>
+      </section>
     </div>
   );
 }
