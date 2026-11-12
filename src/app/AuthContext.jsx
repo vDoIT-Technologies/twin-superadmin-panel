@@ -85,6 +85,7 @@ export function AuthProvider({ children }) {
 
     return () => { active = false; };
   }, [authState.isBootstrapping]);
+
   useEffect(() => {
     let active = true;
     loadAppEnvironment().then((env) => {
@@ -94,6 +95,7 @@ export function AuthProvider({ children }) {
     });
     return () => { active = false; };
   }, []);
+
   useEffect(() => {
     persistStoredSession(authState.session);
   }, [authState.session]);
@@ -115,8 +117,6 @@ export function AuthProvider({ children }) {
     const refreshDelayMs = Math.max(expiryMs - Date.now() - TOKEN_REFRESH_LEEWAY_MS, 0);
     const timeoutId = window.setTimeout(() => {
       refreshAccessToken().catch(() => {
-        // The HTTP client clears invalid sessions and the auth sync effect
-        // below updates UI state when a refresh cannot be recovered.
       });
     }, refreshDelayMs);
 
@@ -234,6 +234,9 @@ export function AuthProvider({ children }) {
           await authService.logout(refreshToken);
         } finally {
           clearAuthToken();
+          
+          sessionStorage.removeItem('superadmin_delete_token');
+          
           setAuthState({
             isLoading: false,
             isLoggingOut: false,
