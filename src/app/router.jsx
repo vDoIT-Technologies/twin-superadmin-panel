@@ -19,7 +19,9 @@ const PlansPage = lazy(() => import('../pages/PlansPage').then((module) => ({ de
 const FinancialPage = lazy(() => import('../pages/FinancialPage').then((module) => ({ default: module.FinancialPage })));
 const UsagePage = lazy(() => import('../pages/UsagePage').then((module) => ({ default: module.UsagePage })));
 const TelemetryPage = lazy(() => import('../pages/TelemetryPage').then((module) => ({ default: module.TelemetryPage })));
-
+const VoicesPage = lazy(() =>
+  import('../pages/VoicesPage').then((m) => ({ default: m.VoicesPage })),
+);
 const ClientDetailPage = lazy(() => import('../pages/EntityDetailPages').then((module) => ({ default: module.ClientDetailPage })));
 const TwinDetailPage = lazy(() => import('../pages/EntityDetailPages').then((module) => ({ default: module.TwinDetailPage })));
 const UserDetailPage = lazy(() => import('../pages/EntityDetailPages').then((module) => ({ default: module.UserDetailPage })));
@@ -116,14 +118,15 @@ export const router = createBrowserRouter([
               { path: 'users', element: renderLazyPage(<UsersPage />) },
               { path: 'users/:userId', element: renderLazyPage(<UserDetailPage />) },
               { path: 'services', element: renderLazyPage(<ServicesPage />) },
+              { path: 'voices', element: <ProductRoute>{renderLazyPage(<VoicesPage />)}</ProductRoute> },
               { path: 'vault', element: <ProductRoute>{renderLazyPage(<VaultPage />)}</ProductRoute> },
               { path: 'plans', element: <ProductRoute>{renderLazyPage(<PlansPage />)}</ProductRoute> },
-              
+
               // Commented out Billing & Telemetry
               // { path: 'financial', element: <ProductRoute>{renderLazyPage(<FinancialPage />)}</ProductRoute> },
-              
+
               { path: 'usage', element: <ProductRoute>{renderLazyPage(<UsagePage />)}</ProductRoute> },
-              
+
               // { path: 'telemetry', element: renderLazyPage(<TelemetryPage />) },
             ],
           },

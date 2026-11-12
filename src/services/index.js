@@ -35,3 +35,4 @@ export {
   getCostByVendorSeries,
 } from './dropdownService';
 export { loadAppEnvironment } from './apiClient';
+export { voiceService } from './voiceService';
