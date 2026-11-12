@@ -1,14 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  History,
-  RefreshCw,
-  Search,
-  ShieldAlert,
-  Trash2,
-  Users,
-  X,
-  CheckCircle2,
+  History, RefreshCw, Search, ShieldAlert, Trash2, Users, X, CheckCircle2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { voiceService } from '../services/voiceService';
@@ -45,7 +38,6 @@ export function VoicesPage() {
   const currentEnv = appEnvironment || 'dev';
 
   const queryClient = useQueryClient();
-  const hasAutoSynced = useRef(false);
   const forceRefreshRef = useRef(false);
 
   const [tab, setTab] = useState('all');
@@ -57,6 +49,25 @@ export function VoicesPage() {
   const [confirmDialog, setConfirmDialog] = useState(null);
 
   const debouncedSearch = useDebounce(search.trim(), 300);
+
+  useEffect(() => {
+    const deleteToken = sessionStorage.getItem('superadmin_delete_token');
+    if (deleteToken) {
+      try {
+        const base64Url = deleteToken.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => 
+          '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+        ).join(''));
+        const { exp } = JSON.parse(jsonPayload);
+        if (exp * 1000 < Date.now()) {
+          sessionStorage.removeItem('superadmin_delete_token');
+        }
+      } catch (e) {
+        sessionStorage.removeItem('superadmin_delete_token');
+      }
+    }
+  }, [confirmDialog]);
 
   useEffect(() => {
     setPage(1);
@@ -106,19 +117,13 @@ export function VoicesPage() {
     mutationFn: () => voiceService.syncHistory(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['voices'] });
+      toast.success('Voice history synced successfully');
     },
-    onError: (e) => console.error('Auto-sync failed:', e),
+    onError: (e) => {
+      console.error('Sync failed:', e);
+      toast.error(e?.response?.data?.message || 'Failed to sync history');
+    },
   });
-
-  useEffect(() => {
-    if (voices.length > 0 && !hasAutoSynced.current) {
-      const hasAnyDates = voices.some((v) => v.last_used_unix);
-      if (!hasAnyDates) {
-        hasAutoSynced.current = true;
-        syncMutation.mutate();
-      }
-    }
-  }, [voices]);
 
   const delMutation = useMutation({
     mutationFn: async ({ ids, confirmProd, password }) => {
@@ -240,13 +245,25 @@ export function VoicesPage() {
           <div className="ml-auto flex items-center gap-2">
             <button
               type="button"
+              onClick={() => syncMutation.mutate()}
+              disabled={isFetching || syncMutation.isPending}
+              className="inline-flex h-9 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 transition hover:border-indigo-200 hover:text-indigo-600 disabled:opacity-50"
+              title="Sync Last Used data from ElevenLabs"
+            >
+              <RefreshCw size={14} className={isFetching || syncMutation.isPending ? 'animate-spin' : ''} />
+              {syncMutation.isPending ? 'Syncing...' : 'Sync History'}
+            </button>
+            
+            <button
+              type="button"
               onClick={handleRefresh}
               disabled={isFetching || syncMutation.isPending}
               className="inline-flex h-9 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 transition hover:border-indigo-200 hover:text-indigo-600 disabled:opacity-50"
             >
               <RefreshCw size={14} className={isFetching || syncMutation.isPending ? 'animate-spin' : ''} />
-              {syncMutation.isPending ? 'Syncing...' : 'Refresh'}
+              Refresh List
             </button>
+
             <button
               type="button"
               onClick={() => setHistoryOpen(true)}
@@ -299,13 +316,11 @@ export function VoicesPage() {
               </tr>
             </thead>
             <tbody>
-              {isLoading || syncMutation.isPending ? (
+              {isLoading ? (
                 <tr>
                   <td colSpan={10} className="px-5 py-12 text-center text-sm text-slate-400">
                     <RefreshCw className="mx-auto mb-2 animate-spin text-indigo-400" size={20} />
-                    {syncMutation.isPending
-                      ? 'Syncing history from ElevenLabs (this takes a moment)...'
-                      : 'Loading voices…'}
+                    Loading voices…
                   </td>
                 </tr>
               ) : error ? (
